@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "eodash-catalog"
+name = "eodash_catalog"
 dynamic = ["version"]
 description = "This package is intended to help create a compatible STAC catalog for the eodash dashboard client. It supports configuration of multiple endpoint types for information extraction."
 readme = "README.md"
@@ -49,9 +49,9 @@ dependencies = [
 [project.scripts]
   eodash_catalog = "eodash_catalog.generate_indicators:process_catalogs"
 [project.urls]
-Documentation = "https://github.com/eodash/eodash-catalog#readme"
-Issues = "https://github.com/eodash/eodash-catalog/issues"
-Source = "https://github.com/eodash/eodash-catalog"
+Documentation = "https://github.com/eodash/eodash_catalog#readme"
+Issues = "https://github.com/eodash/eodash_catalog/issues"
+Source = "https://github.com/eodash/eodash_catalog"
 
 [tool.hatch.version]
 path = "src/eodash_catalog/__about__.py"
@@ -94,8 +94,8 @@ omit = [
 ]
 
 [tool.coverage.paths]
-eodash_catalog = ["src/eodash_catalog", "*/eodash-catalog/src/eodash_catalog"]
-tests = ["tests", "*/eodash-catalog/tests"]
+eodash_catalog = ["src/eodash_catalog", "*/eodash_catalog/src/eodash_catalog"]
+tests = ["tests", "*/eodash_catalog/tests"]
 
 [tool.coverage.report]
 exclude_lines = [

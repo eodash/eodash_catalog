@@ -1,7 +1,7 @@
-# eodash-catalog
+# eodash_catalog
 
-[![PyPI - Version](https://img.shields.io/pypi/v/eodash-catalog.svg)](https://pypi.org/project/eodash-catalog)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eodash-catalog.svg)](https://pypi.org/project/eodash-catalog)
+[![PyPI - Version](https://img.shields.io/pypi/v/eodash_catalog.svg)](https://pypi.org/project/eodash_catalog)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/eodash_catalog.svg)](https://pypi.org/project/eodash_catalog)
 
 ---
 
@@ -13,9 +13,9 @@
 ## Installation
 
 ```console
-pip install eodash-catalog
+pip install eodash_catalog
 ```
 
 ## License
 
-`eodash-catalog` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
+`eodash_catalog` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
