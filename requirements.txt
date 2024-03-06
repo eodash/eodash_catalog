@@ -14,7 +14,6 @@ python-dateutil<3
 swiftspec==0.0.2
 mergedeep
 structlog<22.0
-wheel # for OWSLib from git
-OWSLib @ git+https://github.com/lubojr/OWSLib@368-wmts-dimensions-support # due to https://github.com/geopython/OWSLib/issues/368, using custom version from fork
+OWSLib
 spdx-lookup<=0.3.3
 pystac[validation]<=1.8.3

@@ -10,9 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 keywords = []
-authors = [
-  { name = "Daniel Santillan", email = "daniel.santillan@eox.at" },
-]
+authors = [{ name = "Daniel Santillan", email = "daniel.santillan@eox.at" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
@@ -41,13 +39,12 @@ dependencies = [
   "swiftspec==0.0.2",
   "mergedeep",
   "structlog<22.0",
-  "wheel",
-  "OWSLib@git+https://github.com/lubojr/OWSLib@368-wmts-dimensions-support",
+  "OWSLib",
   "spdx-lookup<=0.3.3",
   "pystac[validation]<=1.8.3",
 ]
 [project.scripts]
-  eodash_catalog = "eodash_catalog.generate_indicators:process_catalogs"
+eodash_catalog = "eodash_catalog.generate_indicators:process_catalogs"
 [project.urls]
 Documentation = "https://github.com/eodash/eodash_catalog#readme"
 Issues = "https://github.com/eodash/eodash_catalog/issues"
@@ -57,31 +54,20 @@ Source = "https://github.com/eodash/eodash_catalog"
 path = "src/eodash_catalog/__about__.py"
 
 [tool.hatch.envs.default]
-dependencies = [
-  "coverage[toml]>=6.5",
-  "pytest",
-]
+dependencies = ["coverage[toml]>=6.5", "pytest"]
 [tool.hatch.metadata]
-  allow-direct-references = true
+allow-direct-references = true
 [tool.hatch.envs.default.scripts]
 test = "pytest {args:tests}"
 test-cov = "coverage run -m pytest {args:tests}"
-cov-report = [
-  "- coverage combine",
-  "coverage report",
-]
-cov = [
-  "test-cov",
-  "cov-report",
-]
+cov-report = ["- coverage combine", "coverage report"]
+cov = ["test-cov", "cov-report"]
 
 [[tool.hatch.envs.all.matrix]]
 python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
 [tool.hatch.envs.types]
-dependencies = [
-  "mypy>=1.0.0",
-]
+dependencies = ["mypy>=1.0.0"]
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/eodash_catalog tests}"
 
@@ -89,17 +75,11 @@ check = "mypy --install-types --non-interactive {args:src/eodash_catalog tests}"
 source_pkgs = ["eodash_catalog", "tests"]
 branch = true
 parallel = true
-omit = [
-  "src/eodash_catalog/__about__.py",
-]
+omit = ["src/eodash_catalog/__about__.py"]
 
 [tool.coverage.paths]
 eodash_catalog = ["src/eodash_catalog", "*/eodash_catalog/src/eodash_catalog"]
 tests = ["tests", "*/eodash_catalog/tests"]
 
 [tool.coverage.report]
-exclude_lines = [
-  "no cov",
-  "if __name__ == .__main__.:",
-  "if TYPE_CHECKING:",
-]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
