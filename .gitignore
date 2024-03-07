@@ -6,7 +6,6 @@ build/
 dist/
 .pytest*
 *.gfs
-.vscode/
 __pycache__
 catalogs/
 collections/

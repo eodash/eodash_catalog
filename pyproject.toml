@@ -14,8 +14,6 @@ authors = [{ name = "Daniel Santillan", email = "daniel.santillan@eox.at" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -49,6 +47,8 @@ eodash_catalog = "eodash_catalog.generate_indicators:process_catalogs"
 Documentation = "https://github.com/eodash/eodash_catalog#readme"
 Issues = "https://github.com/eodash/eodash_catalog/issues"
 Source = "https://github.com/eodash/eodash_catalog"
+[project.optional-dependencies]
+dev = ["pre-commit"]
 
 [tool.hatch.version]
 path = "src/eodash_catalog/__about__.py"
@@ -64,7 +64,7 @@ cov-report = ["- coverage combine", "coverage report"]
 cov = ["test-cov", "cov-report"]
 
 [[tool.hatch.envs.all.matrix]]
-python = ["3.8", "3.9", "3.10", "3.11", "3.12"]
+python = ["3.10", "3.11", "3.12"]
 
 [tool.hatch.envs.types]
 dependencies = ["mypy>=1.0.0"]
