@@ -86,12 +86,19 @@ def process_catalog_file(file_path, options):
             catalog_type=CatalogType.RELATIVE_PUBLISHED,
         )
         for collection in process_collections:
-            process_collection_file(
-                config,
-                "%s/%s.yaml" % (options.collectionsspath, collection),
-                catalog,
-                options,
-            )
+            file_path = "%s/%s.yaml" % (options.collectionspath, collection)
+            if os.path.isfile(file_path):
+                # if collection file exists process it as indicator
+                # collection will be added as single collection to indicator
+                process_indicator_file(config, file_path, catalog, options)
+            else:
+                # if not try to see if indicator definition available
+                process_indicator_file(
+                    config,
+                    "%s/%s.yaml" % (options.indicatorspath, collection),
+                    catalog,
+                    options,
+                )
 
         strategy = TemplateLayoutStrategy(item_template="${collection}/${year}")
         catalog.normalize_hrefs(
@@ -115,6 +122,81 @@ def process_catalog_file(file_path, options):
                 validate_all(catalog.to_dict(), href=config["endpoint"])
             except Exception as e:
                 print("Issue validation collection: %s" % e)
+
+
+def extract_indicator_info(parent_collection):
+    to_extract = [
+        "subcode",
+        "themes",
+        "keywords",
+        "satellite",
+        "sensor",
+        "cities",
+        "countries",
+    ]
+    summaries = {}
+    for key in to_extract:
+        summaries[key] = set()
+
+    for collection in parent_collection.get_collections():
+        for key in to_extract:
+            if key in collection.extra_fields:
+                param = collection.extra_fields[key]
+                if isinstance(param, list):
+                    for p in param:
+                        summaries[key].add(p)
+                else:
+                    summaries[key].add(param)
+            # extract also summary information
+            if collection.summaries.lists:
+                if key in collection.summaries.lists:
+                    for p in collection.summaries.lists[key]:
+                        summaries[key].add(p)
+
+    for key in to_extract:
+        # convert all items back to a list
+        summaries[key] = list(summaries[key])
+        # remove empty ones
+        if len(summaries[key]) == 0:
+            del summaries[key]
+    parent_collection.summaries = Summaries(summaries)
+
+
+def iter_len_at_least(i, n):
+    return sum(1 for _ in zip(range(n), i)) == n
+
+
+def process_indicator_file(config, file_path, catalog, options):
+    with open(file_path) as f:
+        print("Processing indicator:", file_path)
+        data = yaml.load(f, Loader=SafeLoader)
+        parent_indicator, _ = get_or_create_collection(
+            catalog, data["Name"], data, config
+        )
+        if "Collections" in data:
+            for collection in data["Collections"]:
+                process_collection_file(
+                    config,
+                    "%s/%s.yaml" % (options.collectionspath, collection),
+                    catalog,
+                    options,
+                )
+        else:
+            # we assume that collection files can also be loaded directly
+            process_collection_file(config, file_path, parent_indicator, options)
+        add_collection_information(config, parent_indicator, data)
+        if iter_len_at_least(parent_indicator.get_items(recursive=True), 1):
+            parent_indicator.update_extent_from_items()
+        # Add bbox extents from children
+        for c_child in parent_indicator.get_children():
+            parent_indicator.extent.spatial.bboxes.append(
+                c_child.extent.spatial.bboxes[0]
+            )
+        # extract collection information and add it to summary indicator level
+        extract_indicator_info(parent_indicator)
+        # add baselayer and overview information to indicator collection
+        add_base_overlay_info(parent_indicator, config, data)
+        add_to_catalog(parent_indicator, catalog, None, data)
 
 
 def process_collection_file(config, file_path, catalog, options):
@@ -279,6 +361,9 @@ def handle_WMS_endpoint(config, endpoint, data, catalog, wmts=False):
                 properties={},
                 geometry=None,
                 datetime=parser.isoparse(t),
+                stac_extensions=[
+                    "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
+                ],
             )
             add_visualization_info(item, data, endpoint, time=t)
             link = collection.add_item(item)
@@ -292,8 +377,6 @@ def handle_WMS_endpoint(config, endpoint, data, catalog, wmts=False):
                 endpoint["OverwriteBBox"],
             ]
         )
-
-    add_visualization_info(collection, data, endpoint)
     add_collection_information(config, collection, data)
     add_to_catalog(collection, catalog, endpoint, data)
 
@@ -332,6 +415,9 @@ def handle_SH_WMS_endpoint(config, endpoint, data, catalog):
                     properties={},
                     geometry=None,
                     datetime=parser.isoparse(time),
+                    stac_extensions=[
+                        "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
+                    ],
                 )
                 add_visualization_info(item, data, endpoint, time=time)
                 item_link = collection.add_item(item)
@@ -439,11 +525,6 @@ def get_or_create_collection(catalog, collection_id, data, config, endpoint=None
         id=collection_id,
         title=data["Title"],
         description=description,
-        stac_extensions=[
-            "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
-            "https://stac-extensions.github.io/example-links/v0.0.1/schema.json",
-            "https://stac-extensions.github.io/scientific/v1.0.0/schema.json",
-        ],
         extent=extent,
     )
     return (collection, times)
@@ -478,6 +559,8 @@ def add_to_catalog(collection, catalog, endpoint, data):
     link.extra_fields["title"] = collection.title
     link.extra_fields["code"] = data["EodashIdentifier"]
     link.extra_fields["id"] = data["Name"]
+    if "Themes" in data:
+        link.extra_fields["themes"] = data["Themes"]
     # Check for summaries and bubble up info
     if collection.summaries.lists:
         for sum in collection.summaries.lists:
@@ -504,6 +587,8 @@ def add_extra_fields(stac_object, data):
         stac_object.extra_fields["agency"] = data["Agency"]
     if "yAxis" in data:
         stac_object.extra_fields["yAxis"] = data["yAxis"]
+    if "EodashIdentifier" in data:
+        stac_object.extra_fields["subcode"] = data["EodashIdentifier"]
     if "DataSource" in data:
         if "Spaceborne" in data["DataSource"]:
             if "Sensor" in data["DataSource"]["Spaceborne"]:
@@ -693,6 +778,61 @@ def handle_STAC_based_endpoint(config, endpoint, data, catalog, options, headers
     add_to_catalog(root_collection, catalog, endpoint, data)
 
 
+def add_base_overlay_info(collection, config, data):
+    # check if default base layers defined
+    if "default_base_layers" in config:
+        with open("%s.yaml" % config["default_base_layers"]) as f:
+            base_layers = yaml.load(f, Loader=SafeLoader)
+            for layer in base_layers:
+                collection.add_link(create_web_map_link(layer, role="baselayer"))
+    # check if default overlay layers defined
+    if "default_overlay_layers" in config:
+        with open("%s.yaml" % config["default_overlay_layers"]) as f:
+            overlay_layers = yaml.load(f, Loader=SafeLoader)
+            for layer in overlay_layers:
+                collection.add_link(create_web_map_link(layer, role="overlay"))
+    if "BaseLayers" in data:
+        for layer in data["BaseLayers"]:
+            collection.add_link(create_web_map_link(layer, role="baselayer"))
+    if "OverlayLayers" in data:
+        for layer in data["OverlayLayers"]:
+            collection.add_link(create_web_map_link(layer, role="overlay"))
+    # TODO: possibility to overwrite default base and overlay layers
+
+
+def create_web_map_link(layer, role):
+    extra_fields = {
+        "roles": [role],
+        "id": layer["id"],
+    }
+    if "default" in layer and layer["default"]:
+        extra_fields["roles"].append("default")
+    if "visible" in layer and layer["visible"]:
+        extra_fields["roles"].append("visible")
+    if "visible" in layer and not layer["visible"]:
+        extra_fields["roles"].append("invisible")
+
+    match layer["protocol"]:
+        case "wms":
+            # handle wms special config options
+            extra_fields["wms:layers"] = layer["layers"]
+            if "styles" in layer:
+                extra_fields["wms:styles"] = layer["styles"]
+            # TODO: handle wms dimensions extra_fields["wms:dimensions"]
+        case "wmts":
+            extra_fields["wmts:layer"] = layer["layer"]
+            # TODO: handle wmts dimensions extra_fields["wmts:dimensions"]
+
+    wml = Link(
+        rel=layer["protocol"],
+        target=layer["url"],
+        media_type="image/png" if "media_type" not in layer else layer["media_type"],
+        title=layer["name"],
+        extra_fields=extra_fields,
+    )
+    return wml
+
+
 def add_example_info(stac_object, data, endpoint, config):
     if "Services" in data:
         for service in data["Services"]:
@@ -839,6 +979,7 @@ def add_visualization_info(stac_object, data, endpoint, file_url=None, time=None
             instanceId = endpoint["InstanceId"]
         extra_fields = {
             "wms:layers": [endpoint["LayerId"]],
+            "role": ["data"],
         }
         if time != None:
             if endpoint["Name"] == "Sentinel Hub WMS":
@@ -861,7 +1002,9 @@ def add_visualization_info(stac_object, data, endpoint, file_url=None, time=None
             Link(
                 rel="wms",
                 target="https://services.sentinel-hub.com/ogc/wms/%s" % (instanceId),
-                media_type="text/xml",
+                media_type=(
+                    endpoint["MimeType"] if "MimeType" in endpoint else "image/png"
+                ),
                 title=data["Name"],
                 extra_fields=extra_fields,
             )
@@ -869,7 +1012,10 @@ def add_visualization_info(stac_object, data, endpoint, file_url=None, time=None
     # elif resource["Name"] == "GeoDB":
     #     pass
     elif endpoint["Name"] == "WMS":
-        extra_fields = {"wms:layers": [endpoint["LayerId"]]}
+        extra_fields = {
+            "wms:layers": [endpoint["LayerId"]],
+            "role": ["data"],
+        }
         if time != None:
             extra_fields["wms:dimensions"] = {
                 "TIME": time,
@@ -921,7 +1067,10 @@ def add_visualization_info(stac_object, data, endpoint, file_url=None, time=None
             )
     elif endpoint["Type"] == "WMTSCapabilities":
         target_url = "%s" % (endpoint.get("EndPoint"),)
-        extra_fields = {"wmts:layer": endpoint.get("LayerId")}
+        extra_fields = {
+            "wmts:layer": endpoint.get("LayerId"),
+            "role": ["data"],
+        }
         dimensions = {}
         if time != None:
             dimensions["time"] = time
@@ -974,6 +1123,7 @@ def add_visualization_info(stac_object, data, endpoint, file_url=None, time=None
                     "matchKey": endpoint["MatchKey"],
                     "timeKey": endpoint["TimeKey"],
                     "source": endpoint["Source"],
+                    "role": ["data"],
                 },
             )
         )
@@ -995,7 +1145,7 @@ def process_STACAPI_Endpoint(
     collection, _ = get_or_create_collection(
         catalog, endpoint["CollectionId"], data, config, endpoint
     )
-    add_visualization_info(collection, data, endpoint)
+    # add_visualization_info(collection, data, endpoint)
 
     api = Client.open(endpoint["EndPoint"], headers=headers)
     if bbox == None:
@@ -1317,7 +1467,8 @@ def add_collection_information(config, collection, data):
 @dataclass
 class Options:
     catalogspath: str
-    collectionsspath: str
+    collectionspath: str
+    indicatorspath: str
     outputpath: str
     vd: bool
     ni: bool
@@ -1333,10 +1484,16 @@ class Options:
     default="./catalogs/",
 )
 @click.option(
-    "--collectionsspath",
+    "--collectionspath",
     "-clp",
     help="path to collection configuration files",
     default="./collections/",
+)
+@click.option(
+    "--indicatorspath",
+    "-inp",
+    help="path to indicaotr configuration files",
+    default="./indicators/",
 )
 @click.option(
     "--outputpath",
@@ -1362,14 +1519,15 @@ class Options:
     nargs=-1,
 )
 def process_catalogs(
-    catalogspath, collectionsspath, outputpath, vd, ni, tn, collections
+    catalogspath, collectionspath, indicatorspath, outputpath, vd, ni, tn, collections
 ):
     """STAC generator and harvester:
     This library goes over configured endpoints extracting as much information
     as possible and generating a STAC catalog with the information"""
     options = Options(
         catalogspath=catalogspath,
-        collectionsspath=collectionsspath,
+        collectionspath=collectionspath,
+        indicatorspath=indicatorspath,
         outputpath=outputpath,
         vd=vd,
         ni=ni,
