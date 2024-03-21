@@ -125,7 +125,7 @@ def process_collection_file(config, file_path, catalog, options):
             for resource in data["Resources"]:
                 if "EndPoint" in resource:
                     if resource["Name"] == "Sentinel Hub":
-                        handle_SH_endpoint(config, resource, data, catalog)
+                        handle_SH_endpoint(config, resource, data, catalog, options)
                     elif resource["Name"] == "Sentinel Hub WMS":
                         collection = handle_SH_WMS_endpoint(
                             config, resource, data, catalog
@@ -136,7 +136,7 @@ def process_collection_file(config, file_path, catalog, options):
                         )
                         add_to_catalog(collection, catalog, resource, data)
                     elif resource["Name"] == "VEDA":
-                        handle_VEDA_endpoint(config, resource, data, catalog)
+                        handle_VEDA_endpoint(config, resource, data, catalog, options)
                     elif resource["Name"] == "marinedatastore":
                         handle_WMS_endpoint(config, resource, data, catalog, wmts=True)
                     elif resource["Name"] == "xcube":
@@ -264,7 +264,6 @@ def handle_WMS_endpoint(config, endpoint, data, catalog, wmts=False):
     if not endpoint.get("Type") == "OverwriteTimes" or not endpoint.get(
         "OverwriteBBox"
     ):
-
         # some endpoints allow "narrowed-down" capabilities per-layer, which we utilize to not
         # have to process full service capabilities XML
         capabilities_url = endpoint["EndPoint"]
@@ -299,14 +298,14 @@ def handle_WMS_endpoint(config, endpoint, data, catalog, wmts=False):
     add_to_catalog(collection, catalog, endpoint, data)
 
 
-def handle_SH_endpoint(config, endpoint, data, catalog):
+def handle_SH_endpoint(config, endpoint, data, catalog, options):
     token = get_SH_token()
     headers = {"Authorization": "Bearer %s" % token}
     endpoint["EndPoint"] = "https://services.sentinel-hub.com/api/v1/catalog/1.0.0/"
     # Overwrite collection id with type, such as ZARR or BYOC
     if "Type" in endpoint:
         endpoint["CollectionId"] = endpoint["Type"] + "-" + endpoint["CollectionId"]
-    handle_STAC_based_endpoint(config, endpoint, data, catalog, headers)
+    handle_STAC_based_endpoint(config, endpoint, data, catalog, options, headers)
 
 
 def handle_SH_WMS_endpoint(config, endpoint, data, catalog):
@@ -358,8 +357,8 @@ def handle_SH_WMS_endpoint(config, endpoint, data, catalog):
     return root_collection
 
 
-def handle_VEDA_endpoint(config, endpoint, data, catalog):
-    handle_STAC_based_endpoint(config, endpoint, data, catalog)
+def handle_VEDA_endpoint(config, endpoint, data, catalog, options):
+    handle_STAC_based_endpoint(config, endpoint, data, catalog, options)
 
 
 def handle_xcube_endpoint(config, endpoint, data, catalog):
@@ -610,7 +609,7 @@ def handle_GeoDB_endpoint(config, endpoint, data, catalog):
     return collection
 
 
-def handle_STAC_based_endpoint(config, endpoint, data, catalog, headers=None):
+def handle_STAC_based_endpoint(config, endpoint, data, catalog, options, headers=None):
     if "Locations" in data:
         root_collection, _ = get_or_create_collection(
             catalog, data["Name"], data, config, endpoint
@@ -622,6 +621,7 @@ def handle_STAC_based_endpoint(config, endpoint, data, catalog, headers=None):
                     endpoint=endpoint,
                     data=data,
                     catalog=catalog,
+                    options=options,
                     headers=headers,
                     bbox=",".join(map(str, location["Bbox"])),
                     filter_dates=location["FilterDates"],
@@ -633,6 +633,7 @@ def handle_STAC_based_endpoint(config, endpoint, data, catalog, headers=None):
                     endpoint=endpoint,
                     data=data,
                     catalog=catalog,
+                    options=options,
                     headers=headers,
                     bbox=",".join(map(str, location["Bbox"])),
                     root_collection=root_collection,
@@ -674,6 +675,7 @@ def handle_STAC_based_endpoint(config, endpoint, data, catalog, headers=None):
                 endpoint=endpoint,
                 data=data,
                 catalog=catalog,
+                options=options,
                 headers=headers,
                 bbox=",".join(map(str, endpoint["Bbox"])),
             )
@@ -683,6 +685,7 @@ def handle_STAC_based_endpoint(config, endpoint, data, catalog, headers=None):
                 endpoint=endpoint,
                 data=data,
                 catalog=catalog,
+                options=options,
                 headers=headers,
             )
 
@@ -983,6 +986,7 @@ def process_STACAPI_Endpoint(
     endpoint,
     data,
     catalog,
+    options,
     headers={},
     bbox=None,
     root_collection=None,
