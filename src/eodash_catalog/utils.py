@@ -27,12 +27,7 @@ ISO8601_PERIOD_REGEX = re.compile(
 
 def create_geojson_point(lon, lat):
     point = {"type": "Point", "coordinates": [lon, lat]}
-
-    feature = {"type": "Feature", "geometry": point, "properties": {}}
-
-    feature_collection = {"type": "FeatureCollection", "features": [feature]}
-
-    return feature_collection
+    return {"type": "Feature", "geometry": point, "properties": {}}
 
 
 def retrieveExtentFromWMSWMTS(capabilties_url, layer, wmts=False):

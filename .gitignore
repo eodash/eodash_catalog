@@ -9,4 +9,5 @@ dist/
 __pycache__
 catalogs/
 collections/
+layers/
 
