@@ -86,12 +86,19 @@ def process_catalog_file(file_path, options):
             catalog_type=CatalogType.RELATIVE_PUBLISHED,
         )
         for collection in process_collections:
-            process_collection_file(
-                config,
-                "%s/%s.yaml" % (options.collectionsspath, collection),
-                catalog,
-                options,
-            )
+            file_path = "%s/%s.yaml" % (options.collectionspath, collection)
+            if os.path.isfile(file_path):
+                # if collection file exists process it as indicator
+                # collection will be added as single collection to indicator
+                process_indicator_file(config, file_path, catalog, options)
+            else:
+                # if not try to see if indicator definition available
+                process_indicator_file(
+                    config,
+                    "%s/%s.yaml" % (options.indicatorspath, collection),
+                    catalog,
+                    options,
+                )
 
         strategy = TemplateLayoutStrategy(item_template="${collection}/${year}")
         catalog.normalize_hrefs(
@@ -115,6 +122,79 @@ def process_catalog_file(file_path, options):
                 validate_all(catalog.to_dict(), href=config["endpoint"])
             except Exception as e:
                 print("Issue validation collection: %s" % e)
+
+
+def extract_indicator_info(parent_collection):
+    to_extract = [
+        "subcode",
+        "themes",
+        "keywords",
+        "satellite",
+        "sensor",
+        "cities",
+        "countries",
+    ]
+    summaries = {}
+    for key in to_extract:
+        summaries[key] = set()
+
+    for collection in parent_collection.get_collections():
+        for key in to_extract:
+            if key in collection.extra_fields:
+                param = collection.extra_fields[key]
+                if isinstance(param, list):
+                    for p in param:
+                        summaries[key].add(p)
+                else:
+                    summaries[key].add(param)
+            # extract also summary information
+            if collection.summaries.lists:
+                if key in collection.summaries.lists:
+                    for p in collection.summaries.lists[key]:
+                        summaries[key].add(p)
+
+    for key in to_extract:
+        # convert all items back to a list
+        summaries[key] = list(summaries[key])
+        # remove empty ones
+        if len(summaries[key]) == 0:
+            del summaries[key]
+    parent_collection.summaries = Summaries(summaries)
+
+
+def iter_len_at_least(i, n):
+    return sum(1 for _ in zip(range(n), i)) == n
+
+
+def process_indicator_file(config, file_path, catalog, options):
+    with open(file_path) as f:
+        print("Processing indicator:", file_path)
+        data = yaml.load(f, Loader=SafeLoader)
+        parent_indicator, _ = get_or_create_collection(
+            catalog, data["Name"], data, config
+        )
+        if "Collections" in data:
+            for collection in data["Collections"]:
+                process_collection_file(
+                    config,
+                    "%s/%s.yaml" % (options.collectionspath, collection),
+                    catalog,
+                    options,
+                )
+        else:
+            # we assume that collection files can also be loaded directly
+            process_collection_file(config, file_path, parent_indicator, options)
+        add_collection_information(config, parent_indicator, data)
+        if iter_len_at_least(parent_indicator.get_items(recursive=True), 1):
+            parent_indicator.update_extent_from_items()
+        # Add bbox extents from children
+        for c_child in parent_indicator.get_children():
+            parent_indicator.extent.spatial.bboxes.append(
+                c_child.extent.spatial.bboxes[0]
+            )
+        # extract collection information and add it to summary indicator level
+        extract_indicator_info(parent_indicator)
+        add_to_catalog(parent_indicator, catalog, None, data)
 
 
 def process_collection_file(config, file_path, catalog, options):
@@ -478,6 +558,8 @@ def add_to_catalog(collection, catalog, endpoint, data):
     link.extra_fields["title"] = collection.title
     link.extra_fields["code"] = data["EodashIdentifier"]
     link.extra_fields["id"] = data["Name"]
+    if "Themes" in data:
+        link.extra_fields["themes"] = data["Themes"]
     # Check for summaries and bubble up info
     if collection.summaries.lists:
         for sum in collection.summaries.lists:
@@ -504,6 +586,8 @@ def add_extra_fields(stac_object, data):
         stac_object.extra_fields["agency"] = data["Agency"]
     if "yAxis" in data:
         stac_object.extra_fields["yAxis"] = data["yAxis"]
+    if "EodashIdentifier" in data:
+        stac_object.extra_fields["subcode"] = data["EodashIdentifier"]
     if "DataSource" in data:
         if "Spaceborne" in data["DataSource"]:
             if "Sensor" in data["DataSource"]["Spaceborne"]:
@@ -1317,7 +1401,8 @@ def add_collection_information(config, collection, data):
 @dataclass
 class Options:
     catalogspath: str
-    collectionsspath: str
+    collectionspath: str
+    indicatorspath: str
     outputpath: str
     vd: bool
     ni: bool
@@ -1333,10 +1418,16 @@ class Options:
     default="./catalogs/",
 )
 @click.option(
-    "--collectionsspath",
+    "--collectionspath",
     "-clp",
     help="path to collection configuration files",
     default="./collections/",
+)
+@click.option(
+    "--indicatorspath",
+    "-inp",
+    help="path to indicaotr configuration files",
+    default="./indicators/",
 )
 @click.option(
     "--outputpath",
@@ -1362,14 +1453,15 @@ class Options:
     nargs=-1,
 )
 def process_catalogs(
-    catalogspath, collectionsspath, outputpath, vd, ni, tn, collections
+    catalogspath, collectionspath, indicatorspath, outputpath, vd, ni, tn, collections
 ):
     """STAC generator and harvester:
     This library goes over configured endpoints extracting as much information
     as possible and generating a STAC catalog with the information"""
     options = Options(
         catalogspath=catalogspath,
-        collectionsspath=collectionsspath,
+        collectionspath=collectionspath,
+        indicatorspath=indicatorspath,
         outputpath=outputpath,
         vd=vd,
         ni=ni,
