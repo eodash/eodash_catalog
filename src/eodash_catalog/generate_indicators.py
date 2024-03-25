@@ -1487,6 +1487,12 @@ class Options:
 
 @click.command()
 @click.option(
+    "--catalog",
+    "-ctl",
+    help="id of catalog configuration file to be used",
+    default=None,
+)
+@click.option(
     "--catalogspath",
     "-ctp",
     help="path to catalog configuration files",
@@ -1528,7 +1534,15 @@ class Options:
     nargs=-1,
 )
 def process_catalogs(
-    catalogspath, collectionspath, indicatorspath, outputpath, vd, ni, tn, collections
+    catalog,
+    catalogspath,
+    collectionspath,
+    indicatorspath,
+    outputpath,
+    vd,
+    ni,
+    tn,
+    collections,
 ):
     """STAC generator and harvester:
     This library goes over configured endpoints extracting as much information
@@ -1547,9 +1561,12 @@ def process_catalogs(
     for file_name in os.listdir(catalogspath):
         file_path = os.path.join(catalogspath, file_name)
         if os.path.isfile(file_path):
-            tasks.append(
-                RaisingThread(target=process_catalog_file, args=(file_path, options))
-            )
+            if catalog == None or os.path.splitext(file_name)[0] == catalog:
+                tasks.append(
+                    RaisingThread(
+                        target=process_catalog_file, args=(file_path, options)
+                    )
+                )
             tasks[-1].start()
     for task in tasks:
         task.join()
