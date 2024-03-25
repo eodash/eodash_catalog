@@ -1567,6 +1567,6 @@ def process_catalogs(
                         target=process_catalog_file, args=(file_path, options)
                     )
                 )
-            tasks[-1].start()
+                tasks[-1].start()
     for task in tasks:
         task.join()
