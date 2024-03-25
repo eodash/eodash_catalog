@@ -93,12 +93,19 @@ def process_catalog_file(file_path, options):
                 process_indicator_file(config, file_path, catalog, options)
             else:
                 # if not try to see if indicator definition available
-                process_indicator_file(
-                    config,
-                    "%s/%s.yaml" % (options.indicatorspath, collection),
-                    catalog,
-                    options,
-                )
+                file_path = "%s/%s.yaml" % (options.indicatorspath, collection)
+                if os.path.isfile(file_path):
+                    process_indicator_file(
+                        config,
+                        "%s/%s.yaml" % (options.indicatorspath, collection),
+                        catalog,
+                        options,
+                    )
+                else:
+                    print(
+                        "Warning: neither collection nor indicator found for %s"
+                        % collection
+                    )
 
         strategy = TemplateLayoutStrategy(item_template="${collection}/${year}")
         catalog.normalize_hrefs(
@@ -249,7 +256,8 @@ def process_collection_file(config, file_path, catalog, options):
                         countries.append(sub_coll_def["Country"])
                     process_collection_file(
                         config,
-                        "../collections/%s.yaml" % (sub_coll_def["Collection"]),
+                        "%s/%s.yaml"
+                        % (options.collectionspath, sub_coll_def["Collection"]),
                         parent_collection,
                         options,
                     )
@@ -281,7 +289,8 @@ def process_collection_file(config, file_path, catalog, options):
                     )
                     process_collection_file(
                         config,
-                        "../collections/%s.yaml" % (sub_coll_def["Collection"]),
+                        "%s/%s.yaml"
+                        % (options.collectionspath, sub_coll_def["Collection"]),
                         tmp_catalog,
                         options,
                     )
@@ -1481,25 +1490,25 @@ class Options:
     "--catalogspath",
     "-ctp",
     help="path to catalog configuration files",
-    default="./catalogs/",
+    default="catalogs",
 )
 @click.option(
     "--collectionspath",
     "-clp",
     help="path to collection configuration files",
-    default="./collections/",
+    default="collections",
 )
 @click.option(
     "--indicatorspath",
     "-inp",
-    help="path to indicaotr configuration files",
-    default="./indicators/",
+    help="path to indicator configuration files",
+    default="indicators",
 )
 @click.option(
     "--outputpath",
     "-o",
     help="path where the generated catalogs will be saved",
-    default="./build/",
+    default="build",
 )
 @click.option(
     "-vd",
