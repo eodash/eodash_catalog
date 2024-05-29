@@ -362,7 +362,9 @@ def handle_WMS_endpoint(config, endpoint, data, catalog, wmts=False):
         # have to process full service capabilities XML
         capabilities_url = endpoint["EndPoint"]
         spatial_extent, times = retrieveExtentFromWMSWMTS(
-            capabilities_url, endpoint["LayerId"], wmts=wmts
+            capabilities_url, endpoint["LayerId"],
+            version=endpoint.get('Version', '1.1.1'),
+            wmts=wmts,
         )
     # Create an item per time to allow visualization in stac clients
     if len(times) > 0 and not endpoint.get("Disable_Items"):

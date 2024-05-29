@@ -30,12 +30,12 @@ def create_geojson_point(lon, lat):
     return {"type": "Feature", "geometry": point, "properties": {}}
 
 
-def retrieveExtentFromWMSWMTS(capabilties_url, layer, wmts=False):
+def retrieveExtentFromWMSWMTS(capabilties_url, layer, version='1.1.1', wmts=False):
     times = []
     service = None
     try:
         if not wmts:
-            service = WebMapService(capabilties_url, version="1.1.1")
+            service = WebMapService(capabilties_url, version=version)
         else:
             service = WebMapTileService(capabilties_url)
         if layer in list(service.contents):
