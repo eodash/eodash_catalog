@@ -108,8 +108,11 @@ def process_catalog_file(file_path, options):
                     )
 
         strategy = TemplateLayoutStrategy(item_template="${collection}/${year}")
+        # expecting that the catalog will be hosted online, self url should correspond to that
+        # default to a local folder + catalog id in case not set
+        catalog_self_href = config.get("endpoint", "%s/%s" % (options.outputpath, config["id"]))
         catalog.normalize_hrefs(
-            "%s/%s" % (options.outputpath, config["id"]), strategy=strategy
+            catalog_self_href, strategy=strategy
         )
 
         print("Started creation of collection files")
