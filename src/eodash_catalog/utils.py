@@ -1,15 +1,16 @@
-import json
 import re
-from functools import reduce
-from eodash_catalog.duration import Duration
-from decimal import Decimal
+import threading
+from collections.abc import Iterator
 from datetime import datetime, timedelta
-from typing import Iterator
-from six import string_types
+from decimal import Decimal
+from functools import reduce
+
+from dateutil import parser
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
-from dateutil import parser
-import threading
+from six import string_types
+
+from eodash_catalog.duration import Duration
 
 ISO8601_PERIOD_REGEX = re.compile(
     r"^(?P<sign>[+-])?"
@@ -30,7 +31,7 @@ def create_geojson_point(lon, lat):
     return {"type": "Feature", "geometry": point, "properties": {}}
 
 
-def retrieveExtentFromWMSWMTS(capabilties_url, layer, version='1.1.1', wmts=False):
+def retrieveExtentFromWMSWMTS(capabilties_url, layer, version="1.1.1", wmts=False):
     times = []
     service = None
     try:
@@ -40,12 +41,11 @@ def retrieveExtentFromWMSWMTS(capabilties_url, layer, version='1.1.1', wmts=Fals
             service = WebMapTileService(capabilties_url)
         if layer in list(service.contents):
             tps = []
-            if not wmts and service[layer].timepositions != None:
+            if not wmts and service[layer].timepositions is not None:
                 tps = service[layer].timepositions
-            elif wmts:
+            elif time_dimension := service[layer].dimensions.get("time") and wmts:
                 # specifically taking 'time' dimension
-                if time_dimension := service[layer].dimensions.get("time"):
-                    tps = time_dimension["values"]
+                tps = time_dimension["values"]
             for tp in tps:
                 tp_def = tp.split("/")
                 if len(tp_def) > 1:
@@ -59,7 +59,7 @@ def retrieveExtentFromWMSWMTS(capabilties_url, layer, version='1.1.1', wmts=Fals
                     times.append(tp)
             times = [time.replace("\n", "").strip() for time in times]
             # get unique times
-            times = reduce(lambda re, x: re + [x] if x not in re else re, times, [])
+            times = reduce(lambda re, x: [*re, x] if x not in re else re, times, [])
     except Exception as e:
         print("Issue extracting information from service capabilities")
         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
@@ -84,34 +84,8 @@ def parse_duration(datestring):
     Parses an ISO 8601 durations into datetime.timedelta
     """
     if not isinstance(datestring, string_types):
-        raise TypeError("Expecting a string %r" % datestring)
+        raise TypeError(f"Expecting a string {datestring}")
     match = ISO8601_PERIOD_REGEX.match(datestring)
-    if not match:
-        # try alternative format:
-        if datestring.startswith("P"):
-            durdt = parse_datetime(datestring[1:])
-            if durdt.year != 0 or durdt.month != 0:
-                # create Duration
-                ret = Duration(
-                    days=durdt.day,
-                    seconds=durdt.second,
-                    microseconds=durdt.microsecond,
-                    minutes=durdt.minute,
-                    hours=durdt.hour,
-                    months=durdt.month,
-                    years=durdt.year,
-                )
-            else:  # FIXME: currently not possible in alternative format
-                # create timedelta
-                ret = timedelta(
-                    days=durdt.day,
-                    seconds=durdt.second,
-                    microseconds=durdt.microsecond,
-                    minutes=durdt.minute,
-                    hours=durdt.hour,
-                )
-            return ret
-        raise ISO8601Error("Unable to parse duration string %r" % datestring)
     groups = match.groupdict()
     for key, val in groups.items():
         if key not in ("separator", "sign"):
@@ -149,7 +123,9 @@ def parse_duration(datestring):
     return ret
 
 
-def generateDateIsostringsFromInterval(start, end, timedelta_config={}):
+def generateDateIsostringsFromInterval(start, end, timedelta_config=None):
+    if timedelta_config is None:
+        timedelta_config = {}
     start_dt = datetime.fromisoformat(start)
     if end == "today":
         end = datetime.now().isoformat()
@@ -174,3 +150,17 @@ class RaisingThread(threading.Thread):
         super().join(timeout=timeout)
         if self._exc:
             raise self._exc
+
+
+def recursive_save(stac_object, no_items=False):
+    stac_object.save_object()
+    for child in stac_object.get_children():
+        recursive_save(child, no_items)
+    if not no_items:
+        # try to save items if available
+        for item in stac_object.get_items():
+            item.save_object()
+
+
+def iter_len_at_least(i, n):
+    return sum(1 for _ in zip(range(n), i, strict=False)) == n
