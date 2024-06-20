@@ -4,10 +4,12 @@ from collections.abc import Iterator
 from datetime import datetime, timedelta
 from decimal import Decimal
 from functools import reduce
+from typing import Any
 
 from dateutil import parser
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
+from pystac import Catalog
 from six import string_types
 
 from eodash_catalog.duration import Duration
@@ -26,26 +28,29 @@ ISO8601_PERIOD_REGEX = re.compile(
 # regular expression to parse ISO duartion strings.
 
 
-def create_geojson_point(lon, lat):
+def create_geojson_point(lon: int | float, lat: int | float) -> dict[str, Any]:
     point = {"type": "Point", "coordinates": [lon, lat]}
     return {"type": "Feature", "geometry": point, "properties": {}}
 
 
-def retrieveExtentFromWMSWMTS(capabilties_url, layer, version="1.1.1", wmts=False):
+def retrieveExtentFromWMSWMTS(
+    capabilities_url: str, layer: str, version: str = "1.1.1", wmts: bool = False
+):
     times = []
-    service = None
     try:
         if not wmts:
-            service = WebMapService(capabilties_url, version=version)
+            service = WebMapService(capabilities_url, version=version)
         else:
-            service = WebMapTileService(capabilties_url)
+            service = WebMapTileService(capabilities_url)
         if layer in list(service.contents):
             tps = []
             if not wmts and service[layer].timepositions is not None:
                 tps = service[layer].timepositions
-            elif time_dimension := service[layer].dimensions.get("time") and wmts:
+            elif wmts:
+                time_dimension = service[layer].dimensions.get("time")
                 # specifically taking 'time' dimension
-                tps = time_dimension["values"]
+                if time_dimension:
+                    tps = time_dimension["values"]
             for tp in tps:
                 tp_def = tp.split("/")
                 if len(tp_def) > 1:
@@ -66,7 +71,7 @@ def retrieveExtentFromWMSWMTS(capabilties_url, layer, version="1.1.1", wmts=Fals
         message = template.format(type(e).__name__, e.args)
         print(message)
 
-    bbox = [-180, -90, 180, 90]
+    bbox = [-180.0, -90.0, 180.0, 90.0]
     if service and service[layer].boundingBoxWGS84:
         bbox = [float(x) for x in service[layer].boundingBoxWGS84]
     return bbox, times
@@ -123,7 +128,7 @@ def parse_duration(datestring):
     return ret
 
 
-def generateDateIsostringsFromInterval(start, end, timedelta_config=None):
+def generateDateIsostringsFromInterval(start: str, end: str, timedelta_config: dict | None = None):
     if timedelta_config is None:
         timedelta_config = {}
     start_dt = datetime.fromisoformat(start)
@@ -152,7 +157,7 @@ class RaisingThread(threading.Thread):
             raise self._exc
 
 
-def recursive_save(stac_object, no_items=False):
+def recursive_save(stac_object: Catalog, no_items: bool = False) -> None:
     stac_object.save_object()
     for child in stac_object.get_children():
         recursive_save(child, no_items)
@@ -162,5 +167,5 @@ def recursive_save(stac_object, no_items=False):
             item.save_object()
 
 
-def iter_len_at_least(i, n):
+def iter_len_at_least(i, n: int) -> int:
     return sum(1 for _ in zip(range(n), i, strict=False)) == n
