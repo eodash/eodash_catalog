@@ -16,6 +16,22 @@
 pip install eodash_catalog
 ```
 
+## Testing
+
+Project uses pytest and runs it as part of CI:
+
+```bash
+python -m pytest
+```
+
+## Testing
+
+Project uses ruff to perform checks on code style and formatting
+```bash
+ruff check .
+```
+
+
 ## Building and publishing
 
 To build and publish we use hatch, first bump the version in `src/eodash_catalog/__about__.py` then run

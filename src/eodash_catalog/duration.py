@@ -4,8 +4,9 @@ This module defines a Duration class.
 The class Duration allows to define durations in years and months and can be
 used as limited replacement for timedelta objects.
 """
+
 from datetime import timedelta
-from decimal import Decimal, ROUND_FLOOR
+from decimal import ROUND_FLOOR, Decimal
 
 
 def fquotmod(val, low, high):
@@ -82,9 +83,7 @@ class Duration:
             years = Decimal(str(years))
         self.months = months
         self.years = years
-        self.tdelta = timedelta(
-            days, seconds, microseconds, milliseconds, minutes, hours, weeks
-        )
+        self.tdelta = timedelta(days, seconds, microseconds, milliseconds, minutes, hours, weeks)
 
     def __getstate__(self):
         return self.__dict__
@@ -167,13 +166,8 @@ class Duration:
             carry, newmonth = fquotmod(newmonth, 1, 13)
             newyear = other.year + self.years + carry
             maxdays = max_days_in_month(newyear, newmonth)
-            if other.day > maxdays:
-                newday = maxdays
-            else:
-                newday = other.day
-            newdt = other.replace(
-                year=int(newyear), month=int(newmonth), day=int(newday)
-            )
+            newday = maxdays if other.day > maxdays else other.day
+            newdt = other.replace(year=int(newyear), month=int(newmonth), day=int(newday))
             # does a timedelta + date/datetime
             return self.tdelta + newdt
         except AttributeError:
@@ -252,13 +246,8 @@ class Duration:
             carry, newmonth = fquotmod(newmonth, 1, 13)
             newyear = other.year - self.years + carry
             maxdays = max_days_in_month(newyear, newmonth)
-            if other.day > maxdays:
-                newday = maxdays
-            else:
-                newday = other.day
-            newdt = other.replace(
-                year=int(newyear), month=int(newmonth), day=int(newday)
-            )
+            newday = maxdays if other.day > maxdays else other.day
+            newdt = other.replace(year=int(newyear), month=int(newmonth), day=int(newday))
             return newdt - self.tdelta
         except AttributeError:
             # other probably was not compatible with data/datetime

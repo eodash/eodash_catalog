@@ -14,6 +14,11 @@ python-dateutil<3
 swiftspec==0.0.2
 mergedeep
 structlog<22.0
-OWSLib
+OWSLib<1.0
 spdx-lookup<=0.3.3
 pystac[validation]<=1.8.3
+
+# dev tooling
+pytest==8.1.1
+pytest-watch==4.2.0
+ruff==0.4.2
