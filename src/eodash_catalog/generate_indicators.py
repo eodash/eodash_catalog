@@ -90,15 +90,19 @@ def process_catalog_file(file_path: str, options):
         strategy = TemplateLayoutStrategy(item_template="${collection}/${year}")
         # expecting that the catalog will be hosted online, self url should correspond to that
         # default to a local folder + catalog id in case not set
-        catalog_self_href = config.get("endpoint", "{}/{}".format(options.outputpath, config["id"]))
-        catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
 
         print("Started creation of collection files")
         start = time.time()
         if options.ni:
+            catalog_self_href = f'{options.outputpath}/{config["id"]}'
+            catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
             recursive_save(catalog, options.ni)
         else:
             # For full catalog save with items this still seems to be faster
+            catalog_self_href = config.get(
+                "endpoint", "{}/{}".format(options.outputpath, config["id"])
+            )
+            catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
             catalog.save(dest_href="{}/{}".format(options.outputpath, config["id"]))
         end = time.time()
         print(f"Catalog {config['id']}: Time consumed in saving: {end - start}")
@@ -322,7 +326,7 @@ def add_to_catalog(collection, catalog, endpoint, data):
     # Check for summaries and bubble up info
     if collection.summaries.lists:
         for summary in collection.summaries.lists:
-            link.extra_fields[sum] = collection.summaries.lists[summary]
+            link.extra_fields[summary] = collection.summaries.lists[summary]
 
     add_extra_fields(link, data)
     return link
