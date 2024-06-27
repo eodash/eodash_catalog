@@ -18,7 +18,7 @@ from eodash_catalog.sh_endpoint import get_SH_token
 from eodash_catalog.stac_handling import (
     add_collection_information,
     add_example_info,
-    get_or_create_collection,
+    get_or_create_collection_and_times,
 )
 from eodash_catalog.thumbnails import generate_thumbnail
 from eodash_catalog.utils import (
@@ -29,7 +29,9 @@ from eodash_catalog.utils import (
 
 
 def process_STAC_Datacube_Endpoint(config, endpoint, data, catalog):
-    collection, _ = get_or_create_collection(catalog, data["Name"], data, config, endpoint)
+    collection, _ = get_or_create_collection_and_times(
+        catalog, data["Name"], data, config, endpoint
+    )
     add_visualization_info(collection, data, endpoint)
 
     stac_endpoint_url = endpoint["EndPoint"]
@@ -80,7 +82,9 @@ def process_STAC_Datacube_Endpoint(config, endpoint, data, catalog):
 
 def handle_STAC_based_endpoint(config, endpoint, data, catalog, options, headers=None):
     if "Locations" in data:
-        root_collection, _ = get_or_create_collection(catalog, data["Name"], data, config, endpoint)
+        root_collection, _ = get_or_create_collection_and_times(
+            catalog, data["Name"], data, config, endpoint
+        )
         for location in data["Locations"]:
             if "FilterDates" in location:
                 collection = process_STACAPI_Endpoint(
@@ -171,7 +175,7 @@ def process_STACAPI_Endpoint(
 ):
     if headers is None:
         headers = {}
-    collection, _ = get_or_create_collection(
+    collection, _ = get_or_create_collection_and_times(
         catalog, endpoint["CollectionId"], data, config, endpoint
     )
     # add_visualization_info(collection, data, endpoint)
@@ -261,7 +265,9 @@ def handle_VEDA_endpoint(config, endpoint, data, catalog, options):
 
 
 def handle_collection_only(config, endpoint, data, catalog):
-    collection, times = get_or_create_collection(catalog, data["Name"], data, config, endpoint)
+    collection, times = get_or_create_collection_and_times(
+        catalog, data["Name"], data, config, endpoint
+    )
     if len(times) > 0 and not endpoint.get("Disable_Items"):
         for t in times:
             item = Item(
@@ -280,7 +286,9 @@ def handle_collection_only(config, endpoint, data, catalog):
 def handle_SH_WMS_endpoint(config, endpoint, data, catalog):
     # create collection and subcollections (based on locations)
     if "Locations" in data:
-        root_collection, _ = get_or_create_collection(catalog, data["Name"], data, config, endpoint)
+        root_collection, _ = get_or_create_collection_and_times(
+            catalog, data["Name"], data, config, endpoint
+        )
         for location in data["Locations"]:
             # create  and populate location collections based on times
             # TODO: Should we add some new description per location?
@@ -288,7 +296,7 @@ def handle_SH_WMS_endpoint(config, endpoint, data, catalog):
                 "Title": location["Name"],
                 "Description": "",
             }
-            collection, _ = get_or_create_collection(
+            collection, _ = get_or_create_collection_and_times(
                 catalog, location["Identifier"], location_config, config, endpoint
             )
             collection.extra_fields["endpointtype"] = endpoint["Name"]
@@ -324,7 +332,7 @@ def handle_SH_WMS_endpoint(config, endpoint, data, catalog):
     return root_collection
 
 
-def handle_xcube_endpoint(config, endpoint, data, catalog):
+def handle_xcube_endpoint(config, endpoint, data: dict, catalog):
     root_collection = process_STAC_Datacube_Endpoint(
         config=config,
         endpoint=endpoint,
@@ -336,8 +344,8 @@ def handle_xcube_endpoint(config, endpoint, data, catalog):
     return root_collection
 
 
-def handle_GeoDB_endpoint(config, endpoint, data, catalog):
-    collection, _ = get_or_create_collection(
+def handle_GeoDB_endpoint(config, endpoint, data: dict, catalog):
+    collection, _ = get_or_create_collection_and_times(
         catalog, endpoint["CollectionId"], data, config, endpoint
     )
     select = "?select=aoi,aoi_id,country,city,time"
@@ -437,7 +445,9 @@ def handle_SH_endpoint(config, endpoint, data, catalog, options):
 
 
 def handle_WMS_endpoint(config, endpoint, data, catalog, wmts=False):
-    collection, times = get_or_create_collection(catalog, data["Name"], data, config, endpoint)
+    collection, times = get_or_create_collection_and_times(
+        catalog, data["Name"], data, config, endpoint
+    )
     spatial_extent = collection.extent.spatial.to_dict().get("bbox", [-180, -90, 180, 90])[0]
     if endpoint.get("Type") != "OverwriteTimes" or not endpoint.get("OverwriteBBox"):
         # some endpoints allow "narrowed-down" capabilities per-layer, which we utilize to not

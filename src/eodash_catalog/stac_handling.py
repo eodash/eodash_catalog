@@ -18,15 +18,14 @@ from yaml.loader import SafeLoader
 from eodash_catalog.utils import generateDateIsostringsFromInterval
 
 
-def get_or_create_collection(catalog, collection_id, data, config, endpoint=None):
+def get_or_create_collection_and_times(catalog, collection_id, data, config, endpoint=None):
     # Check if collection already in catalog
     for collection in catalog.get_collections():
         if collection.id == collection_id:
             return collection, []
     # If none found create a new one
-    spatial_extent = [-180.0, -90.0, 180.0, 90.0]
-    if endpoint and endpoint.get("OverwriteBBox"):
-        spatial_extent = endpoint.get("OverwriteBBox")
+    spatial_extent = endpoint.get("OverwriteBBox", [-180.0, -90.0, 180.0, 90.0])
+
     spatial_extent = SpatialExtent(
         [
             spatial_extent,

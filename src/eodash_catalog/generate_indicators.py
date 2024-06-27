@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from pystac import (
     Catalog,
     CatalogType,
+    Collection,
     Summaries,
 )
 from pystac.layout import TemplateLayoutStrategy
@@ -34,7 +35,7 @@ from eodash_catalog.stac_handling import (
     add_base_overlay_info,
     add_collection_information,
     add_extra_fields,
-    get_or_create_collection,
+    get_or_create_collection_and_times,
 )
 from eodash_catalog.utils import (
     RaisingThread,
@@ -46,10 +47,22 @@ from eodash_catalog.utils import (
 load_dotenv()
 
 
-def process_catalog_file(file_path: str, options):
+@dataclass
+class Options:
+    catalogspath: str
+    collectionspath: str
+    indicatorspath: str
+    outputpath: str
+    vd: bool
+    ni: bool
+    tn: bool
+    collections: list[str]
+
+
+def process_catalog_file(file_path: str, options: Options):
     print("Processing catalog:", file_path)
     with open(file_path) as f:
-        config = yaml.load(f, Loader=SafeLoader)
+        config: dict = yaml.load(f, Loader=SafeLoader)
 
         if len(options.collections) > 0:
             # create only catalogs containing the passed collections
@@ -153,11 +166,13 @@ def extract_indicator_info(parent_collection):
     parent_collection.summaries = Summaries(summaries)
 
 
-def process_indicator_file(config, file_path, catalog: Catalog, options):
+def process_indicator_file(config: dict, file_path: str, catalog: Catalog, options: Options):
     with open(file_path) as f:
         print("Processing indicator:", file_path)
-        data = yaml.load(f, Loader=SafeLoader)
-        parent_indicator, _ = get_or_create_collection(catalog, data["Name"], data, config)
+        data: dict = yaml.load(f, Loader=SafeLoader)
+        parent_indicator, _ = get_or_create_collection_and_times(
+            catalog, data["Name"], data, config, {}
+        )
         if "Collections" in data:
             for collection in data["Collections"]:
                 process_collection_file(
@@ -182,10 +197,12 @@ def process_indicator_file(config, file_path, catalog: Catalog, options):
         add_to_catalog(parent_indicator, catalog, None, data)
 
 
-def process_collection_file(config, file_path, catalog, options):
+def process_collection_file(
+    config: dict, file_path: str, catalog: Catalog | Collection, options: Options
+):
     print("Processing collection:", file_path)
     with open(file_path) as f:
-        data = yaml.load(f, Loader=SafeLoader)
+        data: dict = yaml.load(f, Loader=SafeLoader)
         if "Resources" in data:
             for resource in data["Resources"]:
                 if "EndPoint" in resource:
@@ -219,7 +236,9 @@ def process_collection_file(config, file_path, catalog, options):
                         raise Exception("No collection generated")
         elif "Subcollections" in data:
             # if no endpoint is specified we check for definition of subcollections
-            parent_collection, _ = get_or_create_collection(catalog, data["Name"], data, config)
+            parent_collection, _ = get_or_create_collection_and_times(
+                catalog, data["Name"], data, config, {}
+            )
 
             locations = []
             countries = []
@@ -267,7 +286,7 @@ def process_collection_file(config, file_path, catalog, options):
                         tmp_catalog,
                         options,
                     )
-                    links = tmp_catalog.get_child(sub_coll_def["Identifier"]).get_links()
+                    links = tmp_catalog.get_child(sub_coll_def["Identifier"]).get_links()  # type: ignore
                     for link in links:
                         # extract summary information
                         if "city" in link.extra_fields:
@@ -330,18 +349,6 @@ def add_to_catalog(collection, catalog, endpoint, data):
 
     add_extra_fields(link, data)
     return link
-
-
-@dataclass
-class Options:
-    catalogspath: str
-    collectionspath: str
-    indicatorspath: str
-    outputpath: str
-    vd: bool
-    ni: bool
-    tn: bool
-    collections: list[str]
 
 
 @click.command()

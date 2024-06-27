@@ -1,5 +1,5 @@
 {
     "recommendations": [
-        "ms-python.black-formatter"
+        "charliermarsh.ruff"
     ]
 }
