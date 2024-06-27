@@ -4,7 +4,7 @@ from pathlib import Path
 
 import requests
 
-from eodash_catalog.endpoints import generate_veda_cog_link
+from eodash_catalog.utils import generate_veda_cog_link
 
 
 def fetch_and_save_thumbnail(data, url):

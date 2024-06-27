@@ -169,3 +169,34 @@ def recursive_save(stac_object: Catalog, no_items: bool = False) -> None:
 
 def iter_len_at_least(i, n: int) -> int:
     return sum(1 for _ in zip(range(n), i, strict=False)) == n
+
+
+def generate_veda_cog_link(endpoint, file_url):
+    bidx = ""
+    if "Bidx" in endpoint:
+        # Check if an array was provided
+        if hasattr(endpoint["Bidx"], "__len__"):
+            for band in endpoint["Bidx"]:
+                bidx = bidx + f"&bidx={band}"
+        else:
+            bidx = "&bidx={}".format(endpoint["Bidx"])
+
+    colormap = ""
+    if "Colormap" in endpoint:
+        colormap = "&colormap={}".format(endpoint["Colormap"])
+        # TODO: For now we assume a already urlparsed colormap definition
+        # it could be nice to allow a json and better convert it on the fly
+        # colormap = "&colormap=%s"%(urllib.parse.quote(str(endpoint["Colormap"])))
+
+    colormap_name = ""
+    if "ColormapName" in endpoint:
+        colormap_name = "&colormap_name={}".format(endpoint["ColormapName"])
+
+    rescale = ""
+    if "Rescale" in endpoint:
+        rescale = "&rescale={},{}".format(endpoint["Rescale"][0], endpoint["Rescale"][1])
+
+    file_url = f"url={file_url}&" if file_url else ""
+
+    target_url = f"https://staging-raster.delta-backend.com/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{file_url}resampling_method=nearest{bidx}{colormap}{colormap_name}{rescale}"
+    return target_url

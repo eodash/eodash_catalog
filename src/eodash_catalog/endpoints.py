@@ -21,7 +21,11 @@ from eodash_catalog.stac_handling import (
     get_or_create_collection,
 )
 from eodash_catalog.thumbnails import generate_thumbnail
-from eodash_catalog.utils import create_geojson_point, retrieveExtentFromWMSWMTS
+from eodash_catalog.utils import (
+    create_geojson_point,
+    generate_veda_cog_link,
+    retrieveExtentFromWMSWMTS,
+)
 
 
 def process_STAC_Datacube_Endpoint(config, endpoint, data, catalog):
@@ -476,37 +480,6 @@ def handle_WMS_endpoint(config, endpoint, data, catalog, wmts=False):
 
 def handle_GeoDB_Tiles_endpoint(config, endpoint, data, catalog):
     raise NotImplementedError
-
-
-def generate_veda_cog_link(endpoint, file_url):
-    bidx = ""
-    if "Bidx" in endpoint:
-        # Check if an array was provided
-        if hasattr(endpoint["Bidx"], "__len__"):
-            for band in endpoint["Bidx"]:
-                bidx = bidx + f"&bidx={band}"
-        else:
-            bidx = "&bidx={}".format(endpoint["Bidx"])
-
-    colormap = ""
-    if "Colormap" in endpoint:
-        colormap = "&colormap={}".format(endpoint["Colormap"])
-        # TODO: For now we assume a already urlparsed colormap definition
-        # it could be nice to allow a json and better convert it on the fly
-        # colormap = "&colormap=%s"%(urllib.parse.quote(str(endpoint["Colormap"])))
-
-    colormap_name = ""
-    if "ColormapName" in endpoint:
-        colormap_name = "&colormap_name={}".format(endpoint["ColormapName"])
-
-    rescale = ""
-    if "Rescale" in endpoint:
-        rescale = "&rescale={},{}".format(endpoint["Rescale"][0], endpoint["Rescale"][1])
-
-    file_url = f"url={file_url}&" if file_url else ""
-
-    target_url = f"https://staging-raster.delta-backend.com/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{file_url}resampling_method=nearest{bidx}{colormap}{colormap_name}{rescale}"
-    return target_url
 
 
 def generate_veda_tiles_link(endpoint, item):
