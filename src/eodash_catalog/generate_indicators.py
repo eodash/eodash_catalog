@@ -163,7 +163,7 @@ def process_indicator_file(config, file_path, catalog: Catalog, options):
                 process_collection_file(
                     config,
                     f"{options.collectionspath}/{collection}.yaml",
-                    catalog,
+                    parent_indicator,
                     options,
                 )
         else:
