@@ -1,5 +1,6 @@
 import json
 import os
+import uuid
 from datetime import datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
@@ -82,9 +83,6 @@ def process_STAC_Datacube_Endpoint(
     add_collection_information(config, collection, data)
 
     return collection
-
-
-import uuid
 
 
 def handle_STAC_based_endpoint(

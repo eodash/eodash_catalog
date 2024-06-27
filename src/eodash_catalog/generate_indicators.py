@@ -31,7 +31,13 @@ from eodash_catalog.stac_handling import (
     add_extra_fields,
     get_or_create_collection_and_times,
 )
-from eodash_catalog.utils import Options, RaisingThread, iter_len_at_least, recursive_save
+from eodash_catalog.utils import (
+    Options,
+    RaisingThread,
+    add_single_item_if_collection_empty,
+    iter_len_at_least,
+    recursive_save,
+)
 
 # make sure we are loading the env local definition
 load_dotenv()
@@ -208,6 +214,7 @@ def process_collection_file(
                     else:
                         raise ValueError("Type of Resource is not supported")
                     if collection is not None:
+                        add_single_item_if_collection_empty(collection)
                         add_to_catalog(collection, catalog, resource, data)
                     else:
                         raise Exception("No collection generated")

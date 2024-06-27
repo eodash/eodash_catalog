@@ -1,5 +1,6 @@
 import re
 import threading
+import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -10,7 +11,7 @@ from typing import Any
 from dateutil import parser
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
-from pystac import Catalog
+from pystac import Catalog, Collection, Item, RelType
 from six import string_types
 
 from eodash_catalog.duration import Duration
@@ -217,3 +218,20 @@ class Options:
     ni: bool
     tn: bool
     collections: list[str]
+
+
+def add_single_item_if_collection_empty(collection: Collection) -> None:
+    for link in collection.links:
+        if link.rel == RelType.ITEM:
+            break
+    else:
+        item = Item(
+            id=str(uuid.uuid4()),
+            bbox=[-180, -85, 180, 85],
+            properties={},
+            geometry=None,
+            datetime=datetime(1970, 1, 1, 0, 0, 0),
+            start_datetime=datetime(1970, 1, 1, 0, 0, 0),
+            end_datetime=datetime.now(),
+        )
+        collection.add_item(item)
