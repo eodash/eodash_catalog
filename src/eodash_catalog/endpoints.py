@@ -6,12 +6,7 @@ from operator import itemgetter
 
 import requests
 from dateutil import parser
-from pystac import (
-    Item,
-    Link,
-    SpatialExtent,
-    Summaries,
-)
+from pystac import Catalog, Collection, Item, Link, SpatialExtent, Summaries
 from pystac_client import Client
 
 from eodash_catalog.sh_endpoint import get_SH_token
@@ -22,13 +17,16 @@ from eodash_catalog.stac_handling import (
 )
 from eodash_catalog.thumbnails import generate_thumbnail
 from eodash_catalog.utils import (
+    Options,
     create_geojson_point,
     generate_veda_cog_link,
     retrieveExtentFromWMSWMTS,
 )
 
 
-def process_STAC_Datacube_Endpoint(config, endpoint, data, catalog):
+def process_STAC_Datacube_Endpoint(
+    config: dict, endpoint: dict, data: dict, catalog: Catalog
+) -> Collection:
     collection, _ = get_or_create_collection_and_times(
         catalog, data["Name"], data, config, endpoint
     )
@@ -39,11 +37,17 @@ def process_STAC_Datacube_Endpoint(config, endpoint, data, catalog):
         stac_endpoint_url = stac_endpoint_url + endpoint.get("StacEndpoint", "")
     # assuming /search not implemented
     api = Client.open(stac_endpoint_url)
-    coll = api.get_collection(endpoint.get("CollectionId", "datacubes"))
-    item = coll.get_item(endpoint.get("DatacubeId"))
+    collection_id = endpoint.get("CollectionId", "datacubes")
+    coll = api.get_collection(collection_id)
+    if not coll:
+        raise ValueError(f"Collection {collection_id} not found in endpoint {endpoint}")
+    item_id = endpoint.get("DatacubeId", "")
+    item = coll.get_item(item_id)
+    if not item:
+        raise ValueError(f"Item  {item_id} not found in collection {coll}")
     # slice a datacube along temporal axis to individual items, selectively adding properties
     dimensions = item.properties.get("cube:dimensions", {})
-    variables = item.properties.get("cube:variables")
+    variables = item.properties.get("cube:variables", {})
     if endpoint.get("Variable") not in variables:
         raise Exception(f'Variable {endpoint.get("Variable")} not found in datacube {variables}')
     time_dimension = "time"
@@ -80,7 +84,12 @@ def process_STAC_Datacube_Endpoint(config, endpoint, data, catalog):
     return collection
 
 
-def handle_STAC_based_endpoint(config, endpoint, data, catalog, options, headers=None):
+import uuid
+
+
+def handle_STAC_based_endpoint(
+    config: dict, endpoint: dict, data: dict, catalog: Catalog, options: Options, headers=None
+) -> Collection:
     if "Locations" in data:
         root_collection, _ = get_or_create_collection_and_times(
             catalog, data["Name"], data, config, endpoint
@@ -112,8 +121,8 @@ def handle_STAC_based_endpoint(config, endpoint, data, catalog, options, headers
             # Update identifier to use location as well as title
             # TODO: should we use the name as id? it provides much more
             # information in the clients
-            collection.id = location["Identifier"]
-            collection.title = (location["Name"],)
+            collection.id = location.get("Identifier", uuid.uuid4())
+            collection.title = location.get("Name")
             # See if description should be overwritten
             if "Description" in location:
                 collection.description = location["Description"]
@@ -136,7 +145,8 @@ def handle_STAC_based_endpoint(config, endpoint, data, catalog, options, headers
         root_collection.update_extent_from_items()
         # Add bbox extents from children
         for c_child in root_collection.get_children():
-            root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+            if isinstance(c_child, Collection):
+                root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
     else:
         if "Bbox" in endpoint:
             root_collection = process_STACAPI_Endpoint(
@@ -163,26 +173,25 @@ def handle_STAC_based_endpoint(config, endpoint, data, catalog, options, headers
 
 
 def process_STACAPI_Endpoint(
-    config,
-    endpoint,
-    data,
-    catalog,
-    options,
-    headers=None,
+    config: dict,
+    endpoint: dict,
+    data: dict,
+    catalog: Catalog,
+    options: Options,
+    headers: dict[str, str] | None = None,
     bbox=None,
-    root_collection=None,
-    filter_dates=None,
-):
+    root_collection: Collection | None = None,
+    filter_dates: list[str] | None = None,
+) -> Collection:
     if headers is None:
         headers = {}
     collection, _ = get_or_create_collection_and_times(
         catalog, endpoint["CollectionId"], data, config, endpoint
     )
-    # add_visualization_info(collection, data, endpoint)
 
     api = Client.open(endpoint["EndPoint"], headers=headers)
     if bbox is None:
-        bbox = "-180,-90,180,90"
+        bbox = [-180, -90, 180, 90]
     results = api.search(
         collections=[endpoint["CollectionId"]],
         bbox=bbox,
@@ -226,7 +235,7 @@ def process_STACAPI_Endpoint(
                 ),
             )
         # If a root collection exists we point back to it from the item
-        if root_collection is not None:
+        if root_collection:
             item.set_collection(root_collection)
 
         # bubble up information we want to the link
@@ -259,12 +268,16 @@ def process_STACAPI_Endpoint(
     return collection
 
 
-def handle_VEDA_endpoint(config, endpoint, data, catalog, options):
+def handle_VEDA_endpoint(
+    config: dict, endpoint: dict, data: dict, catalog: Catalog, options: Options
+) -> Collection:
     collection = handle_STAC_based_endpoint(config, endpoint, data, catalog, options)
     return collection
 
 
-def handle_collection_only(config, endpoint, data, catalog):
+def handle_collection_only(
+    config: dict, endpoint: dict, data: dict, catalog: Catalog
+) -> Collection:
     collection, times = get_or_create_collection_and_times(
         catalog, data["Name"], data, config, endpoint
     )
@@ -283,7 +296,9 @@ def handle_collection_only(config, endpoint, data, catalog):
     return collection
 
 
-def handle_SH_WMS_endpoint(config, endpoint, data, catalog):
+def handle_SH_WMS_endpoint(
+    config: dict, endpoint: dict, data: dict, catalog: Catalog
+) -> Collection:
     # create collection and subcollections (based on locations)
     if "Locations" in data:
         root_collection, _ = get_or_create_collection_and_times(
@@ -328,23 +343,24 @@ def handle_SH_WMS_endpoint(config, endpoint, data, catalog):
         root_collection.update_extent_from_items()
         # Add bbox extents from children
         for c_child in root_collection.get_children():
-            root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+            if isinstance(c_child, Collection):
+                root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
     return root_collection
 
 
-def handle_xcube_endpoint(config, endpoint, data: dict, catalog):
-    root_collection = process_STAC_Datacube_Endpoint(
+def handle_xcube_endpoint(config: dict, endpoint: dict, data: dict, catalog: Catalog) -> Collection:
+    collection = process_STAC_Datacube_Endpoint(
         config=config,
         endpoint=endpoint,
         data=data,
         catalog=catalog,
     )
 
-    add_example_info(root_collection, data, endpoint, config)
-    return root_collection
+    add_example_info(collection, data, endpoint, config)
+    return collection
 
 
-def handle_GeoDB_endpoint(config, endpoint, data: dict, catalog):
+def handle_GeoDB_endpoint(config: dict, endpoint: dict, data: dict, catalog: Catalog) -> Collection:
     collection, _ = get_or_create_collection_and_times(
         catalog, endpoint["CollectionId"], data, config, endpoint
     )
@@ -433,7 +449,9 @@ def handle_GeoDB_endpoint(config, endpoint, data: dict, catalog):
     return collection
 
 
-def handle_SH_endpoint(config, endpoint, data, catalog, options):
+def handle_SH_endpoint(
+    config: dict, endpoint: dict, data: dict, catalog: Catalog, options: Options
+) -> Collection:
     token = get_SH_token()
     headers = {"Authorization": f"Bearer {token}"}
     endpoint["EndPoint"] = "https://services.sentinel-hub.com/api/v1/catalog/1.0.0/"
@@ -444,7 +462,9 @@ def handle_SH_endpoint(config, endpoint, data, catalog, options):
     return collection
 
 
-def handle_WMS_endpoint(config, endpoint, data, catalog, wmts=False):
+def handle_WMS_endpoint(
+    config: dict, endpoint: dict, data: dict, catalog: Catalog, wmts: bool = False
+) -> Collection:
     collection, times = get_or_create_collection_and_times(
         catalog, data["Name"], data, config, endpoint
     )
@@ -488,11 +508,7 @@ def handle_WMS_endpoint(config, endpoint, data, catalog, wmts=False):
     return collection
 
 
-def handle_GeoDB_Tiles_endpoint(config, endpoint, data, catalog):
-    raise NotImplementedError
-
-
-def generate_veda_tiles_link(endpoint, item):
+def generate_veda_tiles_link(endpoint: dict, item: str | None) -> str:
     collection = "collection={}".format(endpoint["CollectionId"])
     assets = ""
     for asset in endpoint["Assets"]:
@@ -508,13 +524,19 @@ def generate_veda_tiles_link(endpoint, item):
     return target_url
 
 
-def add_visualization_info(stac_object, data, endpoint, file_url=None, time=None):
+def add_visualization_info(
+    stac_object: Collection | Item,
+    data: dict,
+    endpoint: dict,
+    file_url: str | None = None,
+    time: str | None = None,
+) -> None:
     # add extension reference
     if endpoint["Name"] == "Sentinel Hub" or endpoint["Name"] == "Sentinel Hub WMS":
         instanceId = os.getenv("SH_INSTANCE_ID")
         if "InstanceId" in endpoint:
             instanceId = endpoint["InstanceId"]
-        extra_fields = {
+        extra_fields: dict[str, list[str] | dict[str, str]] = {
             "wms:layers": [endpoint["LayerId"]],
             "role": ["data"],
         }
@@ -563,7 +585,7 @@ def add_visualization_info(stac_object, data, endpoint, file_url=None, time=None
     elif endpoint["Name"] == "JAXA_WMTS_PALSAR":
         target_url = "{}".format(endpoint.get("EndPoint"))
         # custom time just for this special case as a default for collection wmts
-        extra_fields = {"wmts:layer": endpoint.get("LayerId").replace("{time}", time or "2017")}
+        extra_fields = {"wmts:layer": endpoint.get("LayerId", "").replace("{time}", time or "2017")}
         stac_object.add_link(
             Link(
                 rel="wmts",
@@ -606,7 +628,7 @@ def add_visualization_info(stac_object, data, endpoint, file_url=None, time=None
     elif endpoint["Type"] == "WMTSCapabilities":
         target_url = "{}".format(endpoint.get("EndPoint"))
         extra_fields = {
-            "wmts:layer": endpoint.get("LayerId"),
+            "wmts:layer": endpoint.get("LayerId", ""),
             "role": ["data"],
         }
         dimensions = {}

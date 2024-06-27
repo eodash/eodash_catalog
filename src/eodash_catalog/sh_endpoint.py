@@ -4,7 +4,7 @@ from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
 
-def get_SH_token():
+def get_SH_token() -> str:
     # Your client credentials
     client_id = os.getenv("SH_CLIENT_ID")
     client_secret = os.getenv("SH_CLIENT_SECRET")

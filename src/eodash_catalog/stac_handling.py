@@ -6,6 +6,7 @@ import yaml
 from dateutil import parser
 from pystac import (
     Asset,
+    Catalog,
     Collection,
     Extent,
     Link,
@@ -18,7 +19,9 @@ from yaml.loader import SafeLoader
 from eodash_catalog.utils import generateDateIsostringsFromInterval
 
 
-def get_or_create_collection_and_times(catalog, collection_id, data, config, endpoint=None):
+def get_or_create_collection_and_times(
+    catalog: Catalog, collection_id: str, data: dict, config: dict, endpoint: dict
+) -> tuple[Collection, list[str]]:
     # Check if collection already in catalog
     for collection in catalog.get_collections():
         if collection.id == collection_id:
@@ -31,11 +34,11 @@ def get_or_create_collection_and_times(catalog, collection_id, data, config, end
             spatial_extent,
         ]
     )
-    times = []
+    times: list[str] = []
     temporal_extent = TemporalExtent([[datetime.now(), None]])
     if endpoint and endpoint.get("Type") == "OverwriteTimes":
         if endpoint.get("Times"):
-            times = endpoint.get("Times")
+            times = list(endpoint.get("Times", []))
             times_datetimes = sorted([parser.isoparse(time) for time in times])
             temporal_extent = TemporalExtent([[times_datetimes[0], times_datetimes[-1]]])
         elif endpoint.get("DateTimeInterval"):
@@ -80,7 +83,7 @@ def get_or_create_collection_and_times(catalog, collection_id, data, config, end
     return (collection, times)
 
 
-def create_web_map_link(layer, role):
+def create_web_map_link(layer: dict, role: str) -> Link:
     extra_fields = {
         "roles": [role],
         "id": layer["id"],
@@ -113,7 +116,9 @@ def create_web_map_link(layer, role):
     return wml
 
 
-def add_example_info(stac_object, data, endpoint, config):
+def add_example_info(
+    stac_object: Collection | Catalog, data: dict, endpoint: dict, config: dict
+) -> None:
     if "Services" in data:
         for service in data["Services"]:
             if service["Name"] == "Statistical API":
@@ -178,7 +183,7 @@ def add_example_info(stac_object, data, endpoint, config):
                 )
 
 
-def add_collection_information(config, collection, data):
+def add_collection_information(config: dict, collection: Collection, data: dict) -> None:
     # Add metadata information
     # Check license identifier
     if "License" in data:
@@ -304,7 +309,7 @@ def add_collection_information(config, collection, data):
             )
 
 
-def add_base_overlay_info(collection, config, data):
+def add_base_overlay_info(collection: Collection, config: dict, data: dict) -> None:
     # check if default base layers defined
     if "default_base_layers" in config:
         with open(f"{config["default_base_layers"]}.yaml") as f:
@@ -326,7 +331,7 @@ def add_base_overlay_info(collection, config, data):
     # TODO: possibility to overwrite default base and overlay layers
 
 
-def add_extra_fields(stac_object, data):
+def add_extra_fields(stac_object: Collection | Catalog | Link, data: dict) -> None:
     if "yAxis" in data:
         stac_object.extra_fields["yAxis"] = data["yAxis"]
     if "Themes" in data:

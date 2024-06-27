@@ -1,6 +1,7 @@
 import re
 import threading
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from functools import reduce
@@ -35,7 +36,7 @@ def create_geojson_point(lon: int | float, lat: int | float) -> dict[str, Any]:
 
 def retrieveExtentFromWMSWMTS(
     capabilities_url: str, layer: str, version: str = "1.1.1", wmts: bool = False
-):
+) -> tuple[list[float], list[str]]:
     times = []
     try:
         if not wmts:
@@ -91,7 +92,9 @@ def parse_duration(datestring):
     if not isinstance(datestring, string_types):
         raise TypeError(f"Expecting a string {datestring}")
     match = ISO8601_PERIOD_REGEX.match(datestring)
-    groups = match.groupdict()
+    groups = {}
+    if match:
+        groups = match.groupdict()
     for key, val in groups.items():
         if key not in ("separator", "sign"):
             if val is None:
@@ -128,7 +131,9 @@ def parse_duration(datestring):
     return ret
 
 
-def generateDateIsostringsFromInterval(start: str, end: str, timedelta_config: dict | None = None):
+def generateDateIsostringsFromInterval(
+    start: str, end: str, timedelta_config: dict | None = None
+) -> list[str]:
     if timedelta_config is None:
         timedelta_config = {}
     start_dt = datetime.fromisoformat(start)
@@ -171,7 +176,7 @@ def iter_len_at_least(i, n: int) -> int:
     return sum(1 for _ in zip(range(n), i, strict=False)) == n
 
 
-def generate_veda_cog_link(endpoint, file_url):
+def generate_veda_cog_link(endpoint: dict, file_url: str | None) -> str:
     bidx = ""
     if "Bidx" in endpoint:
         # Check if an array was provided
@@ -200,3 +205,15 @@ def generate_veda_cog_link(endpoint, file_url):
 
     target_url = f"https://staging-raster.delta-backend.com/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{file_url}resampling_method=nearest{bidx}{colormap}{colormap_name}{rescale}"
     return target_url
+
+
+@dataclass
+class Options:
+    catalogspath: str
+    collectionspath: str
+    indicatorspath: str
+    outputpath: str
+    vd: bool
+    ni: bool
+    tn: bool
+    collections: list[str]

@@ -6,17 +6,12 @@ Indicator generator to harvest information from endpoints and generate catalog
 
 import os
 import time
-from dataclasses import dataclass
+from typing import Any
 
 import click
 import yaml
 from dotenv import load_dotenv
-from pystac import (
-    Catalog,
-    CatalogType,
-    Collection,
-    Summaries,
-)
+from pystac import Catalog, CatalogType, Collection, Link, Summaries
 from pystac.layout import TemplateLayoutStrategy
 from pystac.validation import validate_all
 from yaml.loader import SafeLoader
@@ -24,7 +19,6 @@ from yaml.loader import SafeLoader
 from eodash_catalog.endpoints import (
     handle_collection_only,
     handle_GeoDB_endpoint,
-    handle_GeoDB_Tiles_endpoint,
     handle_SH_endpoint,
     handle_SH_WMS_endpoint,
     handle_VEDA_endpoint,
@@ -37,26 +31,10 @@ from eodash_catalog.stac_handling import (
     add_extra_fields,
     get_or_create_collection_and_times,
 )
-from eodash_catalog.utils import (
-    RaisingThread,
-    iter_len_at_least,
-    recursive_save,
-)
+from eodash_catalog.utils import Options, RaisingThread, iter_len_at_least, recursive_save
 
 # make sure we are loading the env local definition
 load_dotenv()
-
-
-@dataclass
-class Options:
-    catalogspath: str
-    collectionspath: str
-    indicatorspath: str
-    outputpath: str
-    vd: bool
-    ni: bool
-    tn: bool
-    collections: list[str]
 
 
 def process_catalog_file(file_path: str, options: Options):
@@ -129,7 +107,7 @@ def process_catalog_file(file_path: str, options: Options):
                 print(f"Issue validation collection: {e}")
 
 
-def extract_indicator_info(parent_collection):
+def extract_indicator_info(parent_collection: Collection):
     to_extract = [
         "subcode",
         "themes",
@@ -139,7 +117,7 @@ def extract_indicator_info(parent_collection):
         "cities",
         "countries",
     ]
-    summaries = {}
+    summaries: dict[str, Any] = {}
     for key in to_extract:
         summaries[key] = set()
 
@@ -189,12 +167,13 @@ def process_indicator_file(config: dict, file_path: str, catalog: Catalog, optio
             parent_indicator.update_extent_from_items()
         # Add bbox extents from children
         for c_child in parent_indicator.get_children():
-            parent_indicator.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+            if isinstance(c_child, Collection):  # typing reason
+                parent_indicator.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
         # extract collection information and add it to summary indicator level
         extract_indicator_info(parent_indicator)
         # add baselayer and overview information to indicator collection
         add_base_overlay_info(parent_indicator, config, data)
-        add_to_catalog(parent_indicator, catalog, None, data)
+        add_to_catalog(parent_indicator, catalog, {}, data)
 
 
 def process_collection_file(
@@ -221,8 +200,6 @@ def process_collection_file(
                         collection = handle_xcube_endpoint(config, resource, data, catalog)
                     elif resource["Name"] == "WMS":
                         collection = handle_WMS_endpoint(config, resource, data, catalog)
-                    elif resource["Name"] == "GeoDB Vector Tiles":
-                        collection = handle_GeoDB_Tiles_endpoint(config, resource, data, catalog)
                     elif resource["Name"] == "JAXA_WMTS_PALSAR":
                         # somewhat one off creation of individual WMTS layers as individual items
                         collection = handle_WMS_endpoint(config, resource, data, catalog, wmts=True)
@@ -303,7 +280,8 @@ def process_collection_file(
             parent_collection.update_extent_from_items()
             # Add bbox extents from children
             for c_child in parent_collection.get_children():
-                parent_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+                if isinstance(c_child, Collection):
+                    parent_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
             # Fill summaries for locations
             parent_collection.summaries = Summaries(
                 {
@@ -311,17 +289,17 @@ def process_collection_file(
                     "countries": list(set(countries)),
                 }
             )
-            add_to_catalog(parent_collection, catalog, None, data)
+            add_to_catalog(parent_collection, catalog, {}, data)
 
 
-def add_to_catalog(collection, catalog, endpoint, data):
+def add_to_catalog(collection: Collection, catalog: Catalog, endpoint: dict, data: dict):
     # check if already in catalog, if it is do not re-add it
     # TODO: probably we should add to the catalog only when creating
     for cat_coll in catalog.get_collections():
         if cat_coll.id == collection.id:
             return
 
-    link = catalog.add_child(collection)
+    link: Link = catalog.add_child(collection)
     # bubble fields we want to have up to collection link and add them to collection
     if endpoint and "Type" in endpoint:
         collection.extra_fields["endpointtype"] = "{}_{}".format(
