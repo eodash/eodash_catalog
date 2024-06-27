@@ -27,24 +27,37 @@ python -m pytest
 ## Testing
 
 Project uses ruff to perform checks on code style and formatting
+
 ```bash
 ruff check .
 ```
 
+## Versioning and branches
 
-## Building and publishing
+eodash_catalog adheres to [Semantic Versioning](https://semver.org/) and follows these rules:
 
-To build and publish we use hatch, first bump the version in `src/eodash_catalog/__about__.py` then run
+Given a version number `MAJOR.MINOR.PATCH`, we increment the:
 
-```console
-hatch build
+- `MAJOR` version when we make incompatible API changes
+- `MINOR` version when we add functionality in a backward compatible manner
+- `PATCH` version when we make backward compatible bug fixes
+
+Active development is followed by the `main` branch.
+`
+New features or maintenance commits should be done against this branch in the form of a Merge Request of a Feature branch.
+
+## Tagging
+
+This repository uses bump2version for managing tags. To bump a version use
+
+```bash
+bump2version <major|minor|patch> # or bump2version --new-version <new_version>
+git push && git push --tags
 ```
 
-If build runs as expected execute:
+Pushing a tag in the repository automatically creates:
 
-```console
-hatch publish
-```
+- versioned package on pypi
 
 ## License
 
