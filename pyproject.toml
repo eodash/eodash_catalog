@@ -20,7 +20,27 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = {file = ["requirements.txt"]}
+dependencies = [
+  "click",
+  "setuptools<68",
+  "oauthlib<3.3",
+  "requests-oauthlib<1.3.2",
+  "python-dotenv<1.1.0",
+  "pystac-client<0.6",
+  "pyyaml<7",
+  "redis<4",
+  "pygeofilter[backend-native]==0.2.0",
+  "click<9",
+  "requests<3",
+  "lxml<5",
+  "python-dateutil<3",
+  "swiftspec==0.0.2",
+  "mergedeep",
+  "structlog<22.0",
+  "OWSLib",
+  "spdx-lookup<=0.3.3",
+  "pystac[validation]<=1.8.3",
+]
 [project.scripts]
 eodash_catalog = "eodash_catalog.generate_indicators:process_catalogs"
 [project.urls]
