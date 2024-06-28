@@ -19,15 +19,19 @@ from yaml.loader import SafeLoader
 from eodash_catalog.utils import generateDateIsostringsFromInterval
 
 
-def get_or_create_collection_and_times(
-    catalog: Catalog, collection_id: str, data: dict, config: dict, endpoint: dict
-) -> tuple[Collection, list[str]]:
+def get_or_create_collection(
+    catalog: Catalog,
+    collection_id: str,
+    collection_config: dict,
+    catalog_config: dict,
+    endpoint_config: dict,
+) -> Collection:
     # Check if collection already in catalog
     for collection in catalog.get_collections():
         if collection.id == collection_id:
-            return collection, []
+            return collection
     # If none found create a new one
-    spatial_extent = endpoint.get("OverwriteBBox", [-180.0, -90.0, 180.0, 90.0])
+    spatial_extent = endpoint_config.get("OverwriteBBox", [-180.0, -90.0, 180.0, 90.0])
 
     spatial_extent = SpatialExtent(
         [
@@ -36,51 +40,51 @@ def get_or_create_collection_and_times(
     )
     times: list[str] = []
     temporal_extent = TemporalExtent([[datetime.now(), None]])
-    if endpoint and endpoint.get("Type") == "OverwriteTimes":
-        if endpoint.get("Times"):
-            times = list(endpoint.get("Times", []))
+    if endpoint_config and endpoint_config.get("Type") == "OverwriteTimes":
+        if endpoint_config.get("Times"):
+            times = list(endpoint_config.get("Times", []))
             times_datetimes = sorted([parser.isoparse(time) for time in times])
             temporal_extent = TemporalExtent([[times_datetimes[0], times_datetimes[-1]]])
-        elif endpoint.get("DateTimeInterval"):
-            start = endpoint["DateTimeInterval"].get("Start", "2020-09-01T00:00:00")
-            end = endpoint["DateTimeInterval"].get("End", "2020-10-01T00:00:00")
-            timedelta_config = endpoint["DateTimeInterval"].get("Timedelta", {"days": 1})
+        elif endpoint_config.get("DateTimeInterval"):
+            start = endpoint_config["DateTimeInterval"].get("Start", "2020-09-01T00:00:00")
+            end = endpoint_config["DateTimeInterval"].get("End", "2020-10-01T00:00:00")
+            timedelta_config = endpoint_config["DateTimeInterval"].get("Timedelta", {"days": 1})
             times = generateDateIsostringsFromInterval(start, end, timedelta_config)
             times_datetimes = sorted([parser.isoparse(time) for time in times])
             temporal_extent = TemporalExtent([[times_datetimes[0], times_datetimes[-1]]])
     extent = Extent(spatial=spatial_extent, temporal=temporal_extent)
 
     # Check if description is link to markdown file
-    if "Description" in data:
-        description = data["Description"]
+    if "Description" in collection_config:
+        description = collection_config["Description"]
         if description.endswith((".md", ".MD")):
             if description.startswith("http"):
                 # if full absolute path is defined
                 response = requests.get(description)
                 if response.status_code == 200:
                     description = response.text
-                elif "Subtitle" in data:
+                elif "Subtitle" in collection_config:
                     print("WARNING: Markdown file could not be fetched")
-                    description = data["Subtitle"]
+                    description = collection_config["Subtitle"]
             else:
                 # relative path to assets was given
-                response = requests.get(f"{config["assets_endpoint"]}/{description}")
+                response = requests.get(f"{catalog_config["assets_endpoint"]}/{description}")
                 if response.status_code == 200:
                     description = response.text
-                elif "Subtitle" in data:
+                elif "Subtitle" in collection_config:
                     print("WARNING: Markdown file could not be fetched")
-                    description = data["Subtitle"]
-    elif "Subtitle" in data:
+                    description = collection_config["Subtitle"]
+    elif "Subtitle" in collection_config:
         # Try to use at least subtitle to fill some information
-        description = data["Subtitle"]
+        description = collection_config["Subtitle"]
 
     collection = Collection(
         id=collection_id,
-        title=data["Title"],
+        title=collection_config["Title"],
         description=description,
         extent=extent,
     )
-    return (collection, times)
+    return collection
 
 
 def create_web_map_link(layer: dict, role: str) -> Link:
@@ -117,16 +121,19 @@ def create_web_map_link(layer: dict, role: str) -> Link:
 
 
 def add_example_info(
-    stac_object: Collection | Catalog, data: dict, endpoint: dict, config: dict
+    stac_object: Collection | Catalog,
+    collection_config: dict,
+    endpoint_config: dict,
+    catalog_config: dict,
 ) -> None:
-    if "Services" in data:
-        for service in data["Services"]:
+    if "Services" in collection_config:
+        for service in collection_config["Services"]:
             if service["Name"] == "Statistical API":
                 service_type = service.get("Type", "byoc")
                 stac_object.add_link(
                     Link(
                         rel="example",
-                        target="{}/{}".format(config["assets_endpoint"], service["Script"]),
+                        target="{}/{}".format(catalog_config["assets_endpoint"], service["Script"]),
                         title="evalscript",
                         media_type="application/javascript",
                         extra_fields={
@@ -161,13 +168,13 @@ def add_example_info(
                         },
                     )
                 )
-    elif "Resources" in data:
-        for service in data["Resources"]:
+    elif "Resources" in collection_config:
+        for service in collection_config["Resources"]:
             if service.get("Name") == "xcube":
                 target_url = "{}/timeseries/{}/{}?aggMethods=median".format(
-                    endpoint["EndPoint"],
-                    endpoint["DatacubeId"],
-                    endpoint["Variable"],
+                    endpoint_config["EndPoint"],
+                    endpoint_config["DatacubeId"],
+                    endpoint_config["Variable"],
                 )
                 stac_object.add_link(
                     Link(
@@ -183,25 +190,27 @@ def add_example_info(
                 )
 
 
-def add_collection_information(config: dict, collection: Collection, data: dict) -> None:
+def add_collection_information(
+    catalog_config: dict, collection: Collection, collection_config: dict
+) -> None:
     # Add metadata information
     # Check license identifier
-    if "License" in data:
+    if "License" in collection_config:
         # Check if list was provided
-        if isinstance(data["License"], list):
-            if len(data["License"]) == 1:
+        if isinstance(collection_config["License"], list):
+            if len(collection_config["License"]) == 1:
                 collection.license = "proprietary"
                 link = Link(
                     rel="license",
-                    target=data["License"][0]["Url"],
-                    media_type=(data["License"][0].get("Type", "text/html")),
+                    target=collection_config["License"][0]["Url"],
+                    media_type=(collection_config["License"][0].get("Type", "text/html")),
                 )
-                if "Title" in data["License"][0]:
-                    link.title = data["License"][0]["Title"]
+                if "Title" in collection_config["License"][0]:
+                    link.title = collection_config["License"][0]["Title"]
                 collection.links.append(link)
-            elif len(data["License"]) > 1:
+            elif len(collection_config["License"]) > 1:
                 collection.license = "various"
-                for license_entry in data["License"]:
+                for license_entry in collection_config["License"]:
                     link = Link(
                         rel="license",
                         target=license_entry["Url"],
@@ -213,7 +222,7 @@ def add_collection_information(config: dict, collection: Collection, data: dict)
                         link.title = license_entry["Title"]
                     collection.links.append(link)
         else:
-            license_data = lookup.by_id(data["License"])
+            license_data = lookup.by_id(collection_config["License"])
             if license_data is not None:
                 collection.license = license_data.id
                 if license_data.sources:
@@ -234,65 +243,65 @@ def add_collection_information(config: dict, collection: Collection, data: dict)
         # print("WARNING: No license was provided, falling back to proprietary")
         pass
 
-    if "Provider" in data:
+    if "Provider" in collection_config:
         try:
             collection.providers = [
                 Provider(
                     # convert information to lower case
                     **{k.lower(): v for k, v in provider.items()}
                 )
-                for provider in data["Provider"]
+                for provider in collection_config["Provider"]
             ]
         except Exception:
             print(f"WARNING: Issue creating provider information for collection: {collection.id}")
 
-    if "Citation" in data:
-        if "DOI" in data["Citation"]:
-            collection.extra_fields["sci:doi"] = data["Citation"]["DOI"]
-        if "Citation" in data["Citation"]:
-            collection.extra_fields["sci:citation"] = data["Citation"]["Citation"]
-        if "Publication" in data["Citation"]:
+    if "Citation" in collection_config:
+        if "DOI" in collection_config["Citation"]:
+            collection.extra_fields["sci:doi"] = collection_config["Citation"]["DOI"]
+        if "Citation" in collection_config["Citation"]:
+            collection.extra_fields["sci:citation"] = collection_config["Citation"]["Citation"]
+        if "Publication" in collection_config["Citation"]:
             collection.extra_fields["sci:publications"] = [
                 # convert keys to lower case
                 {k.lower(): v for k, v in publication.items()}
-                for publication in data["Citation"]["Publication"]
+                for publication in collection_config["Citation"]["Publication"]
             ]
 
-    if "Subtitle" in data:
-        collection.extra_fields["subtitle"] = data["Subtitle"]
-    if "Legend" in data:
+    if "Subtitle" in collection_config:
+        collection.extra_fields["subtitle"] = collection_config["Subtitle"]
+    if "Legend" in collection_config:
         collection.add_asset(
             "legend",
             Asset(
-                href=f"{config["assets_endpoint"]}/{data["Legend"]}",
+                href=f"{catalog_config["assets_endpoint"]}/{collection_config["Legend"]}",
                 media_type="image/png",
                 roles=["metadata"],
             ),
         )
-    if "Story" in data:
+    if "Story" in collection_config:
         collection.add_asset(
             "story",
             Asset(
-                href=f"{config["assets_endpoint"]}/{data["Story"]}",
+                href=f"{catalog_config["assets_endpoint"]}/{collection_config["Story"]}",
                 media_type="text/markdown",
                 roles=["metadata"],
             ),
         )
-    if "Image" in data:
+    if "Image" in collection_config:
         collection.add_asset(
             "thumbnail",
             Asset(
-                href=f"{config["assets_endpoint"]}/{data["Image"]}",
+                href=f"{catalog_config["assets_endpoint"]}/{collection_config["Image"]}",
                 media_type="image/png",
                 roles=["thumbnail"],
             ),
         )
     # Add extra fields to collection if available
-    add_extra_fields(collection, data)
+    add_extra_fields(collection, collection_config)
 
-    if "References" in data:
+    if "References" in collection_config:
         generic_counter = 1
-        for ref in data["References"]:
+        for ref in collection_config["References"]:
             if "Key" in ref:
                 key = ref["Key"]
             else:
@@ -309,56 +318,73 @@ def add_collection_information(config: dict, collection: Collection, data: dict)
             )
 
 
-def add_base_overlay_info(collection: Collection, config: dict, data: dict) -> None:
+def add_base_overlay_info(
+    collection: Collection, catalog_config: dict, collection_config: dict
+) -> None:
     # check if default base layers defined
-    if "default_base_layers" in config:
-        with open(f"{config["default_base_layers"]}.yaml") as f:
+    if "default_base_layers" in catalog_config:
+        with open(f"{catalog_config["default_base_layers"]}.yaml") as f:
             base_layers = yaml.load(f, Loader=SafeLoader)
             for layer in base_layers:
                 collection.add_link(create_web_map_link(layer, role="baselayer"))
     # check if default overlay layers defined
-    if "default_overlay_layers" in config:
-        with open("{}.yaml".format(config["default_overlay_layers"])) as f:
+    if "default_overlay_layers" in catalog_config:
+        with open("{}.yaml".format(catalog_config["default_overlay_layers"])) as f:
             overlay_layers = yaml.load(f, Loader=SafeLoader)
             for layer in overlay_layers:
                 collection.add_link(create_web_map_link(layer, role="overlay"))
-    if "BaseLayers" in data:
-        for layer in data["BaseLayers"]:
+    if "BaseLayers" in collection_config:
+        for layer in collection_config["BaseLayers"]:
             collection.add_link(create_web_map_link(layer, role="baselayer"))
-    if "OverlayLayers" in data:
-        for layer in data["OverlayLayers"]:
+    if "OverlayLayers" in collection_config:
+        for layer in collection_config["OverlayLayers"]:
             collection.add_link(create_web_map_link(layer, role="overlay"))
     # TODO: possibility to overwrite default base and overlay layers
 
 
-def add_extra_fields(stac_object: Collection | Catalog | Link, data: dict) -> None:
-    if "yAxis" in data:
-        stac_object.extra_fields["yAxis"] = data["yAxis"]
-    if "Themes" in data:
-        stac_object.extra_fields["themes"] = data["Themes"]
-    if "Locations" in data or "Subcollections" in data:
+def add_extra_fields(stac_object: Collection | Catalog | Link, collection_config: dict) -> None:
+    if "yAxis" in collection_config:
+        stac_object.extra_fields["yAxis"] = collection_config["yAxis"]
+    if "Themes" in collection_config:
+        stac_object.extra_fields["themes"] = collection_config["Themes"]
+    if "Locations" in collection_config or "Subcollections" in collection_config:
         stac_object.extra_fields["locations"] = True
-    if "Tags" in data:
-        stac_object.extra_fields["tags"] = data["Tags"]
-    if "Satellite" in data:
-        stac_object.extra_fields["satellite"] = data["Satellite"]
-    if "Sensor" in data:
-        stac_object.extra_fields["sensor"] = data["Sensor"]
-    if "Agency" in data:
-        stac_object.extra_fields["agency"] = data["Agency"]
-    if "yAxis" in data:
-        stac_object.extra_fields["yAxis"] = data["yAxis"]
-    if "EodashIdentifier" in data:
-        stac_object.extra_fields["subcode"] = data["EodashIdentifier"]
-    if "DataSource" in data:
-        if "Spaceborne" in data["DataSource"]:
-            if "Sensor" in data["DataSource"]["Spaceborne"]:
-                stac_object.extra_fields["sensor"] = data["DataSource"]["Spaceborne"]["Sensor"]
-            if "Satellite" in data["DataSource"]["Spaceborne"]:
-                stac_object.extra_fields["satellite"] = data["DataSource"]["Spaceborne"][
-                    "Satellite"
+    if "Tags" in collection_config:
+        stac_object.extra_fields["tags"] = collection_config["Tags"]
+    if "Satellite" in collection_config:
+        stac_object.extra_fields["satellite"] = collection_config["Satellite"]
+    if "Sensor" in collection_config:
+        stac_object.extra_fields["sensor"] = collection_config["Sensor"]
+    if "Agency" in collection_config:
+        stac_object.extra_fields["agency"] = collection_config["Agency"]
+    if "yAxis" in collection_config:
+        stac_object.extra_fields["yAxis"] = collection_config["yAxis"]
+    if "EodashIdentifier" in collection_config:
+        stac_object.extra_fields["subcode"] = collection_config["EodashIdentifier"]
+    if "DataSource" in collection_config:
+        if "Spaceborne" in collection_config["DataSource"]:
+            if "Sensor" in collection_config["DataSource"]["Spaceborne"]:
+                stac_object.extra_fields["sensor"] = collection_config["DataSource"]["Spaceborne"][
+                    "Sensor"
                 ]
-        if "InSitu" in data["DataSource"]:
-            stac_object.extra_fields["insituSources"] = data["DataSource"]["InSitu"]
-        if "Other" in data["DataSource"]:
-            stac_object.extra_fields["otherSources"] = data["DataSource"]["Other"]
+            if "Satellite" in collection_config["DataSource"]["Spaceborne"]:
+                stac_object.extra_fields["satellite"] = collection_config["DataSource"][
+                    "Spaceborne"
+                ]["Satellite"]
+        if "InSitu" in collection_config["DataSource"]:
+            stac_object.extra_fields["insituSources"] = collection_config["DataSource"]["InSitu"]
+        if "Other" in collection_config["DataSource"]:
+            stac_object.extra_fields["otherSources"] = collection_config["DataSource"]["Other"]
+
+
+def get_collection_times_from_config(endpoint_config: dict) -> list[str]:
+    times: list[str] = []
+    if endpoint_config and endpoint_config.get("Type") == "OverwriteTimes":
+        if endpoint_config.get("Times"):
+            times = list(endpoint_config.get("Times", []))
+        elif endpoint_config.get("DateTimeInterval"):
+            start = endpoint_config["DateTimeInterval"].get("Start", "2020-09-01T00:00:00")
+            end = endpoint_config["DateTimeInterval"].get("End", "2020-10-01T00:00:00")
+            timedelta_config = endpoint_config["DateTimeInterval"].get("Timedelta", {"days": 1})
+            times = generateDateIsostringsFromInterval(start, end, timedelta_config)
+    return times

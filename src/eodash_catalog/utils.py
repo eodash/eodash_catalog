@@ -177,30 +177,32 @@ def iter_len_at_least(i, n: int) -> int:
     return sum(1 for _ in zip(range(n), i, strict=False)) == n
 
 
-def generate_veda_cog_link(endpoint: dict, file_url: str | None) -> str:
+def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
     bidx = ""
-    if "Bidx" in endpoint:
+    if "Bidx" in endpoint_config:
         # Check if an array was provided
-        if hasattr(endpoint["Bidx"], "__len__"):
-            for band in endpoint["Bidx"]:
+        if hasattr(endpoint_config["Bidx"], "__len__"):
+            for band in endpoint_config["Bidx"]:
                 bidx = bidx + f"&bidx={band}"
         else:
-            bidx = "&bidx={}".format(endpoint["Bidx"])
+            bidx = "&bidx={}".format(endpoint_config["Bidx"])
 
     colormap = ""
-    if "Colormap" in endpoint:
-        colormap = "&colormap={}".format(endpoint["Colormap"])
+    if "Colormap" in endpoint_config:
+        colormap = "&colormap={}".format(endpoint_config["Colormap"])
         # TODO: For now we assume a already urlparsed colormap definition
         # it could be nice to allow a json and better convert it on the fly
-        # colormap = "&colormap=%s"%(urllib.parse.quote(str(endpoint["Colormap"])))
+        # colormap = "&colormap=%s"%(urllib.parse.quote(str(endpoint_config["Colormap"])))
 
     colormap_name = ""
-    if "ColormapName" in endpoint:
-        colormap_name = "&colormap_name={}".format(endpoint["ColormapName"])
+    if "ColormapName" in endpoint_config:
+        colormap_name = "&colormap_name={}".format(endpoint_config["ColormapName"])
 
     rescale = ""
-    if "Rescale" in endpoint:
-        rescale = "&rescale={},{}".format(endpoint["Rescale"][0], endpoint["Rescale"][1])
+    if "Rescale" in endpoint_config:
+        rescale = "&rescale={},{}".format(
+            endpoint_config["Rescale"][0], endpoint_config["Rescale"][1]
+        )
 
     file_url = f"url={file_url}&" if file_url else ""
 

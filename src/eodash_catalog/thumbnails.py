@@ -10,8 +10,10 @@ from pystac import (
 from eodash_catalog.utils import generate_veda_cog_link
 
 
-def fetch_and_save_thumbnail(data: dict, url: str) -> None:
-    collection_path = "../thumbnails/{}_{}/".format(data["EodashIdentifier"], data["Name"])
+def fetch_and_save_thumbnail(collection_config: dict, url: str) -> None:
+    collection_path = "../thumbnails/{}_{}/".format(
+        collection_config["EodashIdentifier"], collection_config["Name"]
+    )
     Path(collection_path).mkdir(parents=True, exist_ok=True)
     image_path = f"{collection_path}/thumbnail.png"
     if not os.path.exists(image_path):
@@ -22,15 +24,15 @@ def fetch_and_save_thumbnail(data: dict, url: str) -> None:
 
 def generate_thumbnail(
     stac_object: Item,
-    data: dict,
-    endpoint: dict,
+    collection_config: dict,
+    endpoint_config: dict,
     file_url: str = "",
     time: str | None = None,
 ) -> None:
-    if endpoint["Name"] == "Sentinel Hub" or endpoint["Name"] == "WMS":
+    if endpoint_config["Name"] == "Sentinel Hub" or endpoint_config["Name"] == "WMS":
         instanceId = os.getenv("SH_INSTANCE_ID")
-        if "InstanceId" in endpoint:
-            instanceId = endpoint["InstanceId"]
+        if "InstanceId" in endpoint_config:
+            instanceId = endpoint_config["InstanceId"]
         # Build example url
         wms_config = (
             "REQUEST=GetMap&SERVICE=WMS&VERSION=1.3.0&FORMAT=image/png&STYLES=&TRANSPARENT=true"
@@ -47,13 +49,13 @@ def generate_thumbnail(
         url = "https://services.sentinel-hub.com/ogc/wms/{}?{}&layers={}&time={}&{}".format(
             instanceId,
             wms_config,
-            endpoint["LayerId"],
+            endpoint_config["LayerId"],
             time,
             output_format,
         )
-        fetch_and_save_thumbnail(data, url)
-    elif endpoint["Name"] == "VEDA":
-        target_url = generate_veda_cog_link(endpoint, file_url)
+        fetch_and_save_thumbnail(collection_config, url)
+    elif endpoint_config["Name"] == "VEDA":
+        target_url = generate_veda_cog_link(endpoint_config, file_url)
         # set to get 0/0/0 tile
         url = re.sub(r"\{.\}", "0", target_url)
-        fetch_and_save_thumbnail(data, url)
+        fetch_and_save_thumbnail(collection_config, url)

@@ -18,6 +18,7 @@ from yaml.loader import SafeLoader
 
 from eodash_catalog.endpoints import (
     handle_collection_only,
+    handle_custom_endpoint,
     handle_GeoDB_endpoint,
     handle_SH_endpoint,
     handle_SH_WMS_endpoint,
@@ -29,7 +30,7 @@ from eodash_catalog.stac_handling import (
     add_base_overlay_info,
     add_collection_information,
     add_extra_fields,
-    get_or_create_collection_and_times,
+    get_or_create_collection,
 )
 from eodash_catalog.utils import (
     Options,
@@ -46,23 +47,25 @@ load_dotenv()
 def process_catalog_file(file_path: str, options: Options):
     print("Processing catalog:", file_path)
     with open(file_path) as f:
-        config: dict = yaml.load(f, Loader=SafeLoader)
+        catalog_config: dict = yaml.load(f, Loader=SafeLoader)
 
         if len(options.collections) > 0:
             # create only catalogs containing the passed collections
-            process_collections = [c for c in config["collections"] if c in options.collections]
+            process_collections = [
+                c for c in catalog_config["collections"] if c in options.collections
+            ]
         elif (len(options.collections) == 1 and options.collections == "all") or len(
             options.collections
         ) == 0:
             # create full catalog
-            process_collections = config["collections"]
+            process_collections = catalog_config["collections"]
         if len(process_collections) == 0:
             print("No applicable collections found for catalog, skipping creation")
             return
         catalog = Catalog(
-            id=config["id"],
-            description=config["description"],
-            title=config["title"],
+            id=catalog_config["id"],
+            description=catalog_config["description"],
+            title=catalog_config["title"],
             catalog_type=CatalogType.RELATIVE_PUBLISHED,
         )
         for collection in process_collections:
@@ -70,13 +73,13 @@ def process_catalog_file(file_path: str, options: Options):
             if os.path.isfile(file_path):
                 # if collection file exists process it as indicator
                 # collection will be added as single collection to indicator
-                process_indicator_file(config, file_path, catalog, options)
+                process_indicator_file(catalog_config, file_path, catalog, options)
             else:
                 # if not try to see if indicator definition available
                 file_path = f"{options.indicatorspath}/{collection}.yaml"
                 if os.path.isfile(file_path):
                     process_indicator_file(
-                        config,
+                        catalog_config,
                         f"{options.indicatorspath}/{collection}.yaml",
                         catalog,
                         options,
@@ -91,24 +94,24 @@ def process_catalog_file(file_path: str, options: Options):
         print("Started creation of collection files")
         start = time.time()
         if options.ni:
-            catalog_self_href = f'{options.outputpath}/{config["id"]}'
+            catalog_self_href = f'{options.outputpath}/{catalog_config["id"]}'
             catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
             recursive_save(catalog, options.ni)
         else:
             # For full catalog save with items this still seems to be faster
-            catalog_self_href = config.get(
-                "endpoint", "{}/{}".format(options.outputpath, config["id"])
+            catalog_self_href = catalog_config.get(
+                "endpoint", "{}/{}".format(options.outputpath, catalog_config["id"])
             )
             catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
-            catalog.save(dest_href="{}/{}".format(options.outputpath, config["id"]))
+            catalog.save(dest_href="{}/{}".format(options.outputpath, catalog_config["id"]))
         end = time.time()
-        print(f"Catalog {config['id']}: Time consumed in saving: {end - start}")
+        print(f"Catalog {catalog_config['id']}: Time consumed in saving: {end - start}")
 
         if options.vd:
             # try to validate catalog if flag was set
             print(f"Running validation of catalog {file_path}")
             try:
-                validate_all(catalog.to_dict(), href=config["endpoint"])
+                validate_all(catalog.to_dict(), href=catalog_config["endpoint"])
             except Exception as e:
                 print(f"Issue validation collection: {e}")
 
@@ -150,25 +153,27 @@ def extract_indicator_info(parent_collection: Collection):
     parent_collection.summaries = Summaries(summaries)
 
 
-def process_indicator_file(config: dict, file_path: str, catalog: Catalog, options: Options):
+def process_indicator_file(
+    catalog_config: dict, file_path: str, catalog: Catalog, options: Options
+):
     with open(file_path) as f:
         print("Processing indicator:", file_path)
-        data: dict = yaml.load(f, Loader=SafeLoader)
-        parent_indicator, _ = get_or_create_collection_and_times(
-            catalog, data["Name"], data, config, {}
+        indicator_config: dict = yaml.load(f, Loader=SafeLoader)
+        parent_indicator = get_or_create_collection(
+            catalog, indicator_config["Name"], indicator_config, catalog_config, {}
         )
-        if "Collections" in data:
-            for collection in data["Collections"]:
+        if "Collections" in indicator_config:
+            for collection in indicator_config["Collections"]:
                 process_collection_file(
-                    config,
+                    catalog_config,
                     f"{options.collectionspath}/{collection}.yaml",
                     parent_indicator,
                     options,
                 )
         else:
             # we assume that collection files can also be loaded directly
-            process_collection_file(config, file_path, parent_indicator, options)
-        add_collection_information(config, parent_indicator, data)
+            process_collection_file(catalog_config, file_path, parent_indicator, options)
+        add_collection_information(catalog_config, parent_indicator, indicator_config)
         if iter_len_at_least(parent_indicator.get_items(recursive=True), 1):
             parent_indicator.update_extent_from_items()
         # Add bbox extents from children
@@ -178,55 +183,77 @@ def process_indicator_file(config: dict, file_path: str, catalog: Catalog, optio
         # extract collection information and add it to summary indicator level
         extract_indicator_info(parent_indicator)
         # add baselayer and overview information to indicator collection
-        add_base_overlay_info(parent_indicator, config, data)
-        add_to_catalog(parent_indicator, catalog, {}, data)
+        add_base_overlay_info(parent_indicator, catalog_config, indicator_config)
+        add_to_catalog(parent_indicator, catalog, {}, indicator_config)
 
 
 def process_collection_file(
-    config: dict, file_path: str, catalog: Catalog | Collection, options: Options
+    catalog_config: dict, file_path: str, catalog: Catalog | Collection, options: Options
 ):
     print("Processing collection:", file_path)
     with open(file_path) as f:
-        data: dict = yaml.load(f, Loader=SafeLoader)
-        if "Resources" in data:
-            for resource in data["Resources"]:
+        collection_config: dict = yaml.load(f, Loader=SafeLoader)
+        if "Resources" in collection_config:
+            for resource in collection_config["Resources"]:
                 if "EndPoint" in resource:
                     collection = None
                     if resource["Name"] == "Sentinel Hub":
-                        collection = handle_SH_endpoint(config, resource, data, catalog, options)
+                        collection = handle_SH_endpoint(
+                            catalog_config, resource, collection_config, catalog, options
+                        )
                     elif resource["Name"] == "Sentinel Hub WMS":
-                        collection = handle_SH_WMS_endpoint(config, resource, data, catalog)
+                        collection = handle_SH_WMS_endpoint(
+                            catalog_config, resource, collection_config, catalog
+                        )
                     elif resource["Name"] == "GeoDB":
-                        collection = handle_GeoDB_endpoint(config, resource, data, catalog)
+                        collection = handle_GeoDB_endpoint(
+                            catalog_config, resource, collection_config, catalog
+                        )
                     elif resource["Name"] == "VEDA":
-                        collection = handle_VEDA_endpoint(config, resource, data, catalog, options)
+                        collection = handle_VEDA_endpoint(
+                            catalog_config, resource, collection_config, catalog, options
+                        )
                     elif resource["Name"] == "marinedatastore":
-                        collection = handle_WMS_endpoint(config, resource, data, catalog, wmts=True)
+                        collection = handle_WMS_endpoint(
+                            catalog_config, resource, collection_config, catalog, wmts=True
+                        )
                     elif resource["Name"] == "xcube":
-                        collection = handle_xcube_endpoint(config, resource, data, catalog)
+                        collection = handle_xcube_endpoint(
+                            catalog_config, resource, collection_config, catalog
+                        )
                     elif resource["Name"] == "WMS":
-                        collection = handle_WMS_endpoint(config, resource, data, catalog)
+                        collection = handle_WMS_endpoint(
+                            catalog_config, resource, collection_config, catalog
+                        )
                     elif resource["Name"] == "JAXA_WMTS_PALSAR":
                         # somewhat one off creation of individual WMTS layers as individual items
-                        collection = handle_WMS_endpoint(config, resource, data, catalog, wmts=True)
+                        collection = handle_WMS_endpoint(
+                            catalog_config, resource, collection_config, catalog, wmts=True
+                        )
                     elif resource["Name"] == "Collection-only":
-                        collection = handle_collection_only(config, resource, data, catalog)
+                        collection = handle_collection_only(
+                            catalog_config, resource, collection_config, catalog
+                        )
+                    elif resource["Name"] == "Custom-Endpoint":
+                        collection = handle_custom_endpoint(
+                            catalog_config, resource, collection_config
+                        )
                     else:
                         raise ValueError("Type of Resource is not supported")
-                    if collection is not None:
+                    if collection:
                         add_single_item_if_collection_empty(collection)
-                        add_to_catalog(collection, catalog, resource, data)
+                        add_to_catalog(collection, catalog, resource, collection_config)
                     else:
-                        raise Exception("No collection generated")
-        elif "Subcollections" in data:
+                        raise Exception(f"No collection was generated for resource {resource}")
+        elif "Subcollections" in collection_config:
             # if no endpoint is specified we check for definition of subcollections
-            parent_collection, _ = get_or_create_collection_and_times(
-                catalog, data["Name"], data, config, {}
+            parent_collection = get_or_create_collection(
+                catalog, collection_config["Name"], collection_config, catalog_config, {}
             )
 
             locations = []
             countries = []
-            for sub_coll_def in data["Subcollections"]:
+            for sub_coll_def in collection_config["Subcollections"]:
                 # Subcollection has only data on one location which
                 # is defined for the entire collection
                 if "Name" in sub_coll_def and "Point" in sub_coll_def:
@@ -236,7 +263,7 @@ def process_collection_file(
                     else:
                         countries.append(sub_coll_def["Country"])
                     process_collection_file(
-                        config,
+                        catalog_config,
                         "{}/{}.yaml".format(options.collectionspath, sub_coll_def["Collection"]),
                         parent_collection,
                         options,
@@ -265,7 +292,7 @@ def process_collection_file(
                     # create temp catalog to save collection
                     tmp_catalog = Catalog(id="tmp_catalog", description="temp catalog placeholder")
                     process_collection_file(
-                        config,
+                        catalog_config,
                         "{}/{}.yaml".format(options.collectionspath, sub_coll_def["Collection"]),
                         tmp_catalog,
                         options,
@@ -283,7 +310,7 @@ def process_collection_file(
 
                     parent_collection.add_links(links)
 
-            add_collection_information(config, parent_collection, data)
+            add_collection_information(catalog_config, parent_collection, collection_config)
             parent_collection.update_extent_from_items()
             # Add bbox extents from children
             for c_child in parent_collection.get_children():
@@ -296,10 +323,12 @@ def process_collection_file(
                     "countries": list(set(countries)),
                 }
             )
-            add_to_catalog(parent_collection, catalog, {}, data)
+            add_to_catalog(parent_collection, catalog, {}, collection_config)
 
 
-def add_to_catalog(collection: Collection, catalog: Catalog, endpoint: dict, data: dict):
+def add_to_catalog(
+    collection: Collection, catalog: Catalog, endpoint: dict, collection_config: dict
+):
     # check if already in catalog, if it is do not re-add it
     # TODO: probably we should add to the catalog only when creating
     for cat_coll in catalog.get_collections():
@@ -320,19 +349,19 @@ def add_to_catalog(collection: Collection, catalog: Catalog, endpoint: dict, dat
     elif endpoint:
         collection.extra_fields["endpointtype"] = endpoint["Name"]
         link.extra_fields["endpointtype"] = endpoint["Name"]
-    if "Subtitle" in data:
-        link.extra_fields["subtitle"] = data["Subtitle"]
+    if "Subtitle" in collection_config:
+        link.extra_fields["subtitle"] = collection_config["Subtitle"]
     link.extra_fields["title"] = collection.title
-    link.extra_fields["code"] = data["EodashIdentifier"]
-    link.extra_fields["id"] = data["Name"]
-    if "Themes" in data:
-        link.extra_fields["themes"] = data["Themes"]
+    link.extra_fields["code"] = collection_config["EodashIdentifier"]
+    link.extra_fields["id"] = collection_config["Name"]
+    if "Themes" in collection_config:
+        link.extra_fields["themes"] = collection_config["Themes"]
     # Check for summaries and bubble up info
     if collection.summaries.lists:
         for summary in collection.summaries.lists:
             link.extra_fields[summary] = collection.summaries.lists[summary]
 
-    add_extra_fields(link, data)
+    add_extra_fields(link, collection_config)
     return link
 
 
