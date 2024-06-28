@@ -4,6 +4,7 @@ import shutil
 from datetime import datetime
 
 import pytest
+from dateutil import parser
 from eodash_catalog.generate_indicators import process_catalog_file
 from eodash_catalog.utils import (
     Options,
@@ -63,9 +64,7 @@ def test_collection_no_wms_has_a_single_item(catalog_output_folder):
         assert collection_json["extent"]["temporal"]["interval"][0][0] == start_date
         assert (
             datetime.today().date()
-            == datetime.fromisoformat(
-                collection_json["extent"]["temporal"]["interval"][0][1]
-            ).date()
+            == parser.parse(collection_json["extent"]["temporal"]["interval"][0][1]).date()
         )
     child_collection_path = os.path.join(root_collection_path, collection_name)
     child_child_collection_path = os.path.join(child_collection_path, collection_name)
