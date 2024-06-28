@@ -195,56 +195,58 @@ def process_collection_file(
         collection_config: dict = yaml.load(f, Loader=SafeLoader)
         if "Resources" in collection_config:
             for resource in collection_config["Resources"]:
-                if "EndPoint" in resource:
-                    collection = None
-                    if resource["Name"] == "Sentinel Hub":
-                        collection = handle_SH_endpoint(
-                            catalog_config, resource, collection_config, catalog, options
-                        )
-                    elif resource["Name"] == "Sentinel Hub WMS":
-                        collection = handle_SH_WMS_endpoint(
-                            catalog_config, resource, collection_config, catalog
-                        )
-                    elif resource["Name"] == "GeoDB":
-                        collection = handle_GeoDB_endpoint(
-                            catalog_config, resource, collection_config, catalog
-                        )
-                    elif resource["Name"] == "VEDA":
-                        collection = handle_VEDA_endpoint(
-                            catalog_config, resource, collection_config, catalog, options
-                        )
-                    elif resource["Name"] == "marinedatastore":
-                        collection = handle_WMS_endpoint(
-                            catalog_config, resource, collection_config, catalog, wmts=True
-                        )
-                    elif resource["Name"] == "xcube":
-                        collection = handle_xcube_endpoint(
-                            catalog_config, resource, collection_config, catalog
-                        )
-                    elif resource["Name"] == "WMS":
-                        collection = handle_WMS_endpoint(
-                            catalog_config, resource, collection_config, catalog
-                        )
-                    elif resource["Name"] == "JAXA_WMTS_PALSAR":
-                        # somewhat one off creation of individual WMTS layers as individual items
-                        collection = handle_WMS_endpoint(
-                            catalog_config, resource, collection_config, catalog, wmts=True
-                        )
-                    elif resource["Name"] == "Collection-only":
-                        collection = handle_collection_only(
-                            catalog_config, resource, collection_config, catalog
-                        )
-                    elif resource["Name"] == "Custom-Endpoint":
-                        collection = handle_custom_endpoint(
-                            catalog_config, resource, collection_config
-                        )
-                    else:
-                        raise ValueError("Type of Resource is not supported")
-                    if collection:
-                        add_single_item_if_collection_empty(collection)
-                        add_to_catalog(collection, catalog, resource, collection_config)
-                    else:
-                        raise Exception(f"No collection was generated for resource {resource}")
+                collection = None
+                if resource["Name"] == "Sentinel Hub":
+                    collection = handle_SH_endpoint(
+                        catalog_config, resource, collection_config, catalog, options
+                    )
+                elif resource["Name"] == "Sentinel Hub WMS":
+                    collection = handle_SH_WMS_endpoint(
+                        catalog_config, resource, collection_config, catalog
+                    )
+                elif resource["Name"] == "GeoDB":
+                    collection = handle_GeoDB_endpoint(
+                        catalog_config, resource, collection_config, catalog
+                    )
+                elif resource["Name"] == "VEDA":
+                    collection = handle_VEDA_endpoint(
+                        catalog_config, resource, collection_config, catalog, options
+                    )
+                elif resource["Name"] == "marinedatastore":
+                    collection = handle_WMS_endpoint(
+                        catalog_config, resource, collection_config, catalog, wmts=True
+                    )
+                elif resource["Name"] == "xcube":
+                    collection = handle_xcube_endpoint(
+                        catalog_config, resource, collection_config, catalog
+                    )
+                elif resource["Name"] == "WMS":
+                    collection = handle_WMS_endpoint(
+                        catalog_config, resource, collection_config, catalog
+                    )
+                elif resource["Name"] == "JAXA_WMTS_PALSAR":
+                    # somewhat one off creation of individual WMTS layers as individual items
+                    collection = handle_WMS_endpoint(
+                        catalog_config, resource, collection_config, catalog, wmts=True
+                    )
+                elif resource["Name"] == "Collection-only":
+                    collection = handle_collection_only(
+                        catalog_config, resource, collection_config, catalog
+                    )
+                elif resource["Name"] == "Custom-Endpoint":
+                    collection = handle_custom_endpoint(
+                        catalog_config,
+                        resource,
+                        collection_config,
+                        catalog,
+                    )
+                else:
+                    raise ValueError("Type of Resource is not supported")
+                if collection:
+                    add_single_item_if_collection_empty(collection)
+                    add_to_catalog(collection, catalog, resource, collection_config)
+                else:
+                    raise Exception(f"No collection was generated for resource {resource}")
         elif "Subcollections" in collection_config:
             # if no endpoint is specified we check for definition of subcollections
             parent_collection = get_or_create_collection(
