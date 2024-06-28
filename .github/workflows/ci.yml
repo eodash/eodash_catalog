@@ -22,5 +22,7 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Lint
         run: python -m ruff check --no-cache .
+      - name: Install eodash catalog itself for tests
+        run: python -m pip install .
       - name: Test
         run: cd tests && python -m pytest -p no:cacheprovider
