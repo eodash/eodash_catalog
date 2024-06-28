@@ -19,15 +19,15 @@ from yaml.loader import SafeLoader
 from eodash_catalog.utils import generateDateIsostringsFromInterval
 
 
-def get_or_create_collection_and_times(
-    catalog: Catalog, collection_id: str, data: dict, config: dict, endpoint: dict
-) -> tuple[Collection, list[str]]:
+def get_or_create_collection(
+    catalog: Catalog, collection_id: str, data: dict, catalog_config: dict, endpoint_config: dict
+) -> Collection:
     # Check if collection already in catalog
     for collection in catalog.get_collections():
         if collection.id == collection_id:
-            return collection, []
+            return collection
     # If none found create a new one
-    spatial_extent = endpoint.get("OverwriteBBox", [-180.0, -90.0, 180.0, 90.0])
+    spatial_extent = endpoint_config.get("OverwriteBBox", [-180.0, -90.0, 180.0, 90.0])
 
     spatial_extent = SpatialExtent(
         [
@@ -36,15 +36,15 @@ def get_or_create_collection_and_times(
     )
     times: list[str] = []
     temporal_extent = TemporalExtent([[datetime.now(), None]])
-    if endpoint and endpoint.get("Type") == "OverwriteTimes":
-        if endpoint.get("Times"):
-            times = list(endpoint.get("Times", []))
+    if endpoint_config and endpoint_config.get("Type") == "OverwriteTimes":
+        if endpoint_config.get("Times"):
+            times = list(endpoint_config.get("Times", []))
             times_datetimes = sorted([parser.isoparse(time) for time in times])
             temporal_extent = TemporalExtent([[times_datetimes[0], times_datetimes[-1]]])
-        elif endpoint.get("DateTimeInterval"):
-            start = endpoint["DateTimeInterval"].get("Start", "2020-09-01T00:00:00")
-            end = endpoint["DateTimeInterval"].get("End", "2020-10-01T00:00:00")
-            timedelta_config = endpoint["DateTimeInterval"].get("Timedelta", {"days": 1})
+        elif endpoint_config.get("DateTimeInterval"):
+            start = endpoint_config["DateTimeInterval"].get("Start", "2020-09-01T00:00:00")
+            end = endpoint_config["DateTimeInterval"].get("End", "2020-10-01T00:00:00")
+            timedelta_config = endpoint_config["DateTimeInterval"].get("Timedelta", {"days": 1})
             times = generateDateIsostringsFromInterval(start, end, timedelta_config)
             times_datetimes = sorted([parser.isoparse(time) for time in times])
             temporal_extent = TemporalExtent([[times_datetimes[0], times_datetimes[-1]]])
@@ -64,7 +64,7 @@ def get_or_create_collection_and_times(
                     description = data["Subtitle"]
             else:
                 # relative path to assets was given
-                response = requests.get(f"{config["assets_endpoint"]}/{description}")
+                response = requests.get(f"{catalog_config["assets_endpoint"]}/{description}")
                 if response.status_code == 200:
                     description = response.text
                 elif "Subtitle" in data:
@@ -80,7 +80,7 @@ def get_or_create_collection_and_times(
         description=description,
         extent=extent,
     )
-    return (collection, times)
+    return collection
 
 
 def create_web_map_link(layer: dict, role: str) -> Link:
@@ -117,7 +117,7 @@ def create_web_map_link(layer: dict, role: str) -> Link:
 
 
 def add_example_info(
-    stac_object: Collection | Catalog, data: dict, endpoint: dict, config: dict
+    stac_object: Collection | Catalog, data: dict, endpoint_config: dict, catalog_config: dict
 ) -> None:
     if "Services" in data:
         for service in data["Services"]:
@@ -126,7 +126,7 @@ def add_example_info(
                 stac_object.add_link(
                     Link(
                         rel="example",
-                        target="{}/{}".format(config["assets_endpoint"], service["Script"]),
+                        target="{}/{}".format(catalog_config["assets_endpoint"], service["Script"]),
                         title="evalscript",
                         media_type="application/javascript",
                         extra_fields={
@@ -165,9 +165,9 @@ def add_example_info(
         for service in data["Resources"]:
             if service.get("Name") == "xcube":
                 target_url = "{}/timeseries/{}/{}?aggMethods=median".format(
-                    endpoint["EndPoint"],
-                    endpoint["DatacubeId"],
-                    endpoint["Variable"],
+                    endpoint_config["EndPoint"],
+                    endpoint_config["DatacubeId"],
+                    endpoint_config["Variable"],
                 )
                 stac_object.add_link(
                     Link(
@@ -183,7 +183,7 @@ def add_example_info(
                 )
 
 
-def add_collection_information(config: dict, collection: Collection, data: dict) -> None:
+def add_collection_information(catalog_config: dict, collection: Collection, data: dict) -> None:
     # Add metadata information
     # Check license identifier
     if "License" in data:
@@ -264,7 +264,7 @@ def add_collection_information(config: dict, collection: Collection, data: dict)
         collection.add_asset(
             "legend",
             Asset(
-                href=f"{config["assets_endpoint"]}/{data["Legend"]}",
+                href=f"{catalog_config["assets_endpoint"]}/{data["Legend"]}",
                 media_type="image/png",
                 roles=["metadata"],
             ),
@@ -273,7 +273,7 @@ def add_collection_information(config: dict, collection: Collection, data: dict)
         collection.add_asset(
             "story",
             Asset(
-                href=f"{config["assets_endpoint"]}/{data["Story"]}",
+                href=f"{catalog_config["assets_endpoint"]}/{data["Story"]}",
                 media_type="text/markdown",
                 roles=["metadata"],
             ),
@@ -282,7 +282,7 @@ def add_collection_information(config: dict, collection: Collection, data: dict)
         collection.add_asset(
             "thumbnail",
             Asset(
-                href=f"{config["assets_endpoint"]}/{data["Image"]}",
+                href=f"{catalog_config["assets_endpoint"]}/{data["Image"]}",
                 media_type="image/png",
                 roles=["thumbnail"],
             ),
@@ -309,16 +309,16 @@ def add_collection_information(config: dict, collection: Collection, data: dict)
             )
 
 
-def add_base_overlay_info(collection: Collection, config: dict, data: dict) -> None:
+def add_base_overlay_info(collection: Collection, catalog_config: dict, data: dict) -> None:
     # check if default base layers defined
-    if "default_base_layers" in config:
-        with open(f"{config["default_base_layers"]}.yaml") as f:
+    if "default_base_layers" in catalog_config:
+        with open(f"{catalog_config["default_base_layers"]}.yaml") as f:
             base_layers = yaml.load(f, Loader=SafeLoader)
             for layer in base_layers:
                 collection.add_link(create_web_map_link(layer, role="baselayer"))
     # check if default overlay layers defined
-    if "default_overlay_layers" in config:
-        with open("{}.yaml".format(config["default_overlay_layers"])) as f:
+    if "default_overlay_layers" in catalog_config:
+        with open("{}.yaml".format(catalog_config["default_overlay_layers"])) as f:
             overlay_layers = yaml.load(f, Loader=SafeLoader)
             for layer in overlay_layers:
                 collection.add_link(create_web_map_link(layer, role="overlay"))
@@ -362,3 +362,16 @@ def add_extra_fields(stac_object: Collection | Catalog | Link, data: dict) -> No
             stac_object.extra_fields["insituSources"] = data["DataSource"]["InSitu"]
         if "Other" in data["DataSource"]:
             stac_object.extra_fields["otherSources"] = data["DataSource"]["Other"]
+
+
+def get_collection_times_from_config(endpoint_config: dict) -> list[str]:
+    times: list[str] = []
+    if endpoint_config and endpoint_config.get("Type") == "OverwriteTimes":
+        if endpoint_config.get("Times"):
+            times = list(endpoint_config.get("Times", []))
+        elif endpoint_config.get("DateTimeInterval"):
+            start = endpoint_config["DateTimeInterval"].get("Start", "2020-09-01T00:00:00")
+            end = endpoint_config["DateTimeInterval"].get("End", "2020-10-01T00:00:00")
+            timedelta_config = endpoint_config["DateTimeInterval"].get("Timedelta", {"days": 1})
+            times = generateDateIsostringsFromInterval(start, end, timedelta_config)
+    return times

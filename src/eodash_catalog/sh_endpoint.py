@@ -3,6 +3,8 @@ import os
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
+SH_TOKEN_URL = "https://services.sentinel-hub.com/oauth/token"
+
 
 def get_SH_token() -> str:
     # Your client credentials
@@ -13,7 +15,7 @@ def get_SH_token() -> str:
     oauth = OAuth2Session(client=client)
     # Get token for the session
     token = oauth.fetch_token(
-        token_url="https://services.sentinel-hub.com/oauth/token",
+        token_url=SH_TOKEN_URL,
         client_secret=client_secret,
     )
 

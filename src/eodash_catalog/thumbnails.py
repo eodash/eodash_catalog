@@ -23,14 +23,14 @@ def fetch_and_save_thumbnail(data: dict, url: str) -> None:
 def generate_thumbnail(
     stac_object: Item,
     data: dict,
-    endpoint: dict,
+    endpoint_config: dict,
     file_url: str = "",
     time: str | None = None,
 ) -> None:
-    if endpoint["Name"] == "Sentinel Hub" or endpoint["Name"] == "WMS":
+    if endpoint_config["Name"] == "Sentinel Hub" or endpoint_config["Name"] == "WMS":
         instanceId = os.getenv("SH_INSTANCE_ID")
-        if "InstanceId" in endpoint:
-            instanceId = endpoint["InstanceId"]
+        if "InstanceId" in endpoint_config:
+            instanceId = endpoint_config["InstanceId"]
         # Build example url
         wms_config = (
             "REQUEST=GetMap&SERVICE=WMS&VERSION=1.3.0&FORMAT=image/png&STYLES=&TRANSPARENT=true"
@@ -47,13 +47,13 @@ def generate_thumbnail(
         url = "https://services.sentinel-hub.com/ogc/wms/{}?{}&layers={}&time={}&{}".format(
             instanceId,
             wms_config,
-            endpoint["LayerId"],
+            endpoint_config["LayerId"],
             time,
             output_format,
         )
         fetch_and_save_thumbnail(data, url)
-    elif endpoint["Name"] == "VEDA":
-        target_url = generate_veda_cog_link(endpoint, file_url)
+    elif endpoint_config["Name"] == "VEDA":
+        target_url = generate_veda_cog_link(endpoint_config, file_url)
         # set to get 0/0/0 tile
         url = re.sub(r"\{.\}", "0", target_url)
         fetch_and_save_thumbnail(data, url)
