@@ -1,6 +1,9 @@
+import importlib
 import json
 import os
+import sys
 import uuid
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
@@ -731,5 +734,33 @@ def handle_custom_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    catalog: Catalog,
 ) -> Collection:
-    raise NotImplementedError
+    collection = get_or_create_collection(
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
+    )
+    # invoke 3rd party code and return
+    function_path = endpoint_config["Python_Function_Location"]
+    module_name, _, func_name = function_path.rpartition(".")
+    # add current working directory to sys path
+    sys.path.append(os.getcwd())
+    try:
+        # import configured function
+        imported_function: Callable[[Collection, dict, dict, dict], Collection] = getattr(
+            importlib.import_module(module_name), func_name
+        )
+    except ModuleNotFoundError as e:
+        print(
+            f"""function {func_name} from module {module_name} can not be imported.
+            Check if you are specifying relative path inside the
+            catalog repository or catalog generator repository."""
+        )
+        raise e
+    # execture the custom handler
+    collection = imported_function(
+        collection,
+        catalog_config,
+        endpoint_config,
+        collection_config,
+    )
+    return collection
