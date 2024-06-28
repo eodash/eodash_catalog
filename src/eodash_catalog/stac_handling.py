@@ -68,7 +68,7 @@ def get_or_create_collection(
                     description = collection_config["Subtitle"]
             else:
                 # relative path to assets was given
-                response = requests.get(f"{catalog_config["assets_endpoint"]}/{description}")
+                response = requests.get(f'{catalog_config["assets_endpoint"]}/{description}')
                 if response.status_code == 200:
                     description = response.text
                 elif "Subtitle" in collection_config:
@@ -273,7 +273,7 @@ def add_collection_information(
         collection.add_asset(
             "legend",
             Asset(
-                href=f"{catalog_config["assets_endpoint"]}/{collection_config["Legend"]}",
+                href=f'{catalog_config["assets_endpoint"]}/{collection_config["Legend"]}',
                 media_type="image/png",
                 roles=["metadata"],
             ),
@@ -282,7 +282,7 @@ def add_collection_information(
         collection.add_asset(
             "story",
             Asset(
-                href=f"{catalog_config["assets_endpoint"]}/{collection_config["Story"]}",
+                href=f'{catalog_config["assets_endpoint"]}/{collection_config["Story"]}',
                 media_type="text/markdown",
                 roles=["metadata"],
             ),
@@ -291,7 +291,7 @@ def add_collection_information(
         collection.add_asset(
             "thumbnail",
             Asset(
-                href=f"{catalog_config["assets_endpoint"]}/{collection_config["Image"]}",
+                href=f'{catalog_config["assets_endpoint"]}/{collection_config["Image"]}',
                 media_type="image/png",
                 roles=["thumbnail"],
             ),
@@ -323,7 +323,7 @@ def add_base_overlay_info(
 ) -> None:
     # check if default base layers defined
     if "default_base_layers" in catalog_config:
-        with open(f"{catalog_config["default_base_layers"]}.yaml") as f:
+        with open(f'{catalog_config["default_base_layers"]}.yaml') as f:
             base_layers = yaml.load(f, Loader=SafeLoader)
             for layer in base_layers:
                 collection.add_link(create_web_map_link(layer, role="baselayer"))
