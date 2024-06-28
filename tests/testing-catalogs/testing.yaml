@@ -1,0 +1,10 @@
+id: "testing-catalog-id"
+title: "testing catalog for integration tests"
+description: "testing catalog"
+endpoint: "https://gtif-cerulean.github.io/catalog/cerulean/"
+default_base_layers: "testing-layers/baselayers"
+default_overlay_layers: "testing-layers/overlays"
+assets_endpoint: "https://raw.githubusercontent.com/eurodatacube/eodash-assets/main/"
+collections:
+  - test_wms_no_time
+  - test_indicator

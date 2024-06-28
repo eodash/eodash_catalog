@@ -1,0 +1,7 @@
+Name: test_indicator_grouping_collections
+Title: test_indicator_grouping_collections
+EodashIdentifier: test_indicator_1
+Description: 'test_indicator_1_description'
+Collections:
+  - test_tif_demo_1
+  - test_tif_demo_2

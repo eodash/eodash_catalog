@@ -1,0 +1,7 @@
+- id: cloudless-2022
+  name: EOxCloudless 2022
+  url: '//s2maps-tiles.eu/wmts/1.0.0/s2cloudless-2022_3857/default/g/{z}/{y}/{x}.jpeg'
+  media_type: image/jpeg
+  attribution: '{ EOxCloudless 2022: <a xmlns:dct="http://purl.org/dc/terms/" href="//s2maps.eu" target="_blank" property="dct:title">Sentinel-2 cloudless - s2maps.eu</a> by <a xmlns:cc="http://creativecommons.org/ns#" href="//eox.at" target="_blank" property="cc:attributionName" rel="cc:attributionURL">EOX IT Services GmbH</a> (Contains modified Copernicus Sentinel data 2022) }'
+  maxNativeZoom: 17
+  protocol: 'xyz'
