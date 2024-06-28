@@ -27,12 +27,12 @@ from eodash_catalog.utils import (
 
 
 def process_STAC_Datacube_Endpoint(
-    catalog_config: dict, endpoint_config: dict, data: dict, catalog: Catalog
+    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
 ) -> Collection:
     collection = get_or_create_collection(
-        catalog, data["Name"], data, catalog_config, endpoint_config
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    add_visualization_info(collection, data, endpoint_config)
+    add_visualization_info(collection, collection_config, endpoint_config)
 
     stac_endpoint_url = endpoint_config["EndPoint"]
     if endpoint_config.get("Name") == "xcube":
@@ -79,11 +79,11 @@ def process_STAC_Datacube_Endpoint(
             link.extra_fields["start_datetime"] = item.properties["start_datetime"]
             link.extra_fields["end_datetime"] = item.properties["end_datetime"]
     unit = variables.get(endpoint_config.get("Variable")).get("unit")
-    if unit and "yAxis" not in data:
-        data["yAxis"] = unit
+    if unit and "yAxis" not in collection_config:
+        collection_config["yAxis"] = unit
     collection.update_extent_from_items()
 
-    add_collection_information(catalog_config, collection, data)
+    add_collection_information(catalog_config, collection, collection_config)
 
     return collection
 
@@ -91,21 +91,21 @@ def process_STAC_Datacube_Endpoint(
 def handle_STAC_based_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
-    data: dict,
+    collection_config: dict,
     catalog: Catalog,
     options: Options,
     headers=None,
 ) -> Collection:
-    if "Locations" in data:
+    if "Locations" in collection_config:
         root_collection = get_or_create_collection(
-            catalog, data["Name"], data, catalog_config, endpoint_config
+            catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
         )
-        for location in data["Locations"]:
+        for location in collection_config["Locations"]:
             if "FilterDates" in location:
                 collection = process_STACAPI_Endpoint(
                     catalog_config=catalog_config,
                     endpoint_config=endpoint_config,
-                    data=data,
+                    collection_config=collection_config,
                     catalog=catalog,
                     options=options,
                     headers=headers,
@@ -117,7 +117,7 @@ def handle_STAC_based_endpoint(
                 collection = process_STACAPI_Endpoint(
                     catalog_config=catalog_config,
                     endpoint_config=endpoint_config,
-                    data=data,
+                    collection_config=collection_config,
                     catalog=catalog,
                     options=options,
                     headers=headers,
@@ -141,7 +141,7 @@ def handle_STAC_based_endpoint(
             link.extra_fields["id"] = location["Identifier"]
             link.extra_fields["latlng"] = latlng
             link.extra_fields["name"] = location["Name"]
-            add_example_info(collection, data, endpoint_config, catalog_config)
+            add_example_info(collection, collection_config, endpoint_config, catalog_config)
             if "OverwriteBBox" in location:
                 collection.extent.spatial = SpatialExtent(
                     [
@@ -158,7 +158,7 @@ def handle_STAC_based_endpoint(
             root_collection = process_STACAPI_Endpoint(
                 catalog_config=catalog_config,
                 endpoint_config=endpoint_config,
-                data=data,
+                collection_config=collection_config,
                 catalog=catalog,
                 options=options,
                 headers=headers,
@@ -168,20 +168,20 @@ def handle_STAC_based_endpoint(
             root_collection = process_STACAPI_Endpoint(
                 catalog_config=catalog_config,
                 endpoint_config=endpoint_config,
-                data=data,
+                collection_config=collection_config,
                 catalog=catalog,
                 options=options,
                 headers=headers,
             )
 
-    add_example_info(root_collection, data, endpoint_config, catalog_config)
+    add_example_info(root_collection, collection_config, endpoint_config, catalog_config)
     return root_collection
 
 
 def process_STACAPI_Endpoint(
     catalog_config: dict,
     endpoint_config: dict,
-    data: dict,
+    collection_config: dict,
     catalog: Catalog,
     options: Options,
     headers: dict[str, str] | None = None,
@@ -192,7 +192,7 @@ def process_STACAPI_Endpoint(
     if headers is None:
         headers = {}
     collection = get_or_create_collection(
-        catalog, endpoint_config["CollectionId"], data, catalog_config, endpoint_config
+        catalog, endpoint_config["CollectionId"], collection_config, catalog_config, endpoint_config
     )
 
     api = Client.open(endpoint_config["EndPoint"], headers=headers)
@@ -218,23 +218,27 @@ def process_STACAPI_Endpoint(
         link = collection.add_item(item)
         if options.tn:
             if "cog_default" in item.assets:
-                generate_thumbnail(item, data, endpoint_config, item.assets["cog_default"].href)
+                generate_thumbnail(
+                    item, collection_config, endpoint_config, item.assets["cog_default"].href
+                )
             else:
-                generate_thumbnail(item, data, endpoint_config)
+                generate_thumbnail(item, collection_config, endpoint_config)
         # Check if we can create visualization link
         if "Assets" in endpoint_config:
-            add_visualization_info(item, data, endpoint_config, item.id)
+            add_visualization_info(item, collection_config, endpoint_config, item.id)
             link.extra_fields["item"] = item.id
         elif "cog_default" in item.assets:
-            add_visualization_info(item, data, endpoint_config, item.assets["cog_default"].href)
+            add_visualization_info(
+                item, collection_config, endpoint_config, item.assets["cog_default"].href
+            )
             link.extra_fields["cog_href"] = item.assets["cog_default"].href
         elif item_datetime:
             time_string = item_datetime.isoformat()[:-6] + "Z"
-            add_visualization_info(item, data, endpoint_config, time=time_string)
+            add_visualization_info(item, collection_config, endpoint_config, time=time_string)
         elif "start_datetime" in item.properties and "end_datetime" in item.properties:
             add_visualization_info(
                 item,
-                data,
+                collection_config,
                 endpoint_config,
                 time="{}/{}".format(
                     item.properties["start_datetime"], item.properties["end_datetime"]
@@ -260,8 +264,8 @@ def process_STACAPI_Endpoint(
     collection.update_extent_from_items()
 
     # replace SH identifier with catalog identifier
-    collection.id = data["Name"]
-    add_collection_information(catalog_config, collection, data)
+    collection.id = collection_config["Name"]
+    add_collection_information(catalog_config, collection, collection_config)
 
     # Check if we need to overwrite the bbox after update from items
     if "OverwriteBBox" in endpoint_config:
@@ -275,17 +279,23 @@ def process_STACAPI_Endpoint(
 
 
 def handle_VEDA_endpoint(
-    catalog_config: dict, endpoint_config: dict, data: dict, catalog: Catalog, options: Options
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    catalog: Catalog,
+    options: Options,
 ) -> Collection:
-    collection = handle_STAC_based_endpoint(catalog_config, endpoint_config, data, catalog, options)
+    collection = handle_STAC_based_endpoint(
+        catalog_config, endpoint_config, collection_config, catalog, options
+    )
     return collection
 
 
 def handle_collection_only(
-    catalog_config: dict, endpoint_config: dict, data: dict, catalog: Catalog
+    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
 ) -> Collection:
     collection = get_or_create_collection(
-        catalog, data["Name"], data, catalog_config, endpoint_config
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
     times = get_collection_times_from_config(endpoint_config)
     if len(times) > 0 and not endpoint_config.get("Disable_Items"):
@@ -299,19 +309,19 @@ def handle_collection_only(
             )
             link = collection.add_item(item)
             link.extra_fields["datetime"] = t
-    add_collection_information(catalog_config, collection, data)
+    add_collection_information(catalog_config, collection, collection_config)
     return collection
 
 
 def handle_SH_WMS_endpoint(
-    catalog_config: dict, endpoint_config: dict, data: dict, catalog: Catalog
+    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
 ) -> Collection:
     # create collection and subcollections (based on locations)
-    if "Locations" in data:
+    if "Locations" in collection_config:
         root_collection = get_or_create_collection(
-            catalog, data["Name"], data, catalog_config, endpoint_config
+            catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
         )
-        for location in data["Locations"]:
+        for location in collection_config["Locations"]:
             # create  and populate location collections based on times
             # TODO: Should we add some new description per location?
             location_config = {
@@ -333,7 +343,7 @@ def handle_SH_WMS_endpoint(
                         "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                     ],
                 )
-                add_visualization_info(item, data, endpoint_config, time=time)
+                add_visualization_info(item, collection_config, endpoint_config, time=time)
                 item_link = collection.add_item(item)
                 item_link.extra_fields["datetime"] = time
 
@@ -345,7 +355,7 @@ def handle_SH_WMS_endpoint(
             link.extra_fields["country"] = location["Country"]
             link.extra_fields["city"] = location["Name"]
             collection.update_extent_from_items()
-            add_visualization_info(collection, data, endpoint_config)
+            add_visualization_info(collection, collection_config, endpoint_config)
 
         root_collection.update_extent_from_items()
         # Add bbox extents from children
@@ -356,24 +366,24 @@ def handle_SH_WMS_endpoint(
 
 
 def handle_xcube_endpoint(
-    catalog_config: dict, endpoint_config: dict, data: dict, catalog: Catalog
+    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
 ) -> Collection:
     collection = process_STAC_Datacube_Endpoint(
         catalog_config=catalog_config,
         endpoint_config=endpoint_config,
-        data=data,
+        collection_config=collection_config,
         catalog=catalog,
     )
 
-    add_example_info(collection, data, endpoint_config, catalog_config)
+    add_example_info(collection, collection_config, endpoint_config, catalog_config)
     return collection
 
 
 def handle_GeoDB_endpoint(
-    catalog_config: dict, endpoint_config: dict, data: dict, catalog: Catalog
+    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
 ) -> Collection:
     collection = get_or_create_collection(
-        catalog, endpoint_config["CollectionId"], data, catalog_config, endpoint_config
+        catalog, endpoint_config["CollectionId"], collection_config, catalog_config, endpoint_config
     )
     select = "?select=aoi,aoi_id,country,city,time"
     url = (
@@ -435,7 +445,7 @@ def handle_GeoDB_endpoint(
         link.extra_fields["country"] = country
         link.extra_fields["city"] = city
 
-    if "yAxis" not in data:
+    if "yAxis" not in collection_config:
         # fetch yAxis and store it to data, preventing need to save it per dataset in yml
         select = "?select=y_axis&limit=1"
         url = (
@@ -446,9 +456,9 @@ def handle_GeoDB_endpoint(
         )
         response = json.loads(requests.get(url).text)
         yAxis = response[0]["y_axis"]
-        data["yAxis"] = yAxis
-    add_collection_information(catalog_config, collection, data)
-    add_example_info(collection, data, endpoint_config, catalog_config)
+        collection_config["yAxis"] = yAxis
+    add_collection_information(catalog_config, collection, collection_config)
+    add_example_info(collection, collection_config, endpoint_config, catalog_config)
 
     collection.update_extent_from_items()
     collection.summaries = Summaries(
@@ -461,7 +471,11 @@ def handle_GeoDB_endpoint(
 
 
 def handle_SH_endpoint(
-    catalog_config: dict, endpoint_config: dict, data: dict, catalog: Catalog, options: Options
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    catalog: Catalog,
+    options: Options,
 ) -> Collection:
     token = get_SH_token()
     headers = {"Authorization": f"Bearer {token}"}
@@ -472,16 +486,20 @@ def handle_SH_endpoint(
             endpoint_config["Type"] + "-" + endpoint_config["CollectionId"]
         )
     collection = handle_STAC_based_endpoint(
-        catalog_config, endpoint_config, data, catalog, options, headers
+        catalog_config, endpoint_config, collection_config, catalog, options, headers
     )
     return collection
 
 
 def handle_WMS_endpoint(
-    catalog_config: dict, endpoint_config: dict, data: dict, catalog: Catalog, wmts: bool = False
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    catalog: Catalog,
+    wmts: bool = False,
 ) -> Collection:
     collection = get_or_create_collection(
-        catalog, data["Name"], data, catalog_config, endpoint_config
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
     times = get_collection_times_from_config(endpoint_config)
     spatial_extent = collection.extent.spatial.to_dict().get("bbox", [-180, -90, 180, 90])[0]
@@ -508,7 +526,7 @@ def handle_WMS_endpoint(
                     "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                 ],
             )
-            add_visualization_info(item, data, endpoint_config, time=t)
+            add_visualization_info(item, collection_config, endpoint_config, time=t)
             link = collection.add_item(item)
             link.extra_fields["datetime"] = t
         collection.update_extent_from_items()
@@ -520,7 +538,7 @@ def handle_WMS_endpoint(
                 endpoint_config["OverwriteBBox"],
             ]
         )
-    add_collection_information(catalog_config, collection, data)
+    add_collection_information(catalog_config, collection, collection_config)
     return collection
 
 
@@ -542,7 +560,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
 
 def add_visualization_info(
     stac_object: Collection | Item,
-    data: dict,
+    collection_config: dict,
     endpoint_config: dict,
     file_url: str | None = None,
     time: str | None = None,
@@ -571,7 +589,7 @@ def add_visualization_info(
                 rel="wms",
                 target=f"https://services.sentinel-hub.com/ogc/wms/{instanceId}",
                 media_type=(endpoint_config.get("MimeType", "image/png")),
-                title=data["Name"],
+                title=collection_config["Name"],
                 extra_fields=extra_fields,
             )
         )
@@ -594,7 +612,7 @@ def add_visualization_info(
                 rel="wms",
                 target=endpoint_config["EndPoint"],
                 media_type=media_type,
-                title=data["Name"],
+                title=collection_config["Name"],
                 extra_fields=extra_fields,
             )
         )
@@ -677,7 +695,7 @@ def add_visualization_info(
                     rel="xyz",
                     target=target_url,
                     media_type="image/png",
-                    title=data["Name"],
+                    title=collection_config["Name"],
                 )
             )
     elif endpoint_config["Name"] == "GeoDB Vector Tiles":
@@ -694,9 +712,9 @@ def add_visualization_info(
                 rel="xyz",
                 target=target_url,
                 media_type="application/pbf",
-                title=data["Name"],
+                title=collection_config["Name"],
                 extra_fields={
-                    "description": data["Title"],
+                    "description": collection_config["Title"],
                     "parameters": endpoint_config["Parameters"],
                     "matchKey": endpoint_config["MatchKey"],
                     "timeKey": endpoint_config["TimeKey"],
@@ -712,6 +730,6 @@ def add_visualization_info(
 def handle_custom_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
-    data: dict,
+    collection_config: dict,
 ) -> Collection:
     raise NotImplementedError

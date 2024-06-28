@@ -10,8 +10,10 @@ from pystac import (
 from eodash_catalog.utils import generate_veda_cog_link
 
 
-def fetch_and_save_thumbnail(data: dict, url: str) -> None:
-    collection_path = "../thumbnails/{}_{}/".format(data["EodashIdentifier"], data["Name"])
+def fetch_and_save_thumbnail(collection_config: dict, url: str) -> None:
+    collection_path = "../thumbnails/{}_{}/".format(
+        collection_config["EodashIdentifier"], collection_config["Name"]
+    )
     Path(collection_path).mkdir(parents=True, exist_ok=True)
     image_path = f"{collection_path}/thumbnail.png"
     if not os.path.exists(image_path):
@@ -22,7 +24,7 @@ def fetch_and_save_thumbnail(data: dict, url: str) -> None:
 
 def generate_thumbnail(
     stac_object: Item,
-    data: dict,
+    collection_config: dict,
     endpoint_config: dict,
     file_url: str = "",
     time: str | None = None,
@@ -51,9 +53,9 @@ def generate_thumbnail(
             time,
             output_format,
         )
-        fetch_and_save_thumbnail(data, url)
+        fetch_and_save_thumbnail(collection_config, url)
     elif endpoint_config["Name"] == "VEDA":
         target_url = generate_veda_cog_link(endpoint_config, file_url)
         # set to get 0/0/0 tile
         url = re.sub(r"\{.\}", "0", target_url)
-        fetch_and_save_thumbnail(data, url)
+        fetch_and_save_thumbnail(collection_config, url)
