@@ -23,4 +23,4 @@ jobs:
       - name: Lint
         run: python -m ruff check --no-cache .
       - name: Test
-        run: python -m pytest -p no:cacheprovider
+        run: cd tests && python -m pytest -p no:cacheprovider

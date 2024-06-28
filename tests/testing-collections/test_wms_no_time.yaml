@@ -1,0 +1,21 @@
+Name: imperviousness_density_2018
+Title: Imperviousness Density 2018 WMS
+EodashIdentifier: IMD
+Description: CLMS Imperviousness Density 2018 10m resolution.
+Themes:
+  - example theme
+Tags:
+  - example tag
+DataSource:
+  Spaceborne:
+    Satellite:
+      - example satellite
+    Sensor:
+      - example sensorname
+Agency:
+  - EEA
+Resources:
+  - EndPoint: https://image.discomap.eea.europa.eu/arcgis/services/GioLandPublic/HRL_ImperviousnessDensity_2018/ImageServer/WMSServer
+    Name: WMS
+    LayerId: 'HRL_ImperviousnessDensity_2018:IMD_MosaicSymbology.rft'
+    Version: 1.3.0

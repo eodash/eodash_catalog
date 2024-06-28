@@ -1,0 +1,19 @@
+Name: test_tif_demo_2
+Title: test_tif_demo_2
+EodashIdentifier: test_tif_demo_2
+Description: ''
+Themes:
+  - agriculture
+Tags:
+  - placeholder
+Satellite:
+  - placeholder
+Sensor:
+  - placeholder
+Agency:
+  - ESA
+Image: Polartep_SeaIceDetection_tif_demo/thumbnail.png # existing file
+Resources:
+  - Name: Collection-only
+    EndPoint: Collection-only
+    OverwriteBBox: [-145.24, -61.13, -135.15, -65.05]
