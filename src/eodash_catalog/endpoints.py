@@ -139,7 +139,7 @@ def handle_STAC_based_endpoint(
                 collection.description = location["Name"]
             # TODO: should we remove all assets from sub collections?
             link = root_collection.add_child(collection)
-            latlng = f"{location["Point"][1]},{location["Point"][0]}"
+            latlng = f'{location["Point"][1]},{location["Point"][0]}'
             # Add extra properties we need
             link.extra_fields["id"] = location["Identifier"]
             link.extra_fields["latlng"] = latlng
