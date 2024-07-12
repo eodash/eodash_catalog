@@ -357,8 +357,6 @@ def add_extra_fields(stac_object: Collection | Catalog | Link, collection_config
         stac_object.extra_fields["sensor"] = collection_config["Sensor"]
     if "Agency" in collection_config:
         stac_object.extra_fields["agency"] = collection_config["Agency"]
-    if "yAxis" in collection_config:
-        stac_object.extra_fields["yAxis"] = collection_config["yAxis"]
     if "EodashIdentifier" in collection_config:
         stac_object.extra_fields["subcode"] = collection_config["EodashIdentifier"]
     if "DataSource" in collection_config:
@@ -375,6 +373,8 @@ def add_extra_fields(stac_object: Collection | Catalog | Link, collection_config
             stac_object.extra_fields["insituSources"] = collection_config["DataSource"]["InSitu"]
         if "Other" in collection_config["DataSource"]:
             stac_object.extra_fields["otherSources"] = collection_config["DataSource"]["Other"]
+    if "MapProjection" in collection_config:
+        stac_object.extra_fields["mapProjection"] = collection_config["MapProjection"]
 
 
 def get_collection_times_from_config(endpoint_config: dict) -> list[str]:

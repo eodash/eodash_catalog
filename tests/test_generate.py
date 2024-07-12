@@ -94,6 +94,15 @@ def test_indicator_groups_collections(catalog_output_folder):
         assert [-145.24, -61.13, -135.15, -65.05] in indicator_bbox
 
 
+def test_indicator_map_projection_added(catalog_output_folder):
+    collection_name = "test_indicator_grouping_collections"
+    root_collection_path = os.path.join(catalog_output_folder, collection_name)
+    with open(os.path.join(root_collection_path, "collection.json")) as fp:
+        indicator_json = json.load(fp)
+        # test that collection has map projection defined
+        assert indicator_json["mapProjection"] == 3035
+
+
 def test_baselayers_and_overlays_added(catalog_output_folder):
     collection_name = "imperviousness_density_2018"
     root_collection_path = os.path.join(catalog_output_folder, collection_name)
