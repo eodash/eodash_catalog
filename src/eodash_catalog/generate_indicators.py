@@ -31,6 +31,7 @@ from eodash_catalog.stac_handling import (
     add_base_overlay_info,
     add_collection_information,
     add_extra_fields,
+    add_projection_info,
     get_or_create_collection,
 )
 from eodash_catalog.utils import (
@@ -249,6 +250,7 @@ def process_collection_file(
                     raise ValueError("Type of Resource is not supported")
                 if collection:
                     add_single_item_if_collection_empty(collection)
+                    add_projection_info(resource, collection)
                     add_to_catalog(collection, catalog, resource, collection_config)
                 else:
                     raise Exception(f"No collection was generated for resource {resource}")

@@ -9,6 +9,7 @@ from pystac import (
     Catalog,
     Collection,
     Extent,
+    Item,
     Link,
     Provider,
     SpatialExtent,
@@ -87,36 +88,39 @@ def get_or_create_collection(
     return collection
 
 
-def create_web_map_link(layer: dict, role: str) -> Link:
+def create_web_map_link(layer_config: dict, role: str) -> Link:
     extra_fields = {
         "roles": [role],
-        "id": layer["id"],
+        "id": layer_config["id"],
     }
-    if layer.get("default"):
+    if layer_config.get("default"):
         extra_fields["roles"].append("default")
-    if layer.get("visible"):
+    if layer_config.get("visible"):
         extra_fields["roles"].append("visible")
-    if "visible" in layer and not layer["visible"]:
+    if "visible" in layer_config and not layer_config["visible"]:
         extra_fields["roles"].append("invisible")
 
-    match layer["protocol"]:
+    match layer_config["protocol"].lower():
         case "wms":
             # handle wms special config options
-            extra_fields["wms:layers"] = layer["layers"]
-            if "styles" in layer:
-                extra_fields["wms:styles"] = layer["styles"]
-            # TODO: handle wms dimensions extra_fields["wms:dimensions"]
+            extra_fields["wms:layers"] = layer_config["layers"]
+            if "styles" in layer_config:
+                extra_fields["wms:styles"] = layer_config["styles"]
+            if "dimensions" in layer_config:
+                extra_fields["wms:dimensions"] = layer_config["dimensions"]
         case "wmts":
-            extra_fields["wmts:layer"] = layer["layer"]
-            # TODO: handle wmts dimensions extra_fields["wmts:dimensions"]
+            extra_fields["wmts:layer"] = layer_config["layer"]
+            if "dimensions" in layer_config:
+                extra_fields["wmts:dimensions"] = layer_config["dimensions"]
 
     wml = Link(
-        rel=layer["protocol"],
-        target=layer["url"],
-        media_type=layer.get("media_type", "image/png"),
-        title=layer["name"],
+        rel=layer_config["protocol"],
+        target=layer_config["url"],
+        media_type=layer_config.get("media_type", "image/png"),
+        title=layer_config["name"],
         extra_fields=extra_fields,
     )
+    add_projection_info(layer_config, wml)
     return wml
 
 
@@ -321,25 +325,26 @@ def add_collection_information(
 def add_base_overlay_info(
     collection: Collection, catalog_config: dict, collection_config: dict
 ) -> None:
-    # check if default base layers defined
-    if "default_base_layers" in catalog_config:
+    # add custom baselayers specially for this indicator
+    if "BaseLayers" in collection_config:
+        for layer in collection_config["BaseLayers"]:
+            collection.add_link(create_web_map_link(layer, role="baselayer"))
+    # alternatively use default base layers defined
+    elif "default_base_layers" in catalog_config:
         with open(f'{catalog_config["default_base_layers"]}.yaml') as f:
             base_layers = yaml.load(f, Loader=SafeLoader)
             for layer in base_layers:
                 collection.add_link(create_web_map_link(layer, role="baselayer"))
+    # add custom overlays just for this indicator
+    if "OverlayLayers" in collection_config:
+        for layer in collection_config["OverlayLayers"]:
+            collection.add_link(create_web_map_link(layer, role="overlay"))
     # check if default overlay layers defined
-    if "default_overlay_layers" in catalog_config:
+    elif "default_overlay_layers" in catalog_config:
         with open("{}.yaml".format(catalog_config["default_overlay_layers"])) as f:
             overlay_layers = yaml.load(f, Loader=SafeLoader)
             for layer in overlay_layers:
                 collection.add_link(create_web_map_link(layer, role="overlay"))
-    if "BaseLayers" in collection_config:
-        for layer in collection_config["BaseLayers"]:
-            collection.add_link(create_web_map_link(layer, role="baselayer"))
-    if "OverlayLayers" in collection_config:
-        for layer in collection_config["OverlayLayers"]:
-            collection.add_link(create_web_map_link(layer, role="overlay"))
-    # TODO: possibility to overwrite default base and overlay layers
 
 
 def add_extra_fields(stac_object: Collection | Catalog | Link, collection_config: dict) -> None:
@@ -388,3 +393,29 @@ def get_collection_times_from_config(endpoint_config: dict) -> list[str]:
             timedelta_config = endpoint_config["DateTimeInterval"].get("Timedelta", {"days": 1})
             times = generateDateIsostringsFromInterval(start, end, timedelta_config)
     return times
+
+
+def add_projection_info(
+    endpoint_config: dict, stac_object: Item | Asset | Collection | Link
+) -> None:
+    if proj := endpoint_config.get("DataProjection"):
+        if isinstance(proj, str):
+            if proj.lower().startswith("epsg"):
+                # consider input such as "EPSG:4326"
+                proj = proj.lower().split("EPSG:")[1]
+            # consider a number only
+            proj = int(proj)
+        if isinstance(proj, int):
+            # only set if not existing on source stac_object
+            if not stac_object.extra_fields.get("proj:epsg"):
+                # handling EPSG code for "proj:epsg"
+                stac_object.extra_fields["proj:epsg"] = proj
+        elif isinstance(proj, dict):
+            # custom handling due to incompatibility of proj4js supported syntax (WKT1)
+            # and STAC supported syntax (projjson or WKT2)
+            # so we are taking over the DataProjection as is and deal with it in the eodash client
+            # in a non-standard compliant way
+            # https://github.com/proj4js/proj4js/issues/400
+            stac_object.extra_fields["proj4_def"] = proj
+        else:
+            raise Exception(f"Incorrect type of proj definition {proj}")

@@ -17,6 +17,7 @@ from eodash_catalog.sh_endpoint import get_SH_token
 from eodash_catalog.stac_handling import (
     add_collection_information,
     add_example_info,
+    add_projection_info,
     get_collection_times_from_config,
     get_or_create_collection,
 )
@@ -264,7 +265,10 @@ def process_STACAPI_Endpoint(
         else:
             link.extra_fields["start_datetime"] = item.properties["start_datetime"]
             link.extra_fields["end_datetime"] = item.properties["end_datetime"]
-
+        add_projection_info(
+            endpoint_config,
+            item,
+        )
     collection.update_extent_from_items()
 
     # replace SH identifier with catalog identifier
@@ -347,6 +351,7 @@ def handle_SH_WMS_endpoint(
                         "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                     ],
                 )
+                add_projection_info(endpoint_config, item)
                 add_visualization_info(item, collection_config, endpoint_config, time=time)
                 item_link = collection.add_item(item)
                 item_link.extra_fields["datetime"] = time
@@ -530,6 +535,7 @@ def handle_WMS_endpoint(
                     "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                 ],
             )
+            add_projection_info(endpoint_config, item)
             add_visualization_info(item, collection_config, endpoint_config, time=t)
             link = collection.add_item(item)
             link.extra_fields["datetime"] = t
@@ -645,6 +651,7 @@ def add_visualization_info(
             if "Rescale" in endpoint_config:
                 vmin = endpoint_config["Rescale"][0]
                 vmax = endpoint_config["Rescale"][1]
+            # depending on numerical input only
             data_projection = endpoint_config.get("DataProjection", 3857)
             epsg_prefix = "" if "EPSG:" in data_projection else "EPSG:"
             crs = f"{epsg_prefix}{data_projection}"
@@ -780,9 +787,6 @@ def handle_raw_source(
     )
     if len(endpoint_config.get("TimeEntries", [])) > 0:
         for time_entry in endpoint_config["TimeEntries"]:
-            extra_fields = {}
-            if "DataProjection" in endpoint_config:
-                extra_fields["proj:epsg"] = endpoint_config["DataProjection"]
             assets = {}
             media_type = "application/geo+json"
             style_type = "text/vector-styles"
@@ -790,9 +794,11 @@ def handle_raw_source(
                 style_type = "text/cog-styles"
                 media_type = "image/tiff"
             for a in time_entry["Assets"]:
-                assets[a["Identifier"]] = Asset(
-                    href=a["File"], roles=["data"], media_type=media_type, extra_fields=extra_fields
+                asset = Asset(
+                    href=a["File"], roles=["data"], media_type=media_type, extra_fields={}
                 )
+                add_projection_info(endpoint_config, asset)
+                assets[a["Identifier"]] = asset
             bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
             item = Item(
                 id=time_entry["Time"],
@@ -801,7 +807,11 @@ def handle_raw_source(
                 geometry=create_geojson_from_bbox(bbox),
                 datetime=parser.isoparse(time_entry["Time"]),
                 assets=assets,
-                extra_fields=extra_fields,
+                extra_fields={},
+            )
+            add_projection_info(
+                endpoint_config,
+                item,
             )
             ep_st = endpoint_config["Style"]
             style_link = Link(
@@ -818,8 +828,6 @@ def handle_raw_source(
             link = collection.add_item(item)
             link.extra_fields["datetime"] = time_entry["Time"]
             link.extra_fields["assets"] = [a["File"] for a in time_entry["Assets"]]
-    if "DataProjection" in endpoint_config:
-        collection.extra_fields["proj:epsg"] = endpoint_config["DataProjection"]
     add_collection_information(catalog_config, collection, collection_config)
     collection.update_extent_from_items()
     return collection

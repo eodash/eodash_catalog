@@ -6,3 +6,15 @@ MapProjection: 3035
 Collections:
   - test_tif_demo_1
   - test_tif_demo_2
+BaseLayers:
+  - id: sx-cat_ortho680500
+    name: Terrain Light Stereographic North
+    url: '//sxcat-demo.eox.at/sxcat_maps/wms'
+    layers: sx-cat_ortho680500
+    attribution: '{ Terrain light: Data &copy; <a href="http://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors and <a href="//maps.eox.at/#data" target="_blank">others</a>, Rendering &copy; <a href="http://eox.at" target="_blank">EOX</a> }'
+    visible: false
+    protocol: wms
+    DataProjection: 
+      name: 'ORTHO:680500'
+      def: '+proj=ortho +lat_0=90 +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs'
+
