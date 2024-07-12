@@ -133,7 +133,7 @@ def test_geojson_dataset_handled(catalog_output_folder):
         # and has a correct value
         assert (
             geojson_links[0]["assets"][0]
-            == "https://raw.githubusercontent.com/eodash/eodash_catalog/main/tests/regional_forecast.json"
+            == "https://raw.githubusercontent.com/eodash/eodash_catalog/main/tests/test-data/regional_forecast.json"
         )
         # epsg code saved on collection
         assert collection_json.get("proj:epsg", "") == 3035
