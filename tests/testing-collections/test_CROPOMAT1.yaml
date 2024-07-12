@@ -47,5 +47,5 @@ Resources:
         - Time: "20240101"
           Assets:
             - Identifier: vector_data
-              File: "https://raw.githubusercontent.com/eodash/eodash_catalog/main/tests/regional_forecast.json"
+              File: "https://raw.githubusercontent.com/eodash/eodash_catalog/main/tests/test-data/regional_forecast.json"
 Legend: crop_forecast_CropOM/cm_legend.png
