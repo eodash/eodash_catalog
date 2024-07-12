@@ -8,3 +8,5 @@ assets_endpoint: "https://raw.githubusercontent.com/eurodatacube/eodash-assets/m
 collections:
   - test_wms_no_time
   - test_indicator
+  - test_CROPOMAT1
+  - test_see_solar_energy

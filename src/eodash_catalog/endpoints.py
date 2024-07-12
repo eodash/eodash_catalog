@@ -10,7 +10,7 @@ from operator import itemgetter
 
 import requests
 from dateutil import parser
-from pystac import Catalog, Collection, Item, Link, SpatialExtent, Summaries
+from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries
 from pystac_client import Client
 
 from eodash_catalog.sh_endpoint import get_SH_token
@@ -23,6 +23,7 @@ from eodash_catalog.stac_handling import (
 from eodash_catalog.thumbnails import generate_thumbnail
 from eodash_catalog.utils import (
     Options,
+    create_geojson_from_bbox,
     create_geojson_point,
     generate_veda_cog_link,
     retrieveExtentFromWMSWMTS,
@@ -763,4 +764,59 @@ def handle_custom_endpoint(
         endpoint_config,
         collection_config,
     )
+    return collection
+
+
+def handle_raw_source(
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    catalog: Catalog,
+) -> Collection:
+    collection = get_or_create_collection(
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
+    )
+    if len(endpoint_config.get("TimeEntries", [])) > 0:
+        for time_entry in endpoint_config["TimeEntries"]:
+            extra_fields = {}
+            if "DataProjection" in endpoint_config:
+                extra_fields["proj:epsg"] = endpoint_config["DataProjection"]
+            assets = {}
+            media_type = "application/geo+json"
+            style_type = "text/vector-styles"
+            if endpoint_config["Name"] == "COG source":
+                style_type = "text/cog-styles"
+                media_type = "image/tiff"
+            for a in time_entry["Assets"]:
+                assets[a["Identifier"]] = Asset(
+                    href=a["File"], roles=["data"], media_type=media_type, extra_fields=extra_fields
+                )
+            bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
+            item = Item(
+                id=time_entry["Time"],
+                bbox=bbox,
+                properties={},
+                geometry=create_geojson_from_bbox(bbox),
+                datetime=parser.isoparse(time_entry["Time"]),
+                assets=assets,
+            )
+            ep_st = endpoint_config["Style"]
+            style_link = Link(
+                rel="style",
+                target=ep_st
+                if ep_st.startswith("http")
+                else f"{catalog_config["assets_endpoint"]}/{ep_st}",
+                media_type=style_type,
+                extra_fields={
+                    "asset:keys": list(assets),
+                },
+            )
+            item.add_link(style_link)
+            if "DataProjection" in endpoint_config:
+                collection.extra_fields["proj:epsg"] = endpoint_config["DataProjection"]
+            link = collection.add_item(item)
+            link.extra_fields["datetime"] = time_entry["Time"]
+            link.extra_fields["assets"] = [a["File"] for a in time_entry["Assets"]]
+    add_collection_information(catalog_config, collection, collection_config)
+    collection.update_extent_from_items()
     return collection
