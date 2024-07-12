@@ -137,11 +137,15 @@ def test_geojson_dataset_handled(catalog_output_folder):
         )
         # epsg code saved on collection
         assert collection_json.get("proj:epsg", "") == 3035
-    # epsg code is saved to item
     with open(os.path.join(item_dir, item_paths[0])) as fp:
         item_json = json.load(fp)
+        # mimetype saved correctly
         assert item_json["assets"]["vector_data"]["type"] == "application/geo+json"
         assert item_json["collection"] == collection_name
+        # epsg code is saved to item
+        assert item_json["proj:epsg"] == 3035
+        # epsg code is saved to assets
+        assert item_json["assets"]["vector_data"]["proj:epsg"] == 3035
 
 
 def test_cog_dataset_handled(catalog_output_folder):

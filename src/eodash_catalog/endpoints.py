@@ -799,6 +799,7 @@ def handle_raw_source(
                 geometry=create_geojson_from_bbox(bbox),
                 datetime=parser.isoparse(time_entry["Time"]),
                 assets=assets,
+                extra_fields=extra_fields,
             )
             ep_st = endpoint_config["Style"]
             style_link = Link(
