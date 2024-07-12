@@ -221,7 +221,7 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
 
     file_url = f"url={file_url}&" if file_url else ""
 
-    target_url = f"https://staging-raster.delta-backend.com/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{file_url}resampling_method=nearest{bidx}{colormap}{colormap_name}{rescale}"
+    target_url = f"https://openveda.cloud/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{file_url}resampling_method=nearest{bidx}{colormap}{colormap_name}{rescale}"
     return target_url
 
 

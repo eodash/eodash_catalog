@@ -558,7 +558,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     if "NoData" in endpoint_config:
         no_data = "&no_data={}".format(endpoint_config["NoData"])
     item = f"&item={item}" if item else ""
-    target_url = f"https://staging-raster.delta-backend.com/stac/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{collection}{item}{assets}{color_formula}{no_data}"
+    target_url = f"https://openveda.cloud/stac/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{collection}{item}{assets}{color_formula}{no_data}"
     return target_url
 
 
@@ -645,7 +645,9 @@ def add_visualization_info(
             if "Rescale" in endpoint_config:
                 vmin = endpoint_config["Rescale"][0]
                 vmax = endpoint_config["Rescale"][1]
-            crs = endpoint_config.get("Crs", "EPSG:3857")
+            data_projection = endpoint_config.get("DataProjection", 3857)
+            epsg_prefix = "" if "EPSG:" in data_projection else "EPSG:"
+            crs = f"{epsg_prefix}{data_projection}"
             target_url = (
                 "{}/tiles/{}/{}/{{z}}/{{y}}/{{x}}" "?crs={}&time={{time}}&vmin={}&vmax={}&cbar={}"
             ).format(
@@ -813,11 +815,11 @@ def handle_raw_source(
                 },
             )
             item.add_link(style_link)
-            if "DataProjection" in endpoint_config:
-                collection.extra_fields["proj:epsg"] = endpoint_config["DataProjection"]
             link = collection.add_item(item)
             link.extra_fields["datetime"] = time_entry["Time"]
             link.extra_fields["assets"] = [a["File"] for a in time_entry["Assets"]]
+    if "DataProjection" in endpoint_config:
+        collection.extra_fields["proj:epsg"] = endpoint_config["DataProjection"]
     add_collection_information(catalog_config, collection, collection_config)
     collection.update_extent_from_items()
     return collection
