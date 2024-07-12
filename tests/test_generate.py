@@ -111,3 +111,47 @@ def test_baselayers_and_overlays_added(catalog_output_folder):
         ]
         assert len(baselayer_links) == 1
         assert len(overlay_links) == 1
+
+
+def test_geojson_dataset_handled(catalog_output_folder):
+    collection_name = "crop_forecast_at"
+    root_collection_path = os.path.join(catalog_output_folder, collection_name)
+    child_collection_path = os.path.join(root_collection_path, collection_name)
+    child_child_collection_path = os.path.join(child_collection_path, collection_name)
+    item_dir = os.path.join(child_child_collection_path, "2024")
+    item_paths = os.listdir(item_dir)
+    assert len(item_paths) == 1
+    with open(os.path.join(child_collection_path, "collection.json")) as fp:
+        collection_json = json.load(fp)
+        geojson_links = [
+            link
+            for link in collection_json["links"]
+            if (link.get("rel", "") == "item" and len(link.get("assets", [])) > 0)
+        ]
+        # geojson link with assets exists
+        assert len(geojson_links) > 0
+        # and has a correct value
+        assert (
+            geojson_links[0]["assets"][0]
+            == "https://raw.githubusercontent.com/eodash/eodash_catalog/main/tests/regional_forecast.json"
+        )
+        # epsg code saved on collection
+        assert collection_json.get("proj:epsg", "") == 3035
+    # epsg code is saved to item
+    with open(os.path.join(item_dir, item_paths[0])) as fp:
+        item_json = json.load(fp)
+        assert item_json["assets"]["vector_data"]["type"] == "application/geo+json"
+        assert item_json["collection"] == collection_name
+
+
+def test_cog_dataset_handled(catalog_output_folder):
+    collection_name = "solar_energy"
+    root_collection_path = os.path.join(catalog_output_folder, collection_name)
+    child_collection_path = os.path.join(root_collection_path, collection_name)
+    child_child_collection_path = os.path.join(child_collection_path, collection_name)
+    item_dir = os.path.join(child_child_collection_path, "2023")
+    item_paths = os.listdir(item_dir)
+    with open(os.path.join(item_dir, item_paths[0])) as fp:
+        item_json = json.load(fp)
+        assert item_json["assets"]["solar_power"]["type"] == "image/tiff"
+        assert item_json["collection"] == collection_name

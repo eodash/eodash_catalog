@@ -1,0 +1,25 @@
+Name: solar_energy
+Title: Solar energy cog example
+EodashIdentifier: SEE
+Description: testing 
+Themes:
+  - placeholder
+Tags:
+  - placeholder
+DataSource:
+  Spaceborne:
+    Satellite:
+      - Sentinel-2
+Agency:
+  - ESA
+Resources:
+    - Name: COG source
+      Style: test_assets/cog_style.json
+      Bbox: [11, 46.5, 15.5, 48.9]
+      TimeEntries:
+        - Time: "2023"
+          Assets: 
+            - Identifier: solar_power
+              File: https://eox-gtif-public.s3.eu-central-1.amazonaws.com/DHI/v2/SolarPowerPotential_Annual_COG_clipped_3857_fixed.tif
+            - Identifier: wsf
+              File: https://eox-gtif-public.s3.eu-central-1.amazonaws.com/DHI/WSF_EucDist_Austria_3857_COG_fix.tif

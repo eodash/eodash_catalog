@@ -20,6 +20,7 @@ from eodash_catalog.endpoints import (
     handle_collection_only,
     handle_custom_endpoint,
     handle_GeoDB_endpoint,
+    handle_raw_source,
     handle_SH_endpoint,
     handle_SH_WMS_endpoint,
     handle_VEDA_endpoint,
@@ -239,6 +240,10 @@ def process_collection_file(
                         resource,
                         collection_config,
                         catalog,
+                    )
+                elif resource["Name"] in ["COG source", "GeoJSON source"]:
+                    collection = handle_raw_source(
+                        catalog_config, resource, collection_config, catalog
                     )
                 else:
                     raise ValueError("Type of Resource is not supported")
