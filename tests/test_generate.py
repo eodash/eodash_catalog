@@ -180,7 +180,8 @@ def test_baselayer_with_custom_projection_added(catalog_output_folder):
             for link in indicator_json["links"]
             if link.get("roles") and "baselayer" in link["roles"]
         ]
-        # test that manual BaseLayers definition it did overwrite default_baselayers, so there is just 1
+        # test that manual BaseLayers definition
+        # overwrites default_baselayers, so there is just 1
         assert len(baselayer_links) == 1
         # test that custom proj4 definition is added to link
         assert baselayer_links[0]["proj4_def"]["name"] == "ORTHO:680500"
