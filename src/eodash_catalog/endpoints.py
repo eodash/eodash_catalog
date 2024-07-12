@@ -805,7 +805,7 @@ def handle_raw_source(
                 rel="style",
                 target=ep_st
                 if ep_st.startswith("http")
-                else f"{catalog_config["assets_endpoint"]}/{ep_st}",
+                else f"{catalog_config['assets_endpoint']}/{ep_st}",
                 media_type=style_type,
                 extra_fields={
                     "asset:keys": list(assets),
