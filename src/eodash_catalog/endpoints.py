@@ -800,18 +800,18 @@ def handle_raw_source(
                 endpoint_config,
                 item,
             )
-            ep_st = endpoint_config["Style"]
-            style_link = Link(
-                rel="style",
-                target=ep_st
-                if ep_st.startswith("http")
-                else f"{catalog_config['assets_endpoint']}/{ep_st}",
-                media_type=style_type,
-                extra_fields={
-                    "asset:keys": list(assets),
-                },
-            )
-            item.add_link(style_link)
+            if ep_st := endpoint_config.get("Style"):
+                style_link = Link(
+                    rel="style",
+                    target=ep_st
+                    if ep_st.startswith("http")
+                    else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                    media_type=style_type,
+                    extra_fields={
+                        "asset:keys": list(assets),
+                    },
+                )
+                item.add_link(style_link)
             link = collection.add_item(item)
             link.extra_fields["datetime"] = time_entry["Time"]
             link.extra_fields["assets"] = [a["File"] for a in time_entry["Assets"]]
