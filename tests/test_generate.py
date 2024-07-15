@@ -145,7 +145,7 @@ def test_geojson_dataset_handled(catalog_output_folder):
             == "https://raw.githubusercontent.com/eodash/eodash_catalog/main/tests/test-data/regional_forecast.json"
         )
         # epsg code saved on collection
-        assert collection_json.get("proj:epsg", "") == 3035
+        assert collection_json["proj:epsg"] == 3035
     with open(os.path.join(item_dir, item_paths[0])) as fp:
         item_json = json.load(fp)
         # mimetype saved correctly
@@ -168,3 +168,20 @@ def test_cog_dataset_handled(catalog_output_folder):
         item_json = json.load(fp)
         assert item_json["assets"]["solar_power"]["type"] == "image/tiff"
         assert item_json["collection"] == collection_name
+
+
+def test_baselayer_with_custom_projection_added(catalog_output_folder):
+    collection_name = "test_indicator_grouping_collections"
+    root_collection_path = os.path.join(catalog_output_folder, collection_name)
+    with open(os.path.join(root_collection_path, "collection.json")) as fp:
+        indicator_json = json.load(fp)
+        baselayer_links = [
+            link
+            for link in indicator_json["links"]
+            if link.get("roles") and "baselayer" in link["roles"]
+        ]
+        # test that manual BaseLayers definition
+        # overwrites default_baselayers, so there is just 1
+        assert len(baselayer_links) == 1
+        # test that custom proj4 definition is added to link
+        assert baselayer_links[0]["proj4_def"]["name"] == "ORTHO:680500"
