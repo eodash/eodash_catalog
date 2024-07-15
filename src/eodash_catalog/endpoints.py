@@ -106,29 +106,17 @@ def handle_STAC_based_endpoint(
             catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
         )
         for location in collection_config["Locations"]:
-            if "FilterDates" in location:
-                collection = process_STACAPI_Endpoint(
-                    catalog_config=catalog_config,
-                    endpoint_config=endpoint_config,
-                    collection_config=collection_config,
-                    catalog=catalog,
-                    options=options,
-                    headers=headers,
-                    bbox=",".join(map(str, location["Bbox"])),
-                    filter_dates=location["FilterDates"],
-                    root_collection=root_collection,
-                )
-            else:
-                collection = process_STACAPI_Endpoint(
-                    catalog_config=catalog_config,
-                    endpoint_config=endpoint_config,
-                    collection_config=collection_config,
-                    catalog=catalog,
-                    options=options,
-                    headers=headers,
-                    bbox=",".join(map(str, location["Bbox"])),
-                    root_collection=root_collection,
-                )
+            collection = process_STACAPI_Endpoint(
+                catalog_config=catalog_config,
+                endpoint_config=endpoint_config,
+                collection_config=collection_config,
+                catalog=catalog,
+                options=options,
+                headers=headers,
+                filter_dates=location.get("FilterDates"),
+                bbox=",".join(map(str, location["Bbox"])),
+                root_collection=root_collection,
+            )
             # Update identifier to use location as well as title
             # TODO: should we use the name as id? it provides much more
             # information in the clients
@@ -159,25 +147,18 @@ def handle_STAC_based_endpoint(
             if isinstance(c_child, Collection):
                 root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
     else:
+        bbox = None
         if "Bbox" in endpoint_config:
-            root_collection = process_STACAPI_Endpoint(
-                catalog_config=catalog_config,
-                endpoint_config=endpoint_config,
-                collection_config=collection_config,
-                catalog=catalog,
-                options=options,
-                headers=headers,
-                bbox=",".join(map(str, endpoint_config["Bbox"])),
-            )
-        else:
-            root_collection = process_STACAPI_Endpoint(
-                catalog_config=catalog_config,
-                endpoint_config=endpoint_config,
-                collection_config=collection_config,
-                catalog=catalog,
-                options=options,
-                headers=headers,
-            )
+            bbox = ",".join(map(str, endpoint_config["Bbox"]))
+        root_collection = process_STACAPI_Endpoint(
+            catalog_config=catalog_config,
+            endpoint_config=endpoint_config,
+            collection_config=collection_config,
+            catalog=catalog,
+            options=options,
+            headers=headers,
+            bbox=bbox,
+        )
 
     add_example_info(root_collection, collection_config, endpoint_config, catalog_config)
     return root_collection
@@ -199,6 +180,12 @@ def process_STACAPI_Endpoint(
     collection = get_or_create_collection(
         catalog, endpoint_config["CollectionId"], collection_config, catalog_config, endpoint_config
     )
+    datetime_query = ["1900-01-01T00:00:00Z", "3000-01-01T00:00:00Z"]
+    if query := endpoint_config.get("Query"):
+        if start := query.get("Start"):
+            datetime_query[0] = start
+        if end := query.get("End"):
+            datetime_query[1] = end
 
     api = Client.open(endpoint_config["EndPoint"], headers=headers)
     if bbox is None:
@@ -206,7 +193,7 @@ def process_STACAPI_Endpoint(
     results = api.search(
         collections=[endpoint_config["CollectionId"]],
         bbox=bbox,
-        datetime=["1900-01-01T00:00:00Z", "3000-01-01T00:00:00Z"],
+        datetime=datetime_query,  # type: ignore
     )
     # We keep track of potential duplicate times in this list
     added_times = {}
