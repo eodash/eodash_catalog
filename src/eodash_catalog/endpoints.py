@@ -4,7 +4,7 @@ import os
 import sys
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
 
@@ -293,7 +293,7 @@ def handle_collection_only(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
     times = get_collection_times_from_config(endpoint_config)
-    if len(times) > 0 and not endpoint_config.get("Disable_Items"):
+    if len(times) > 0:
         for t in times:
             item = Item(
                 id=t,
@@ -509,8 +509,21 @@ def handle_WMS_endpoint(
             version=endpoint_config.get("Version", "1.1.1"),
             wmts=wmts,
         )
+    # optionally filter time results
+    if query := endpoint_config.get("Query"):
+        datetime_query = [times[0], times[-1]]
+        if start := query.get("Start"):
+            datetime_query[0] = parser.isoparse(start).replace(tzinfo=UTC)
+        if end := query.get("End"):
+            datetime_query[1] = parser.isoparse(end).replace(tzinfo=UTC)
+        # filter times based on query Start/End
+        times = [
+            datetime_str
+            for datetime_str in times
+            if datetime_query[0] <= parser.isoparse(datetime_str) < datetime_query[1]
+        ]
     # Create an item per time to allow visualization in stac clients
-    if len(times) > 0 and not endpoint_config.get("Disable_Items"):
+    if len(times) > 0:
         for t in times:
             item = Item(
                 id=t,
