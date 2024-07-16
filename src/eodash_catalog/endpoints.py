@@ -4,7 +4,7 @@ import os
 import sys
 import uuid
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from itertools import groupby
 from operator import itemgetter
 
@@ -513,9 +513,9 @@ def handle_WMS_endpoint(
     if query := endpoint_config.get("Query"):
         datetime_query = [times[0], times[-1]]
         if start := query.get("Start"):
-            datetime_query[0] = parser.isoparse(start).replace(tzinfo=UTC)
+            datetime_query[0] = parser.isoparse(start).replace(tzinfo=timezone.utc)
         if end := query.get("End"):
-            datetime_query[1] = parser.isoparse(end).replace(tzinfo=UTC)
+            datetime_query[1] = parser.isoparse(end).replace(tzinfo=timezone.utc)
         # filter times based on query Start/End
         times = [
             datetime_str
