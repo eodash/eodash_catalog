@@ -27,6 +27,7 @@ from eodash_catalog.utils import (
     create_geojson_from_bbox,
     create_geojson_point,
     generate_veda_cog_link,
+    replace_with_env_variables,
     retrieveExtentFromWMSWMTS,
 )
 
@@ -473,7 +474,7 @@ def handle_SH_endpoint(
     catalog: Catalog,
     options: Options,
 ) -> Collection:
-    token = get_SH_token()
+    token = get_SH_token(endpoint_config)
     headers = {"Authorization": f"Bearer {token}"}
     endpoint_config["EndPoint"] = "https://services.sentinel-hub.com/api/v1/catalog/1.0.0/"
     # Overwrite collection id with type, such as ZARR or BYOC
@@ -580,6 +581,10 @@ def add_visualization_info(
         instanceId = os.getenv("SH_INSTANCE_ID")
         if "InstanceId" in endpoint_config:
             instanceId = endpoint_config["InstanceId"]
+        if env_id := endpoint_config.get("CustomSHEnvId"):
+            # special handling for custom environment
+            # (will take SH_INSTANCE_ID_{env_id}) as ENV VAR
+            instanceId = os.getenv(f"SH_INSTANCE_ID_{env_id}")
         extra_fields: dict[str, list[str] | dict[str, str]] = {
             "wms:layers": [endpoint_config["LayerId"]],
             "role": ["data"],
@@ -617,10 +622,13 @@ def add_visualization_info(
         media_type = "image/jpeg"
         if "MediaType" in endpoint_config:
             media_type = endpoint_config["MediaType"]
+        endpoint_url = endpoint_config["EndPoint"]
+        # custom replacing of all ENV VARS present as template in URL as {VAR}
+        endpoint_url = replace_with_env_variables(endpoint_url)
         stac_object.add_link(
             Link(
                 rel="wms",
-                target=endpoint_config["EndPoint"],
+                target=endpoint_url,
                 media_type=media_type,
                 title=collection_config["Name"],
                 extra_fields=extra_fields,

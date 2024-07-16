@@ -1,3 +1,4 @@
+import os
 import re
 import threading
 import uuid
@@ -252,3 +253,18 @@ def add_single_item_if_collection_empty(collection: Collection) -> None:
             end_datetime=datetime.now(),
         )
         collection.add_item(item)
+
+
+def replace_with_env_variables(s: str) -> str:
+    # Define the regex pattern to find text within curly brackets
+    pattern = r"\{(\w+)\}"
+
+    # Define the replacement function
+    def replacer(match):
+        # Extract the variable name from the match
+        var_name = match.group(1)
+        # Get the environment variable value, if it doesn't exist, keep the original placeholder
+        return os.getenv(var_name, match.group(0))
+
+    # Use re.sub with the replacement function
+    return re.sub(pattern, replacer, s)
