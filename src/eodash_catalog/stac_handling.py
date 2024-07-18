@@ -347,7 +347,7 @@ def add_base_overlay_info(
                 collection.add_link(create_web_map_link(layer, role="overlay"))
 
 
-def add_extra_fields(stac_object: Collection | Catalog | Link, collection_config: dict) -> None:
+def add_extra_fields(stac_object: Collection | Link, collection_config: dict) -> None:
     if "yAxis" in collection_config:
         stac_object.extra_fields["yAxis"] = collection_config["yAxis"]
     if "Themes" in collection_config:

@@ -88,6 +88,8 @@ def process_catalog_file(file_path: str, options: Options):
                     )
                 else:
                     print(f"Warning: neither collection nor indicator found for {collection}")
+        if "MapProjection" in catalog_config:
+            catalog.extra_fields["eodash:mapProjection"] = catalog_config["MapProjection"]
 
         strategy = TemplateLayoutStrategy(item_template="${collection}/${year}")
         # expecting that the catalog will be hosted online, self url should correspond to that
