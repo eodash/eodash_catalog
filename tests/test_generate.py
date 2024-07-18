@@ -100,7 +100,7 @@ def test_indicator_map_projection_added(catalog_output_folder):
     with open(os.path.join(root_collection_path, "collection.json")) as fp:
         indicator_json = json.load(fp)
         # test that collection has map projection defined
-        assert indicator_json["mapProjection"] == 3035
+        assert indicator_json["eodash:mapProjection"] == 3035
 
 
 def test_baselayers_and_overlays_added(catalog_output_folder):
@@ -184,4 +184,4 @@ def test_baselayer_with_custom_projection_added(catalog_output_folder):
         # overwrites default_baselayers, so there is just 1
         assert len(baselayer_links) == 1
         # test that custom proj4 definition is added to link
-        assert baselayer_links[0]["proj4_def"]["name"] == "ORTHO:680500"
+        assert baselayer_links[0]["eodash:proj4_def"]["name"] == "ORTHO:680500"

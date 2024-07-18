@@ -379,7 +379,7 @@ def add_extra_fields(stac_object: Collection | Catalog | Link, collection_config
         if "Other" in collection_config["DataSource"]:
             stac_object.extra_fields["otherSources"] = collection_config["DataSource"]["Other"]
     if "MapProjection" in collection_config:
-        stac_object.extra_fields["mapProjection"] = collection_config["MapProjection"]
+        stac_object.extra_fields["eodash:mapProjection"] = collection_config["MapProjection"]
 
 
 def get_collection_times_from_config(endpoint_config: dict) -> list[str]:
@@ -416,6 +416,6 @@ def add_projection_info(
             # so we are taking over the DataProjection as is and deal with it in the eodash client
             # in a non-standard compliant way
             # https://github.com/proj4js/proj4js/issues/400
-            stac_object.extra_fields["proj4_def"] = proj
+            stac_object.extra_fields["eodash:proj4_def"] = proj
         else:
             raise Exception(f"Incorrect type of proj definition {proj}")
