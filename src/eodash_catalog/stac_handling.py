@@ -365,6 +365,8 @@ def add_extra_fields(stac_object: Collection | Link, collection_config: dict) ->
         stac_object.extra_fields["agency"] = collection_config["Agency"]
     if "EodashIdentifier" in collection_config:
         stac_object.extra_fields["subcode"] = collection_config["EodashIdentifier"]
+    if "CollectionGroup" in collection_config:
+        stac_object.extra_fields["collection_group"] = collection_config["CollectionGroup"]
     if "DataSource" in collection_config:
         if "Spaceborne" in collection_config["DataSource"]:
             if "Sensor" in collection_config["DataSource"]["Spaceborne"]:
