@@ -136,6 +136,8 @@ def handle_STAC_based_endpoint(
             link.extra_fields["latlng"] = latlng
             link.extra_fields["name"] = location["Name"]
             add_example_info(collection, collection_config, endpoint_config, catalog_config)
+            # eodash v4 compatibility
+            add_visualization_info(collection, collection_config, endpoint_config)
             if "OverwriteBBox" in location:
                 collection.extent.spatial = SpatialExtent(
                     [
@@ -160,7 +162,8 @@ def handle_STAC_based_endpoint(
             headers=headers,
             bbox=bbox,
         )
-
+    # eodash v4 compatibility
+    add_visualization_info(root_collection, collection_config, endpoint_config)
     add_example_info(root_collection, collection_config, endpoint_config, catalog_config)
     return root_collection
 
@@ -306,6 +309,8 @@ def handle_collection_only(
             link = collection.add_item(item)
             link.extra_fields["datetime"] = t
     add_collection_information(catalog_config, collection, collection_config)
+    # eodash v4 compatibility
+    add_visualization_info(collection, collection_config, endpoint_config)
     return collection
 
 
@@ -359,6 +364,8 @@ def handle_SH_WMS_endpoint(
         for c_child in root_collection.get_children():
             if isinstance(c_child, Collection):
                 root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+    # eodash v4 compatibility
+    add_visualization_info(root_collection, collection_config, endpoint_config)
     return root_collection
 
 
@@ -549,6 +556,8 @@ def handle_WMS_endpoint(
                 endpoint_config["OverwriteBBox"],
             ]
         )
+    # eodash v4 compatibility
+    add_visualization_info(collection, collection_config, endpoint_config)
     add_collection_information(catalog_config, collection, collection_config)
     return collection
 
