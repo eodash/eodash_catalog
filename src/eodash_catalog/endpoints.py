@@ -519,7 +519,10 @@ def handle_WMS_endpoint(
         )
     # optionally filter time results
     if query := endpoint_config.get("Query"):
-        datetime_query = [times[0], times[-1]]
+        datetime_query = [
+            parser.isoparse(times[0]).replace(tzinfo=timezone.utc),
+            parser.isoparse(times[-1]).replace(tzinfo=timezone.utc),
+        ]
         if start := query.get("Start"):
             datetime_query[0] = parser.isoparse(start).replace(tzinfo=timezone.utc)
         if end := query.get("End"):
@@ -585,6 +588,9 @@ def add_visualization_info(
     file_url: str | None = None,
     time: str | None = None,
 ) -> None:
+    extra_fields: dict[str, list[str] | dict[str, str]] = {}
+    if "Attribution" in endpoint_config:
+        extra_fields["attribution"] = endpoint_config["Attribution"]
     # add extension reference
     if endpoint_config["Name"] == "Sentinel Hub" or endpoint_config["Name"] == "Sentinel Hub WMS":
         instanceId = os.getenv("SH_INSTANCE_ID")
@@ -594,10 +600,12 @@ def add_visualization_info(
             # special handling for custom environment
             # (will take SH_INSTANCE_ID_{env_id}) as ENV VAR
             instanceId = os.getenv(f"SH_INSTANCE_ID_{env_id}")
-        extra_fields: dict[str, list[str] | dict[str, str]] = {
-            "wms:layers": [endpoint_config["LayerId"]],
-            "role": ["data"],
-        }
+        extra_fields.update(
+            {
+                "wms:layers": [endpoint_config["LayerId"]],
+                "role": ["data"],
+            }
+        )
         if time is not None:
             if endpoint_config["Name"] == "Sentinel Hub WMS":
                 # SH WMS for public collections needs time interval, we use full day here
@@ -618,19 +626,19 @@ def add_visualization_info(
             )
         )
     elif endpoint_config["Name"] == "WMS":
-        extra_fields = {
-            "wms:layers": [endpoint_config["LayerId"]],
-            "role": ["data"],
-        }
+        extra_fields.update(
+            {
+                "wms:layers": [endpoint_config["LayerId"]],
+                "role": ["data"],
+            }
+        )
         if time is not None:
             extra_fields["wms:dimensions"] = {
                 "TIME": time,
             }
         if "Styles" in endpoint_config:
             extra_fields["wms:styles"] = endpoint_config["Styles"]
-        media_type = "image/jpeg"
-        if "MediaType" in endpoint_config:
-            media_type = endpoint_config["MediaType"]
+        media_type = endpoint_config.get("MediaType", "image/jpeg")
         endpoint_url = endpoint_config["EndPoint"]
         # custom replacing of all ENV VARS present as template in URL as {VAR}
         endpoint_url = replace_with_env_variables(endpoint_url)
@@ -646,9 +654,9 @@ def add_visualization_info(
     elif endpoint_config["Name"] == "JAXA_WMTS_PALSAR":
         target_url = "{}".format(endpoint_config.get("EndPoint"))
         # custom time just for this special case as a default for collection wmts
-        extra_fields = {
-            "wmts:layer": endpoint_config.get("LayerId", "").replace("{time}", time or "2017")
-        }
+        extra_fields.update(
+            {"wmts:layer": endpoint_config.get("LayerId", "").replace("{time}", time or "2017")}
+        )
         stac_object.add_link(
             Link(
                 rel="wmts",
@@ -689,14 +697,17 @@ def add_visualization_info(
                     target=target_url,
                     media_type="image/png",
                     title="xcube tiles",
+                    extra_fields=extra_fields,
                 )
             )
-    elif endpoint_config["Type"] == "WMTSCapabilities":
+    elif endpoint_config.get("Type") == "WMTSCapabilities":
         target_url = "{}".format(endpoint_config.get("EndPoint"))
-        extra_fields = {
-            "wmts:layer": endpoint_config.get("LayerId", ""),
-            "role": ["data"],
-        }
+        extra_fields.update(
+            {
+                "wmts:layer": endpoint_config.get("LayerId", ""),
+                "role": ["data"],
+            }
+        )
         dimensions = {}
         if time is not None:
             dimensions["time"] = time
@@ -726,6 +737,7 @@ def add_visualization_info(
                     target=target_url,
                     media_type="image/png",
                     title=collection_config["Name"],
+                    extra_fields=extra_fields,
                 )
             )
     elif endpoint_config["Name"] == "GeoDB Vector Tiles":
@@ -737,20 +749,23 @@ def add_visualization_info(
             endpoint_config["Database"],
             endpoint_config["CollectionId"],
         )
+        extra_fields.update(
+            {
+                "description": collection_config["Title"],
+                "parameters": endpoint_config["Parameters"],
+                "matchKey": endpoint_config["MatchKey"],
+                "timeKey": endpoint_config["TimeKey"],
+                "source": endpoint_config["Source"],
+                "role": ["data"],
+            }
+        )
         stac_object.add_link(
             Link(
                 rel="xyz",
                 target=target_url,
                 media_type="application/pbf",
                 title=collection_config["Name"],
-                extra_fields={
-                    "description": collection_config["Title"],
-                    "parameters": endpoint_config["Parameters"],
-                    "matchKey": endpoint_config["MatchKey"],
-                    "timeKey": endpoint_config["TimeKey"],
-                    "source": endpoint_config["Source"],
-                    "role": ["data"],
-                },
+                extra_fields=extra_fields,
             )
         )
     else:

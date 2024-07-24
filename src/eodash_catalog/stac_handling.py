@@ -112,7 +112,8 @@ def create_web_map_link(layer_config: dict, role: str) -> Link:
             extra_fields["wmts:layer"] = layer_config["layer"]
             if "dimensions" in layer_config:
                 extra_fields["wmts:dimensions"] = layer_config["dimensions"]
-
+    if "Attribution" in layer_config:
+        extra_fields["attribution"] = layer_config["Attribution"]
     wml = Link(
         rel=layer_config["protocol"],
         target=layer_config["url"],

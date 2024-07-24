@@ -120,6 +120,8 @@ def test_baselayers_and_overlays_added(catalog_output_folder):
         ]
         assert len(baselayer_links) == 1
         assert len(overlay_links) == 1
+        # test that attribution gets passed to a link dict
+        assert "attribution" in baselayer_links[0]
 
 
 def test_geojson_dataset_handled(catalog_output_folder):
