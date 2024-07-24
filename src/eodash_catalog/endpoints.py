@@ -677,7 +677,7 @@ def add_visualization_info(
                 vmin = endpoint_config["Rescale"][0]
                 vmax = endpoint_config["Rescale"][1]
             # depending on numerical input only
-            data_projection = endpoint_config.get("DataProjection", 3857)
+            data_projection = str(endpoint_config.get("DataProjection", 3857))
             epsg_prefix = "" if "EPSG:" in data_projection else "EPSG:"
             crs = f"{epsg_prefix}{data_projection}"
             target_url = (
