@@ -386,8 +386,10 @@ def handle_xcube_endpoint(
 def handle_GeoDB_endpoint(
     catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
 ) -> Collection:
+    # ID of collection is data["Name"] instead of CollectionId to be able to 
+    # create more STAC collections from one geoDB table
     collection = get_or_create_collection(
-        catalog, endpoint_config["CollectionId"], collection_config, catalog_config, endpoint_config
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
     select = "?select=aoi,aoi_id,country,city,time"
     url = (
@@ -463,6 +465,7 @@ def handle_GeoDB_endpoint(
         collection_config["yAxis"] = yAxis
     add_collection_information(catalog_config, collection, collection_config)
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
+    collection.extra_fields["geoDBID"] = endpoint_config["CollectionId"]
 
     collection.update_extent_from_items()
     collection.summaries = Summaries(
