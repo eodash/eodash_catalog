@@ -45,11 +45,11 @@ def process_STAC_Datacube_Endpoint(
         stac_endpoint_url = stac_endpoint_url + endpoint_config.get("StacEndpoint", "")
     # assuming /search not implemented
     api = Client.open(stac_endpoint_url)
-    collection_id = endpoint_config.get("CollectionId", "datacubes")
+    collection_id = endpoint_config.get("DatacubeId", "")
     coll = api.get_collection(collection_id)
     if not coll:
         raise ValueError(f"Collection {collection_id} not found in endpoint {endpoint_config}")
-    item_id = endpoint_config.get("DatacubeId", "")
+    item_id = endpoint_config.get("CollectionId", "datacube")
     item = coll.get_item(item_id)
     if not item:
         raise ValueError(f"Item  {item_id} not found in collection {coll}")
