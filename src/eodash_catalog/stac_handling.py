@@ -15,9 +15,12 @@ from pystac import (
     SpatialExtent,
     TemporalExtent,
 )
+from structlog import get_logger
 from yaml.loader import SafeLoader
 
 from eodash_catalog.utils import generateDateIsostringsFromInterval
+
+LOGGER = get_logger(__name__)
 
 
 def get_or_create_collection(
@@ -65,7 +68,7 @@ def get_or_create_collection(
                 if response.status_code == 200:
                     description = response.text
                 elif "Subtitle" in collection_config:
-                    print("WARNING: Markdown file could not be fetched")
+                    LOGGER.warn("Markdown file could not be fetched")
                     description = collection_config["Subtitle"]
             else:
                 # relative path to assets was given
@@ -73,7 +76,7 @@ def get_or_create_collection(
                 if response.status_code == 200:
                     description = response.text
                 elif "Subtitle" in collection_config:
-                    print("WARNING: Markdown file could not be fetched")
+                    LOGGER.warn("Markdown file could not be fetched")
                     description = collection_config["Subtitle"]
     elif "Subtitle" in collection_config:
         # Try to use at least subtitle to fill some information
@@ -242,10 +245,9 @@ def add_collection_information(
                         )
             else:
                 # fallback to proprietary
-                print("WARNING: License could not be parsed, falling back to proprietary")
+                LOGGER.warn("License could not be parsed, falling back to proprietary")
                 collection.license = "proprietary"
     else:
-        # print("WARNING: No license was provided, falling back to proprietary")
         pass
 
     if "Provider" in collection_config:
@@ -258,7 +260,7 @@ def add_collection_information(
                 for provider in collection_config["Provider"]
             ]
         except Exception:
-            print(f"WARNING: Issue creating provider information for collection: {collection.id}")
+            LOGGER.warn(f"Issue creating provider information for collection: {collection.id}")
 
     if "Citation" in collection_config:
         if "DOI" in collection_config["Citation"]:

@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from pystac import Catalog, CatalogType, Collection, Link, Summaries
 from pystac.layout import TemplateLayoutStrategy
 from pystac.validation import validate_all
+from structlog import get_logger
 from yaml.loader import SafeLoader
 
 from eodash_catalog.endpoints import (
@@ -44,10 +45,11 @@ from eodash_catalog.utils import (
 
 # make sure we are loading the env local definition
 load_dotenv()
+LOGGER = get_logger(__name__)
 
 
 def process_catalog_file(file_path: str, options: Options):
-    print("Processing catalog:", file_path)
+    LOGGER.info(f"Processing catalog: {file_path}")
     with open(file_path) as f:
         catalog_config: dict = yaml.load(f, Loader=SafeLoader)
 
@@ -62,7 +64,7 @@ def process_catalog_file(file_path: str, options: Options):
             # create full catalog
             process_collections = catalog_config["collections"]
         if len(process_collections) == 0:
-            print("No applicable collections found for catalog, skipping creation")
+            LOGGER.info("No applicable collections found for catalog, skipping creation")
             return
         catalog = Catalog(
             id=catalog_config["id"],
@@ -87,7 +89,7 @@ def process_catalog_file(file_path: str, options: Options):
                         options,
                     )
                 else:
-                    print(f"Warning: neither collection nor indicator found for {collection}")
+                    LOGGER.info(f"Warning: neither collection nor indicator found for {collection}")
         if "MapProjection" in catalog_config:
             catalog.extra_fields["eodash:mapProjection"] = catalog_config["MapProjection"]
 
@@ -95,7 +97,7 @@ def process_catalog_file(file_path: str, options: Options):
         # expecting that the catalog will be hosted online, self url should correspond to that
         # default to a local folder + catalog id in case not set
 
-        print("Started creation of collection files")
+        LOGGER.info("Started creation of collection files")
         start = time.time()
         if options.ni:
             catalog_self_href = f'{options.outputpath}/{catalog_config["id"]}'
@@ -109,15 +111,15 @@ def process_catalog_file(file_path: str, options: Options):
             catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
             catalog.save(dest_href="{}/{}".format(options.outputpath, catalog_config["id"]))
         end = time.time()
-        print(f"Catalog {catalog_config['id']}: Time consumed in saving: {end - start}")
+        LOGGER.info(f"Catalog {catalog_config['id']}: Time consumed in saving: {end - start}")
 
         if options.vd:
             # try to validate catalog if flag was set
-            print(f"Running validation of catalog {file_path}")
+            LOGGER.info(f"Running validation of catalog {file_path}")
             try:
                 validate_all(catalog.to_dict(), href=catalog_config["endpoint"])
             except Exception as e:
-                print(f"Issue validation collection: {e}")
+                LOGGER.info(f"Issue validation collection: {e}")
 
 
 def extract_indicator_info(parent_collection: Collection):
@@ -161,7 +163,7 @@ def process_indicator_file(
     catalog_config: dict, file_path: str, catalog: Catalog, options: Options
 ):
     with open(file_path) as f:
-        print("Processing indicator:", file_path)
+        LOGGER.info(f"Processing indicator: {file_path}")
         indicator_config: dict = yaml.load(f, Loader=SafeLoader)
         parent_indicator = get_or_create_collection(
             catalog, indicator_config["Name"], indicator_config, catalog_config, {}
@@ -194,68 +196,75 @@ def process_indicator_file(
 def process_collection_file(
     catalog_config: dict, file_path: str, catalog: Catalog | Collection, options: Options
 ):
-    print("Processing collection:", file_path)
+    LOGGER.info(f"Processing collection: {file_path}")
     with open(file_path) as f:
         collection_config: dict = yaml.load(f, Loader=SafeLoader)
         if "Resources" in collection_config:
             for endpoint_config in collection_config["Resources"]:
-                collection = None
-                if endpoint_config["Name"] == "Sentinel Hub":
-                    collection = handle_SH_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, options
-                    )
-                elif endpoint_config["Name"] == "Sentinel Hub WMS":
-                    collection = handle_SH_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
-                    )
-                elif endpoint_config["Name"] == "GeoDB":
-                    collection = handle_GeoDB_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
-                    )
-                elif endpoint_config["Name"] == "VEDA":
-                    collection = handle_VEDA_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, options
-                    )
-                elif endpoint_config["Name"] == "marinedatastore":
-                    collection = handle_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, wmts=True
-                    )
-                elif endpoint_config["Name"] == "xcube":
-                    collection = handle_xcube_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
-                    )
-                elif endpoint_config["Name"] == "WMS":
-                    collection = handle_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
-                    )
-                elif endpoint_config["Name"] == "JAXA_WMTS_PALSAR":
-                    # somewhat one off creation of individual WMTS layers as individual items
-                    collection = handle_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, wmts=True
-                    )
-                elif endpoint_config["Name"] == "Collection-only":
-                    collection = handle_collection_only(
-                        catalog_config, endpoint_config, collection_config, catalog
-                    )
-                elif endpoint_config["Name"] == "Custom-Endpoint":
-                    collection = handle_custom_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        catalog,
-                    )
-                elif endpoint_config["Name"] in ["COG source", "GeoJSON source"]:
-                    collection = handle_raw_source(
-                        catalog_config, endpoint_config, collection_config, catalog
-                    )
-                else:
-                    raise ValueError("Type of Resource is not supported")
-                if collection:
-                    add_single_item_if_collection_empty(collection)
-                    add_projection_info(endpoint_config, collection)
-                    add_to_catalog(collection, catalog, endpoint_config, collection_config)
-                else:
-                    raise Exception(f"No collection was generated for resource {endpoint_config}")
+                try:
+                    collection = None
+                    if endpoint_config["Name"] == "Sentinel Hub":
+                        collection = handle_SH_endpoint(
+                            catalog_config, endpoint_config, collection_config, catalog, options
+                        )
+                    elif endpoint_config["Name"] == "Sentinel Hub WMS":
+                        collection = handle_SH_WMS_endpoint(
+                            catalog_config, endpoint_config, collection_config, catalog
+                        )
+                    elif endpoint_config["Name"] == "GeoDB":
+                        collection = handle_GeoDB_endpoint(
+                            catalog_config, endpoint_config, collection_config, catalog
+                        )
+                    elif endpoint_config["Name"] == "VEDA":
+                        collection = handle_VEDA_endpoint(
+                            catalog_config, endpoint_config, collection_config, catalog, options
+                        )
+                    elif endpoint_config["Name"] == "marinedatastore":
+                        collection = handle_WMS_endpoint(
+                            catalog_config, endpoint_config, collection_config, catalog, wmts=True
+                        )
+                    elif endpoint_config["Name"] == "xcube":
+                        collection = handle_xcube_endpoint(
+                            catalog_config, endpoint_config, collection_config, catalog
+                        )
+                    elif endpoint_config["Name"] == "WMS":
+                        collection = handle_WMS_endpoint(
+                            catalog_config, endpoint_config, collection_config, catalog
+                        )
+                    elif endpoint_config["Name"] == "JAXA_WMTS_PALSAR":
+                        # somewhat one off creation of individual WMTS layers as individual items
+                        collection = handle_WMS_endpoint(
+                            catalog_config, endpoint_config, collection_config, catalog, wmts=True
+                        )
+                    elif endpoint_config["Name"] == "Collection-only":
+                        collection = handle_collection_only(
+                            catalog_config, endpoint_config, collection_config, catalog
+                        )
+                    elif endpoint_config["Name"] == "Custom-Endpoint":
+                        collection = handle_custom_endpoint(
+                            catalog_config,
+                            endpoint_config,
+                            collection_config,
+                            catalog,
+                        )
+                    elif endpoint_config["Name"] in ["COG source", "GeoJSON source"]:
+                        collection = handle_raw_source(
+                            catalog_config, endpoint_config, collection_config, catalog
+                        )
+                    else:
+                        raise ValueError("Type of Resource is not supported")
+                    if collection:
+                        add_single_item_if_collection_empty(collection)
+                        add_projection_info(endpoint_config, collection)
+                        add_to_catalog(collection, catalog, endpoint_config, collection_config)
+                    else:
+                        raise Exception(
+                            f"No collection was generated for resource {endpoint_config}"
+                        )
+                except Exception as e:
+                    LOGGER.exception(f"{e.args[0]}, {endpoint_config}")
+                    raise e
+
         elif "Subcollections" in collection_config:
             # if no endpoint is specified we check for definition of subcollections
             parent_collection = get_or_create_collection(

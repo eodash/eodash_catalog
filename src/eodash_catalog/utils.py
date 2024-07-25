@@ -14,6 +14,7 @@ from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
 from pystac import Catalog, Collection, Item, RelType
 from six import string_types
+from structlog import get_logger
 
 from eodash_catalog.duration import Duration
 
@@ -29,6 +30,8 @@ ISO8601_PERIOD_REGEX = re.compile(
     r"(?P<seconds>[0-9]+([,.][0-9]+)?S)?)?$"
 )
 # regular expression to parse ISO duartion strings.
+
+LOGGER = get_logger(__name__)
 
 
 def create_geojson_point(lon: int | float, lat: int | float) -> dict[str, Any]:
@@ -84,10 +87,10 @@ def retrieveExtentFromWMSWMTS(
             # get unique times
             times = reduce(lambda re, x: [*re, x] if x not in re else re, times, [])
     except Exception as e:
-        print("Issue extracting information from service capabilities")
+        LOGGER.warn("Issue extracting information from service capabilities")
         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
         message = template.format(type(e).__name__, e.args)
-        print(message)
+        LOGGER.warn(message)
 
     bbox = [-180.0, -90.0, 180.0, 90.0]
     if service and service[layer].boundingBoxWGS84:
@@ -116,7 +119,6 @@ def parse_duration(datestring):
         if key not in ("separator", "sign"):
             if val is None:
                 groups[key] = "0n"
-            # print groups[key]
             if key in ("years", "months"):
                 groups[key] = Decimal(groups[key][:-1].replace(",", "."))
             else:

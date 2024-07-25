@@ -12,6 +12,7 @@ import requests
 from dateutil import parser
 from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries
 from pystac_client import Client
+from structlog import get_logger
 
 from eodash_catalog.sh_endpoint import get_SH_token
 from eodash_catalog.stac_handling import (
@@ -30,6 +31,8 @@ from eodash_catalog.utils import (
     replace_with_env_variables,
     retrieveExtentFromWMSWMTS,
 )
+
+LOGGER = get_logger(__name__)
 
 
 def process_STAC_Datacube_Endpoint(
@@ -774,7 +777,7 @@ def add_visualization_info(
             )
         )
     else:
-        print("Visualization endpoint not supported")
+        LOGGER.info(f"Visualization endpoint not supported {endpoint_config['Name']}")
 
 
 def handle_custom_endpoint(
@@ -797,7 +800,7 @@ def handle_custom_endpoint(
             importlib.import_module(module_name), func_name
         )
     except ModuleNotFoundError as e:
-        print(
+        LOGGER.warn(
             f"""function {func_name} from module {module_name} can not be imported.
             Check if you are specifying relative path inside the
             catalog repository or catalog generator repository."""
