@@ -41,6 +41,7 @@ from eodash_catalog.utils import (
     add_single_item_if_collection_empty,
     iter_len_at_least,
     recursive_save,
+    retry,
 )
 
 # make sure we are loading the env local definition
@@ -193,6 +194,7 @@ def process_indicator_file(
         add_to_catalog(parent_indicator, catalog, {}, indicator_config)
 
 
+@retry((Exception), tries=3, delay=5, backoff=2, logger=LOGGER)
 def process_collection_file(
     catalog_config: dict, file_path: str, catalog: Catalog | Collection, options: Options
 ):
@@ -262,7 +264,7 @@ def process_collection_file(
                             f"No collection was generated for resource {endpoint_config}"
                         )
                 except Exception as e:
-                    LOGGER.exception(f"{e.args[0]}, {endpoint_config}")
+                    LOGGER.warn(f"""Exception: {e.args[0]} with config: {endpoint_config}""")
                     raise e
 
         elif "Subcollections" in collection_config:

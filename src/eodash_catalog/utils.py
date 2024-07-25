@@ -1,12 +1,13 @@
 import os
 import re
 import threading
+import time
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
-from functools import reduce
+from functools import reduce, wraps
 from typing import Any
 
 from dateutil import parser
@@ -270,3 +271,39 @@ def replace_with_env_variables(s: str) -> str:
 
     # Use re.sub with the replacement function
     return re.sub(pattern, replacer, s)
+
+
+def retry(exceptions, tries=3, delay=2, backoff=1, logger=None):
+    """
+    Retry decorator for retrying exceptions.
+
+    :param exceptions: Exception or tuple of exceptions to catch.
+    :param tries: Number of attempts. Default is 3.
+    :param delay: Initial delay between attempts in seconds. Default is 2.
+    :param backoff: Multiplier applied to delay between attempts. Default is 1 (no backoff).
+    :param logger: Logger to use. If None, print. Default is None.
+    """
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            _tries, _delay = tries, delay
+            while _tries > 0:
+                try:
+                    return func(*args, **kwargs)
+                except exceptions as e:
+                    _tries -= 1
+                    if _tries == 0:
+                        raise
+                    else:
+                        msg = f"{e}, Try: {tries-_tries+1}/{tries}, retry in {_delay} seconds..."
+                        if logger:
+                            logger.warning(msg)
+                        else:
+                            print(msg)
+                        time.sleep(_delay)
+                        _delay *= backoff
+
+        return wrapper
+
+    return decorator
