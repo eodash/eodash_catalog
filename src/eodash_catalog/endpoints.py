@@ -164,6 +164,7 @@ def handle_STAC_based_endpoint(
         )
     # eodash v4 compatibility
     add_visualization_info(root_collection, collection_config, endpoint_config)
+    add_collection_information(catalog_config, root_collection, collection_config)
     add_example_info(root_collection, collection_config, endpoint_config, catalog_config)
     return root_collection
 
@@ -365,6 +366,7 @@ def handle_SH_WMS_endpoint(
             if isinstance(c_child, Collection):
                 root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
     # eodash v4 compatibility
+    add_collection_information(catalog_config, root_collection, collection_config)
     add_visualization_info(root_collection, collection_config, endpoint_config)
     return root_collection
 
