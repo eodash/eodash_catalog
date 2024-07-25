@@ -240,7 +240,7 @@ class Options:
 
 def add_single_item_if_collection_empty(collection: Collection) -> None:
     for link in collection.links:
-        if link.rel == RelType.ITEM:
+        if link.rel in [RelType.CHILD, RelType.ITEM]:
             break
     else:
         item = Item(

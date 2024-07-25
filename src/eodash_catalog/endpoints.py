@@ -386,7 +386,7 @@ def handle_xcube_endpoint(
 def handle_GeoDB_endpoint(
     catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
 ) -> Collection:
-    # ID of collection is data["Name"] instead of CollectionId to be able to 
+    # ID of collection is data["Name"] instead of CollectionId to be able to
     # create more STAC collections from one geoDB table
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
