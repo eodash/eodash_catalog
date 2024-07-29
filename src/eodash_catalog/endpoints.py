@@ -868,6 +868,8 @@ def handle_raw_source(
             link = collection.add_item(item)
             link.extra_fields["datetime"] = time_entry["Time"]
             link.extra_fields["assets"] = [a["File"] for a in time_entry["Assets"]]
+        # eodash v4 compatibility, adding last referenced style to collection
+        collection.add_link(style_link)
     add_collection_information(catalog_config, collection, collection_config)
     collection.update_extent_from_items()
     return collection
