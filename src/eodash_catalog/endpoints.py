@@ -826,6 +826,7 @@ def handle_raw_source(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
     if len(endpoint_config.get("TimeEntries", [])) > 0:
+        style_link = None
         for time_entry in endpoint_config["TimeEntries"]:
             assets = {}
             media_type = "application/geo+json"
@@ -869,7 +870,8 @@ def handle_raw_source(
             link.extra_fields["datetime"] = time_entry["Time"]
             link.extra_fields["assets"] = [a["File"] for a in time_entry["Assets"]]
         # eodash v4 compatibility, adding last referenced style to collection
-        collection.add_link(style_link)
+        if style_link:
+            collection.add_link(style_link)
     add_collection_information(catalog_config, collection, collection_config)
     collection.update_extent_from_items()
     return collection
