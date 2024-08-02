@@ -574,7 +574,7 @@ def handle_WMS_endpoint(
 
 
 def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
-    collection = "collection={}".format(endpoint_config["CollectionId"])
+    collection = endpoint_config["CollectionId"]
     assets = ""
     for asset in endpoint_config["Assets"]:
         assets += f"&assets={asset}"
@@ -584,8 +584,8 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     no_data = ""
     if "NoData" in endpoint_config:
         no_data = "&no_data={}".format(endpoint_config["NoData"])
-    item = f"&item={item}" if item else ""
-    target_url = f"https://openveda.cloud/api/raster/stac/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{collection}{item}{assets}{color_formula}{no_data}"
+    item = item if item else "{item}"
+    target_url = f"https://openveda.cloud/api/raster/collections/{collection}/items/{item}/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{color_formula}{no_data}"
     return target_url
 
 
