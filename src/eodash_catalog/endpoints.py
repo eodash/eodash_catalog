@@ -327,10 +327,10 @@ def handle_SH_WMS_endpoint(
     catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
 ) -> Collection:
     # create collection and subcollections (based on locations)
+    root_collection = get_or_create_collection(
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
+    )
     if "Locations" in collection_config:
-        root_collection = get_or_create_collection(
-            catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-        )
         for location in collection_config["Locations"]:
             # create  and populate location collections based on times
             # TODO: Should we add some new description per location?
@@ -373,6 +373,26 @@ def handle_SH_WMS_endpoint(
         for c_child in root_collection.get_children():
             if isinstance(c_child, Collection):
                 root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+    else:
+        # if locations are not provided, treat the collection as a
+        # general proxy to the sentinel hub layer
+        times = get_collection_times_from_config(endpoint_config)
+        bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
+        for time in times:
+            item = Item(
+                id=time,
+                bbox=bbox,
+                properties={},
+                geometry=None,
+                datetime=parser.isoparse(time),
+                stac_extensions=[
+                    "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
+                ],
+            )
+            add_projection_info(endpoint_config, item)
+            add_visualization_info(item, collection_config, endpoint_config, time=time)
+            item_link = root_collection.add_item(item)
+            item_link.extra_fields["datetime"] = time
     # eodash v4 compatibility
     add_collection_information(catalog_config, root_collection, collection_config)
     add_visualization_info(root_collection, collection_config, endpoint_config)
@@ -606,16 +626,22 @@ def add_visualization_info(
                 "role": ["data"],
             }
         )
+        dimensions = {}
+        if dimensions_config := endpoint_config.get("Dimensions", {}):
+            for key, value in dimensions_config.items():
+                dimensions[key] = value
         if time is not None:
             if endpoint_config["Name"] == "Sentinel Hub WMS":
                 # SH WMS for public collections needs time interval, we use full day here
-                datetime_object = datetime.strptime(time, "%Y-%m-%d")
+                datetime_object = datetime.fromisoformat(time)
                 start = datetime_object.isoformat()
                 end = (datetime_object + timedelta(days=1) - timedelta(milliseconds=1)).isoformat()
                 time_interval = f"{start}/{end}"
-                extra_fields["wms:dimensions"] = {"TIME": time_interval}
+                dimensions["TIME"] = time_interval
             if endpoint_config["Name"] == "Sentinel Hub":
-                extra_fields["wms:dimensions"] = {"TIME": time}
+                dimensions["TIME"] = time
+        if dimensions != {}:
+            extra_fields["wms:dimensions"] = dimensions
         stac_object.add_link(
             Link(
                 rel="wms",
@@ -632,10 +658,14 @@ def add_visualization_info(
                 "role": ["data"],
             }
         )
+        dimensions = {}
+        if dimensions_config := endpoint_config.get("Dimensions", {}):
+            for key, value in dimensions_config.items():
+                dimensions[key] = value
         if time is not None:
-            extra_fields["wms:dimensions"] = {
-                "TIME": time,
-            }
+            dimensions["TIME"] = time
+        if dimensions != {}:
+            extra_fields["wms:dimensions"] = dimensions
         if "Styles" in endpoint_config:
             extra_fields["wms:styles"] = endpoint_config["Styles"]
         media_type = endpoint_config.get("MediaType", "image/jpeg")

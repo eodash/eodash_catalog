@@ -44,7 +44,7 @@ def get_or_create_collection(
     )
     times: list[str] = []
     temporal_extent = TemporalExtent([[datetime.now(), None]])
-    if endpoint_config and endpoint_config.get("Type") == "OverwriteTimes":
+    if endpoint_config:
         if endpoint_config.get("Times"):
             times = list(endpoint_config.get("Times", []))
             times_datetimes = sorted([parser.isoparse(time) for time in times])
@@ -389,7 +389,7 @@ def add_extra_fields(stac_object: Collection | Link, collection_config: dict) ->
 
 def get_collection_times_from_config(endpoint_config: dict) -> list[str]:
     times: list[str] = []
-    if endpoint_config and endpoint_config.get("Type") == "OverwriteTimes":
+    if endpoint_config:
         if endpoint_config.get("Times"):
             times = list(endpoint_config.get("Times", []))
         elif endpoint_config.get("DateTimeInterval"):
