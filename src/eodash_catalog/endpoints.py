@@ -4,7 +4,7 @@ import os
 import sys
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
 
@@ -27,6 +27,7 @@ from eodash_catalog.utils import (
     Options,
     create_geojson_from_bbox,
     create_geojson_point,
+    filter_time_entries,
     generate_veda_cog_link,
     replace_with_env_variables,
     retrieveExtentFromWMSWMTS,
@@ -69,6 +70,10 @@ def process_STAC_Datacube_Endpoint(
             time_dimension = k
             break
     time_entries = dimensions.get(time_dimension).get("values")
+    # optionally subset time results based on config
+    if query := endpoint_config.get("Query"):
+        time_entries = filter_time_entries(time_entries, query)
+
     for t in time_entries:
         item = Item(
             id=t,
@@ -527,20 +532,7 @@ def handle_WMS_endpoint(
         )
     # optionally filter time results
     if query := endpoint_config.get("Query"):
-        datetime_query = [
-            parser.isoparse(times[0]).replace(tzinfo=timezone.utc),
-            parser.isoparse(times[-1]).replace(tzinfo=timezone.utc),
-        ]
-        if start := query.get("Start"):
-            datetime_query[0] = parser.isoparse(start).replace(tzinfo=timezone.utc)
-        if end := query.get("End"):
-            datetime_query[1] = parser.isoparse(end).replace(tzinfo=timezone.utc)
-        # filter times based on query Start/End
-        times = [
-            datetime_str
-            for datetime_str in times
-            if datetime_query[0] <= parser.isoparse(datetime_str) < datetime_query[1]
-        ]
+        times = filter_time_entries(times, query)
     # Create an item per time to allow visualization in stac clients
     if len(times) > 0:
         for t in times:

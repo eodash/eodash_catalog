@@ -5,7 +5,7 @@ import time
 import uuid
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from functools import reduce, wraps
 from typing import Any
@@ -307,3 +307,21 @@ def retry(exceptions, tries=3, delay=2, backoff=1, logger=None):
         return wrapper
 
     return decorator
+
+
+def filter_time_entries(time_entries: list[str], query: dict[str, str]) -> list[str]:
+    datetime_query = [
+        parser.isoparse(time_entries[0]).replace(tzinfo=timezone.utc),
+        parser.isoparse(time_entries[-1]).replace(tzinfo=timezone.utc),
+    ]
+    if start := query.get("Start"):
+        datetime_query[0] = parser.isoparse(start).replace(tzinfo=timezone.utc)
+    if end := query.get("End"):
+        datetime_query[1] = parser.isoparse(end).replace(tzinfo=timezone.utc)
+    # filter times based on query Start/End
+    time_entries = [
+        datetime_str
+        for datetime_str in time_entries
+        if datetime_query[0] <= parser.isoparse(datetime_str) < datetime_query[1]
+    ]
+    return time_entries
