@@ -83,7 +83,7 @@ def process_STAC_Datacube_Endpoint(
             datetime=parser.isoparse(t),
         )
         link = collection.add_item(item)
-        link.extra_fields["datetime"] = t
+        link.extra_fields["datetime"] = parser.isoparse(t).isoformat()[:-6] + "Z"
         # bubble up information we want to the link
         item_datetime = item.get_datetime()
         # it is possible for datetime to be null, if it is start and end datetime have to exist
@@ -316,7 +316,7 @@ def handle_collection_only(
                 datetime=parser.isoparse(t),
             )
             link = collection.add_item(item)
-            link.extra_fields["datetime"] = t
+            link.extra_fields["datetime"] = parser.isoparse(t).isoformat()[:-6] + "Z"
     add_collection_information(catalog_config, collection, collection_config)
     # eodash v4 compatibility
     add_visualization_info(collection, collection_config, endpoint_config)
@@ -356,7 +356,7 @@ def handle_SH_WMS_endpoint(
                 add_projection_info(endpoint_config, item)
                 add_visualization_info(item, collection_config, endpoint_config, time=time)
                 item_link = collection.add_item(item)
-                item_link.extra_fields["datetime"] = time
+                item_link.extra_fields["datetime"] = parser.isoparse(time).isoformat()[:-6] + "Z"
 
             link = root_collection.add_child(collection)
             # bubble up information we want to the link
@@ -392,7 +392,7 @@ def handle_SH_WMS_endpoint(
             add_projection_info(endpoint_config, item)
             add_visualization_info(item, collection_config, endpoint_config, time=time)
             item_link = root_collection.add_item(item)
-            item_link.extra_fields["datetime"] = time
+            item_link.extra_fields["datetime"] = parser.isoparse(time).isoformat()[:-6] + "Z"
     # eodash v4 compatibility
     add_collection_information(catalog_config, root_collection, collection_config)
     add_visualization_info(root_collection, collection_config, endpoint_config)
@@ -569,7 +569,7 @@ def handle_WMS_endpoint(
             add_projection_info(endpoint_config, item)
             add_visualization_info(item, collection_config, endpoint_config, time=t)
             link = collection.add_item(item)
-            link.extra_fields["datetime"] = t
+            link.extra_fields["datetime"] = parser.isoparse(t).isoformat()[:-6] + "Z"
         collection.update_extent_from_items()
 
     # Check if we should overwrite bbox
@@ -889,7 +889,9 @@ def handle_raw_source(
                 )
                 item.add_link(style_link)
             link = collection.add_item(item)
-            link.extra_fields["datetime"] = time_entry["Time"]
+            link.extra_fields["datetime"] = (
+                parser.isoparse(time_entry["Time"]).isoformat()[:-6] + "Z"
+            )
             link.extra_fields["assets"] = [a["File"] for a in time_entry["Assets"]]
         # eodash v4 compatibility, adding last referenced style to collection
         if style_link:
