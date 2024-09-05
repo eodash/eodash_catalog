@@ -642,15 +642,18 @@ def add_visualization_info(
                 dimensions["TIME"] = time
         if dimensions != {}:
             extra_fields["wms:dimensions"] = dimensions
-        stac_object.add_link(
-            Link(
-                rel="wms",
-                target=f"https://services.sentinel-hub.com/ogc/wms/{instanceId}",
-                media_type=(endpoint_config.get("MimeType", "image/png")),
-                title=collection_config["Name"],
-                extra_fields=extra_fields,
-            )
+        link = Link(
+            rel="wms",
+            target=f"https://services.sentinel-hub.com/ogc/wms/{instanceId}",
+            media_type=(endpoint_config.get("MimeType", "image/png")),
+            title=collection_config["Name"],
+            extra_fields=extra_fields,
         )
+        add_projection_info(
+            endpoint_config,
+            link,
+        )
+        stac_object.add_link(link)
     elif endpoint_config["Name"] == "WMS":
         extra_fields.update(
             {
@@ -672,15 +675,18 @@ def add_visualization_info(
         endpoint_url = endpoint_config["EndPoint"]
         # custom replacing of all ENV VARS present as template in URL as {VAR}
         endpoint_url = replace_with_env_variables(endpoint_url)
-        stac_object.add_link(
-            Link(
-                rel="wms",
-                target=endpoint_url,
-                media_type=media_type,
-                title=collection_config["Name"],
-                extra_fields=extra_fields,
-            )
+        link = Link(
+            rel="wms",
+            target=endpoint_url,
+            media_type=media_type,
+            title=collection_config["Name"],
+            extra_fields=extra_fields,
         )
+        add_projection_info(
+            endpoint_config,
+            link,
+        )
+        stac_object.add_link(link)
     elif endpoint_config["Name"] == "JAXA_WMTS_PALSAR":
         target_url = "{}".format(endpoint_config.get("EndPoint"))
         # custom time just for this special case as a default for collection wmts
@@ -761,15 +767,18 @@ def add_visualization_info(
         elif endpoint_config["Type"] == "tiles":
             target_url = generate_veda_tiles_link(endpoint_config, file_url)
         if target_url:
-            stac_object.add_link(
-                Link(
-                    rel="xyz",
-                    target=target_url,
-                    media_type="image/png",
-                    title=collection_config["Name"],
-                    extra_fields=extra_fields,
-                )
+            link = Link(
+                rel="xyz",
+                target=target_url,
+                media_type="image/png",
+                title=collection_config["Name"],
+                extra_fields=extra_fields,
             )
+            add_projection_info(
+                endpoint_config,
+                link,
+            )
+            stac_object.add_link(link)
     elif endpoint_config["Name"] == "GeoDB Vector Tiles":
         # `${geoserverUrl}${config.layerName}@EPSG%3A${projString}@pbf/{z}/{x}/{-y}.pbf`,
         # 'geodb_debd884d-92f9-4979-87b6-eadef1139394:GTIF_AT_Gemeinden_3857'
