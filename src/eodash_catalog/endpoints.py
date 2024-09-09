@@ -244,7 +244,10 @@ def process_STACAPI_Endpoint(
                 item,
                 collection_config,
                 endpoint_config,
-                datetimes=[item.properties["start_datetime"], item.properties["end_datetime"]],
+                datetimes=[
+                    parse_datestring_to_tz_aware_datetime(item.properties["start_datetime"]),
+                    parse_datestring_to_tz_aware_datetime(item.properties["end_datetime"]),
+                ],
             )
         # If a root collection exists we point back to it from the item
         if root_collection:
@@ -253,11 +256,14 @@ def process_STACAPI_Endpoint(
         # bubble up information we want to the link
         # it is possible for datetime to be null, if it is start and end datetime have to exist
         if item_datetime:
-            iso_time = format_datetime_to_isostring_zulu(item_datetime)
-            link.extra_fields["datetime"] = iso_time
+            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(item_datetime)
         else:
-            link.extra_fields["start_datetime"] = item.properties["start_datetime"]
-            link.extra_fields["end_datetime"] = item.properties["end_datetime"]
+            link.extra_fields["start_datetime"] = format_datetime_to_isostring_zulu(
+                parse_datestring_to_tz_aware_datetime(item.properties["start_datetime"])
+            )
+            link.extra_fields["end_datetime"] = format_datetime_to_isostring_zulu(
+                parse_datestring_to_tz_aware_datetime(item.properties["end_datetime"])
+            )
         add_projection_info(
             endpoint_config,
             item,
