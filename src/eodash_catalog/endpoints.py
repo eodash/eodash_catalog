@@ -9,7 +9,6 @@ from itertools import groupby
 from operator import itemgetter
 
 import requests
-from dateutil import parser
 from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries
 from pystac_client import Client
 from structlog import get_logger
@@ -19,7 +18,7 @@ from eodash_catalog.stac_handling import (
     add_collection_information,
     add_example_info,
     add_projection_info,
-    get_collection_times_from_config,
+    get_collection_datetimes_from_config,
     get_or_create_collection,
 )
 from eodash_catalog.thumbnails import generate_thumbnail
@@ -28,7 +27,9 @@ from eodash_catalog.utils import (
     create_geojson_from_bbox,
     create_geojson_point,
     filter_time_entries,
+    format_datetime_to_isostring_zulu,
     generate_veda_cog_link,
+    parse_datestring_to_tz_aware_datetime,
     replace_with_env_variables,
     retrieveExtentFromWMSWMTS,
 )
@@ -69,29 +70,26 @@ def process_STAC_Datacube_Endpoint(
         if v.get("type") == "temporal":
             time_dimension = k
             break
-    time_entries = dimensions.get(time_dimension).get("values")
+    datetimes = [
+        parse_datestring_to_tz_aware_datetime(time_string)
+        for time_string in dimensions.get(time_dimension).get("values")
+    ]
     # optionally subset time results based on config
     if query := endpoint_config.get("Query"):
-        time_entries = filter_time_entries(time_entries, query)
+        datetimes = filter_time_entries(datetimes, query)
 
-    for t in time_entries:
-        item = Item(
-            id=t,
+    for dt in datetimes:
+        new_item = Item(
+            id=format_datetime_to_isostring_zulu(dt),
             bbox=item.bbox,
             properties={},
             geometry=item.geometry,
-            datetime=parser.isoparse(t),
+            datetime=dt,
         )
-        link = collection.add_item(item)
-        link.extra_fields["datetime"] = parser.isoparse(t).isoformat()[:-6] + "Z"
+        link = collection.add_item(new_item)
         # bubble up information we want to the link
-        item_datetime = item.get_datetime()
-        # it is possible for datetime to be null, if it is start and end datetime have to exist
-        if item_datetime:
-            link.extra_fields["datetime"] = item_datetime.isoformat()[:-6] + "Z"
-        else:
-            link.extra_fields["start_datetime"] = item.properties["start_datetime"]
-            link.extra_fields["end_datetime"] = item.properties["end_datetime"]
+        link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
+
     unit = variables.get(endpoint_config.get("Variable")).get("unit")
     if unit and "yAxis" not in collection_config:
         collection_config["yAxis"] = unit
@@ -238,16 +236,15 @@ def process_STACAPI_Endpoint(
             )
             link.extra_fields["cog_href"] = item.assets["cog_default"].href
         elif item_datetime:
-            time_string = item_datetime.isoformat()[:-6] + "Z"
-            add_visualization_info(item, collection_config, endpoint_config, time=time_string)
+            add_visualization_info(
+                item, collection_config, endpoint_config, datetimes=[item_datetime]
+            )
         elif "start_datetime" in item.properties and "end_datetime" in item.properties:
             add_visualization_info(
                 item,
                 collection_config,
                 endpoint_config,
-                time="{}/{}".format(
-                    item.properties["start_datetime"], item.properties["end_datetime"]
-                ),
+                datetimes=[item.properties["start_datetime"], item.properties["end_datetime"]],
             )
         # If a root collection exists we point back to it from the item
         if root_collection:
@@ -256,12 +253,8 @@ def process_STACAPI_Endpoint(
         # bubble up information we want to the link
         # it is possible for datetime to be null, if it is start and end datetime have to exist
         if item_datetime:
-            iso_time = item_datetime.isoformat()[:-6] + "Z"
-            if endpoint_config["Name"] == "Sentinel Hub":
-                # for SH WMS we only save the date (no time)
-                link.extra_fields["datetime"] = iso_date
-            else:
-                link.extra_fields["datetime"] = iso_time
+            iso_time = format_datetime_to_isostring_zulu(item_datetime)
+            link.extra_fields["datetime"] = iso_time
         else:
             link.extra_fields["start_datetime"] = item.properties["start_datetime"]
             link.extra_fields["end_datetime"] = item.properties["end_datetime"]
@@ -305,18 +298,18 @@ def handle_collection_only(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    times = get_collection_times_from_config(endpoint_config)
-    if len(times) > 0:
-        for t in times:
+    datetimes = get_collection_datetimes_from_config(endpoint_config)
+    if len(datetimes) > 0:
+        for dt in datetimes:
             item = Item(
-                id=t,
+                id=format_datetime_to_isostring_zulu(dt),
                 bbox=endpoint_config.get("OverwriteBBox"),
                 properties={},
                 geometry=None,
-                datetime=parser.isoparse(t),
+                datetime=dt,
             )
             link = collection.add_item(item)
-            link.extra_fields["datetime"] = parser.isoparse(t).isoformat()[:-6] + "Z"
+            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
     add_collection_information(catalog_config, collection, collection_config)
     # eodash v4 compatibility
     add_visualization_info(collection, collection_config, endpoint_config)
@@ -342,21 +335,22 @@ def handle_SH_WMS_endpoint(
                 catalog, location["Identifier"], location_config, catalog_config, endpoint_config
             )
             collection.extra_fields["endpointtype"] = endpoint_config["Name"]
-            for time in location["Times"]:
+            for time_string in location["Times"]:
+                dt = parse_datestring_to_tz_aware_datetime(time_string)
                 item = Item(
-                    id=time,
+                    id=format_datetime_to_isostring_zulu(dt),
                     bbox=location["Bbox"],
                     properties={},
                     geometry=None,
-                    datetime=parser.isoparse(time),
+                    datetime=dt,
                     stac_extensions=[
                         "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                     ],
                 )
                 add_projection_info(endpoint_config, item)
-                add_visualization_info(item, collection_config, endpoint_config, time=time)
+                add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
                 item_link = collection.add_item(item)
-                item_link.extra_fields["datetime"] = parser.isoparse(time).isoformat()[:-6] + "Z"
+                item_link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
 
             link = root_collection.add_child(collection)
             # bubble up information we want to the link
@@ -376,23 +370,23 @@ def handle_SH_WMS_endpoint(
     else:
         # if locations are not provided, treat the collection as a
         # general proxy to the sentinel hub layer
-        times = get_collection_times_from_config(endpoint_config)
+        datetimes = get_collection_datetimes_from_config(endpoint_config)
         bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
-        for time in times:
+        for dt in datetimes:
             item = Item(
-                id=time,
+                id=format_datetime_to_isostring_zulu(dt),
                 bbox=bbox,
                 properties={},
                 geometry=None,
-                datetime=parser.isoparse(time),
+                datetime=dt,
                 stac_extensions=[
                     "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                 ],
             )
             add_projection_info(endpoint_config, item)
-            add_visualization_info(item, collection_config, endpoint_config, time=time)
+            add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
             item_link = root_collection.add_item(item)
-            item_link.extra_fields["datetime"] = parser.isoparse(time).isoformat()[:-6] + "Z"
+            item_link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
     # eodash v4 compatibility
     add_collection_information(catalog_config, root_collection, collection_config)
     add_visualization_info(root_collection, collection_config, endpoint_config)
@@ -538,13 +532,13 @@ def handle_WMS_endpoint(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    times = get_collection_times_from_config(endpoint_config)
+    datetimes = get_collection_datetimes_from_config(endpoint_config)
     spatial_extent = collection.extent.spatial.to_dict().get("bbox", [-180, -90, 180, 90])[0]
     if endpoint_config.get("Type") != "OverwriteTimes" or not endpoint_config.get("OverwriteBBox"):
         # some endpoints allow "narrowed-down" capabilities per-layer, which we utilize to not
         # have to process full service capabilities XML
         capabilities_url = endpoint_config["EndPoint"]
-        spatial_extent, times = retrieveExtentFromWMSWMTS(
+        spatial_extent, datetimes = retrieveExtentFromWMSWMTS(
             capabilities_url,
             endpoint_config["LayerId"],
             version=endpoint_config.get("Version", "1.1.1"),
@@ -552,24 +546,24 @@ def handle_WMS_endpoint(
         )
     # optionally filter time results
     if query := endpoint_config.get("Query"):
-        times = filter_time_entries(times, query)
+        datetimes = filter_time_entries(datetimes, query)
     # Create an item per time to allow visualization in stac clients
-    if len(times) > 0:
-        for t in times:
+    if len(datetimes) > 0:
+        for dt in datetimes:
             item = Item(
-                id=t,
+                id=format_datetime_to_isostring_zulu(dt),
                 bbox=spatial_extent,
                 properties={},
                 geometry=None,
-                datetime=parser.isoparse(t),
+                datetime=dt,
                 stac_extensions=[
                     "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                 ],
             )
             add_projection_info(endpoint_config, item)
-            add_visualization_info(item, collection_config, endpoint_config, time=t)
+            add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
             link = collection.add_item(item)
-            link.extra_fields["datetime"] = parser.isoparse(t).isoformat()[:-6] + "Z"
+            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
         collection.update_extent_from_items()
 
     # Check if we should overwrite bbox
@@ -606,7 +600,7 @@ def add_visualization_info(
     collection_config: dict,
     endpoint_config: dict,
     file_url: str | None = None,
-    time: str | None = None,
+    datetimes: list[datetime] | None = None,
 ) -> None:
     extra_fields: dict[str, list[str] | dict[str, str]] = {}
     if "Attribution" in endpoint_config:
@@ -630,16 +624,18 @@ def add_visualization_info(
         if dimensions_config := endpoint_config.get("Dimensions", {}):
             for key, value in dimensions_config.items():
                 dimensions[key] = value
-        if time is not None:
-            if endpoint_config["Name"] == "Sentinel Hub WMS":
-                # SH WMS for public collections needs time interval, we use full day here
-                datetime_object = datetime.fromisoformat(time)
-                start = datetime_object.isoformat()
-                end = (datetime_object + timedelta(days=1) - timedelta(milliseconds=1)).isoformat()
-                time_interval = f"{start}/{end}"
-                dimensions["TIME"] = time_interval
-            if endpoint_config["Name"] == "Sentinel Hub":
-                dimensions["TIME"] = time
+        if datetimes is not None:
+            dt = datetimes[0]
+            start_isostring = format_datetime_to_isostring_zulu(dt)
+            # SH WMS for public collections needs time interval, we use full day here
+            end = dt + timedelta(days=1) - timedelta(milliseconds=1)
+            # we have start_datetime and end_datetime
+            if len(datetimes) == 2:
+                end = datetimes[1]
+            end_isostring = format_datetime_to_isostring_zulu(end)
+            time_interval = f"{start_isostring}/{end_isostring}"
+            dimensions["TIME"] = time_interval
+
         if dimensions != {}:
             extra_fields["wms:dimensions"] = dimensions
         link = Link(
@@ -665,8 +661,8 @@ def add_visualization_info(
         if dimensions_config := endpoint_config.get("Dimensions", {}):
             for key, value in dimensions_config.items():
                 dimensions[key] = value
-        if time is not None:
-            dimensions["TIME"] = time
+        if datetimes is not None:
+            dimensions["TIME"] = format_datetime_to_isostring_zulu(datetimes[0])
         if dimensions != {}:
             extra_fields["wms:dimensions"] = dimensions
         if "Styles" in endpoint_config:
@@ -690,8 +686,15 @@ def add_visualization_info(
     elif endpoint_config["Name"] == "JAXA_WMTS_PALSAR":
         target_url = "{}".format(endpoint_config.get("EndPoint"))
         # custom time just for this special case as a default for collection wmts
+        time = None
+        if datetimes is not None:
+            time = datetimes[0]
         extra_fields.update(
-            {"wmts:layer": endpoint_config.get("LayerId", "").replace("{time}", time or "2017")}
+            {
+                "wmts:layer": endpoint_config.get("LayerId", "").replace(
+                    "{time}", (time and str(time.year)) or "2017"
+                )
+            }
         )
         stac_object.add_link(
             Link(
@@ -745,8 +748,8 @@ def add_visualization_info(
             }
         )
         dimensions = {}
-        if time is not None:
-            dimensions["time"] = time
+        if datetimes is not None:
+            dimensions["time"] = format_datetime_to_isostring_zulu(datetimes[0])
         if dimensions_config := endpoint_config.get("Dimensions", {}):
             for key, value in dimensions_config.items():
                 dimensions[key] = value
@@ -872,12 +875,13 @@ def handle_raw_source(
                 add_projection_info(endpoint_config, asset)
                 assets[a["Identifier"]] = asset
             bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
+            dt = parse_datestring_to_tz_aware_datetime(time_entry["Time"])
             item = Item(
-                id=time_entry["Time"],
+                id=format_datetime_to_isostring_zulu(dt),
                 bbox=bbox,
                 properties={},
                 geometry=create_geojson_from_bbox(bbox),
-                datetime=parser.isoparse(time_entry["Time"]),
+                datetime=dt,
                 assets=assets,
                 extra_fields={},
             )
@@ -898,9 +902,7 @@ def handle_raw_source(
                 )
                 item.add_link(style_link)
             link = collection.add_item(item)
-            link.extra_fields["datetime"] = (
-                parser.isoparse(time_entry["Time"]).isoformat()[:-6] + "Z"
-            )
+            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
             link.extra_fields["assets"] = [a["File"] for a in time_entry["Assets"]]
         # eodash v4 compatibility, adding last referenced style to collection
         if style_link:

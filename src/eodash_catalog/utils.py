@@ -14,6 +14,7 @@ from dateutil import parser
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
 from pystac import Catalog, Collection, Item, RelType
+from pytz import timezone as pytztimezone
 from six import string_types
 from structlog import get_logger
 
@@ -57,7 +58,7 @@ def create_geojson_from_bbox(bbox: list[float | int]) -> dict:
 
 def retrieveExtentFromWMSWMTS(
     capabilities_url: str, layer: str, version: str = "1.1.1", wmts: bool = False
-) -> tuple[list[float], list[str]]:
+) -> tuple[list[float], list[datetime]]:
     times = []
     try:
         if not wmts:
@@ -96,7 +97,9 @@ def retrieveExtentFromWMSWMTS(
     bbox = [-180.0, -90.0, 180.0, 90.0]
     if service and service[layer].boundingBoxWGS84:
         bbox = [float(x) for x in service[layer].boundingBoxWGS84]
-    return bbox, times
+
+    datetimes = [parse_datestring_to_tz_aware_datetime(time_str) for time_str in times]
+    return bbox, datetimes
 
 
 def interval(start: datetime, stop: datetime, delta: timedelta) -> Iterator[datetime]:
@@ -151,19 +154,20 @@ def parse_duration(datestring):
     return ret
 
 
-def generateDateIsostringsFromInterval(
+def generateDatetimesFromInterval(
     start: str, end: str, timedelta_config: dict | None = None
-) -> list[str]:
+) -> list[datetime]:
     if timedelta_config is None:
         timedelta_config = {}
-    start_dt = datetime.fromisoformat(start)
+    start_dt = parse_datestring_to_tz_aware_datetime(start)
     if end == "today":
-        end = datetime.now().isoformat()
-    end_dt = datetime.fromisoformat(end)
+        end_dt = datetime.now(tz=timezone.utc)
+    else:
+        end_dt = parse_datestring_to_tz_aware_datetime(end)
     delta = timedelta(**timedelta_config)
     dates = []
     while start_dt <= end_dt:
-        dates.append(start_dt.isoformat())
+        dates.append(start_dt)
         start_dt += delta
     return dates
 
@@ -251,9 +255,9 @@ def add_single_item_if_collection_empty(collection: Collection) -> None:
             bbox=[-180, -85, 180, 85],
             properties={},
             geometry=None,
-            datetime=datetime(1970, 1, 1, 0, 0, 0),
-            start_datetime=datetime(1970, 1, 1, 0, 0, 0),
-            end_datetime=datetime.now(),
+            datetime=datetime(1970, 1, 1, 0, 0, 0, tzinfo=pytztimezone("UTC")),
+            start_datetime=datetime(1970, 1, 1, 0, 0, 0, tzinfo=pytztimezone("UTC")),
+            end_datetime=datetime.now(tz=pytztimezone("UTC")),
         )
         collection.add_item(item)
 
@@ -309,19 +313,28 @@ def retry(exceptions, tries=3, delay=2, backoff=1, logger=None):
     return decorator
 
 
-def filter_time_entries(time_entries: list[str], query: dict[str, str]) -> list[str]:
+def filter_time_entries(time_entries: list[datetime], query: dict[str, str]) -> list[datetime]:
     datetime_query = [
-        parser.isoparse(time_entries[0]).replace(tzinfo=timezone.utc),
-        parser.isoparse(time_entries[-1]).replace(tzinfo=timezone.utc),
+        time_entries[0],
+        time_entries[-1],
     ]
     if start := query.get("Start"):
-        datetime_query[0] = parser.isoparse(start).replace(tzinfo=timezone.utc)
+        datetime_query[0] = parse_datestring_to_tz_aware_datetime(start)
     if end := query.get("End"):
-        datetime_query[1] = parser.isoparse(end).replace(tzinfo=timezone.utc)
+        datetime_query[1] = parse_datestring_to_tz_aware_datetime(end)
     # filter times based on query Start/End
-    time_entries = [
-        datetime_str
-        for datetime_str in time_entries
-        if datetime_query[0] <= parser.isoparse(datetime_str) < datetime_query[1]
-    ]
+    time_entries = [dt for dt in time_entries if datetime_query[0] <= dt < datetime_query[1]]
     return time_entries
+
+
+def parse_datestring_to_tz_aware_datetime(datestring: str) -> datetime:
+    dt = parser.isoparse(datestring)
+    dt = pytztimezone("UTC").localize(dt) if dt.tzinfo is None else dt
+    return dt
+
+
+def format_datetime_to_isostring_zulu(datetime_obj: datetime) -> str:
+    # although "+00:00" is a valid ISO 8601 timezone designation for UTC,
+    # we rather convert it to Zulu based string in order for various clients
+    # to understand it better (WMS)
+    return (datetime_obj.replace(microsecond=0).isoformat()).replace("+00:00", "Z")

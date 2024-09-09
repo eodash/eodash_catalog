@@ -7,7 +7,7 @@ from pystac import (
     Item,
 )
 
-from eodash_catalog.utils import generate_veda_cog_link
+from eodash_catalog.utils import format_datetime_to_isostring_zulu, generate_veda_cog_link
 
 
 def fetch_and_save_thumbnail(collection_config: dict, url: str) -> None:
@@ -45,7 +45,7 @@ def generate_thumbnail(
         # it is possible for datetime to be null,
         # if it is start and end datetime have to exist
         if item_datetime:
-            time = item_datetime.isoformat()[:-6] + "Z"
+            time = format_datetime_to_isostring_zulu(item_datetime)
         url = "https://services.sentinel-hub.com/ogc/wms/{}?{}&layers={}&time={}&{}".format(
             instanceId,
             wms_config,

@@ -3,7 +3,6 @@ from datetime import datetime
 import requests
 import spdx_lookup as lookup
 import yaml
-from dateutil import parser
 from pystac import (
     Asset,
     Catalog,
@@ -18,7 +17,10 @@ from pystac import (
 from structlog import get_logger
 from yaml.loader import SafeLoader
 
-from eodash_catalog.utils import generateDateIsostringsFromInterval
+from eodash_catalog.utils import (
+    generateDatetimesFromInterval,
+    parse_datestring_to_tz_aware_datetime,
+)
 
 LOGGER = get_logger(__name__)
 
@@ -42,20 +44,12 @@ def get_or_create_collection(
             spatial_extent,
         ]
     )
-    times: list[str] = []
     temporal_extent = TemporalExtent([[datetime.now(), None]])
     if endpoint_config:
-        if endpoint_config.get("Times"):
-            times = list(endpoint_config.get("Times", []))
-            times_datetimes = sorted([parser.isoparse(time) for time in times])
+        times_datetimes = get_collection_datetimes_from_config(endpoint_config)
+        if len(times_datetimes) > 0:
             temporal_extent = TemporalExtent([[times_datetimes[0], times_datetimes[-1]]])
-        elif endpoint_config.get("DateTimeInterval"):
-            start = endpoint_config["DateTimeInterval"].get("Start", "2020-09-01T00:00:00")
-            end = endpoint_config["DateTimeInterval"].get("End", "2020-10-01T00:00:00")
-            timedelta_config = endpoint_config["DateTimeInterval"].get("Timedelta", {"days": 1})
-            times = generateDateIsostringsFromInterval(start, end, timedelta_config)
-            times_datetimes = sorted([parser.isoparse(time) for time in times])
-            temporal_extent = TemporalExtent([[times_datetimes[0], times_datetimes[-1]]])
+
     extent = Extent(spatial=spatial_extent, temporal=temporal_extent)
 
     # Check if description is link to markdown file
@@ -387,17 +381,20 @@ def add_extra_fields(stac_object: Collection | Link, collection_config: dict) ->
         stac_object.extra_fields["eodash:mapProjection"] = collection_config["MapProjection"]
 
 
-def get_collection_times_from_config(endpoint_config: dict) -> list[str]:
-    times: list[str] = []
+def get_collection_datetimes_from_config(endpoint_config: dict) -> list[datetime]:
+    times_datetimes: list[datetime] = []
     if endpoint_config:
         if endpoint_config.get("Times"):
             times = list(endpoint_config.get("Times", []))
+            times_datetimes = sorted(
+                [parse_datestring_to_tz_aware_datetime(time) for time in times]
+            )
         elif endpoint_config.get("DateTimeInterval"):
-            start = endpoint_config["DateTimeInterval"].get("Start", "2020-09-01T00:00:00")
-            end = endpoint_config["DateTimeInterval"].get("End", "2020-10-01T00:00:00")
+            start = endpoint_config["DateTimeInterval"].get("Start", "2020-09-01T00:00:00Z")
+            end = endpoint_config["DateTimeInterval"].get("End", "2020-10-01T00:00:00Z")
             timedelta_config = endpoint_config["DateTimeInterval"].get("Timedelta", {"days": 1})
-            times = generateDateIsostringsFromInterval(start, end, timedelta_config)
-    return times
+            times_datetimes = generateDatetimesFromInterval(start, end, timedelta_config)
+    return times_datetimes
 
 
 def add_projection_info(
