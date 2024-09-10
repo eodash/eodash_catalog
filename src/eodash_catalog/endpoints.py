@@ -377,7 +377,7 @@ def handle_SH_WMS_endpoint(
             if location["Times"]:
                 collection.update_extent_from_items()
             else:
-                LOGGER.warn(f"NO datetimes configured for collection: {collection_config["Name"]}!")
+                LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
             add_visualization_info(collection, collection_config, endpoint_config)
 
         root_collection.update_extent_from_items()
@@ -584,7 +584,7 @@ def handle_WMS_endpoint(
             link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
         collection.update_extent_from_items()
     else:
-        LOGGER.warn(f"NO datetimes returned for collection: {collection_config["Name"]}!")
+        LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
 
     # Check if we should overwrite bbox
     if "OverwriteBBox" in endpoint_config:
@@ -929,7 +929,7 @@ def handle_raw_source(
             collection.add_link(style_link)
         collection.update_extent_from_items()
     else:
-        LOGGER.warn(f"NO datetimes configured for collection: {collection_config["Name"]}!")
+        LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
 
     add_collection_information(catalog_config, collection, collection_config)
     return collection
