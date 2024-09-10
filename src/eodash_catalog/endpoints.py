@@ -93,7 +93,10 @@ def process_STAC_Datacube_Endpoint(
     unit = variables.get(endpoint_config.get("Variable")).get("unit")
     if unit and "yAxis" not in collection_config:
         collection_config["yAxis"] = unit
-    collection.update_extent_from_items()
+    if datetimes:
+        collection.update_extent_from_items()
+    else:
+        LOGGER.warn(f"NO datetimes returned for collection: {collection_id}!")
 
     add_collection_information(catalog_config, collection, collection_config)
 
@@ -188,8 +191,9 @@ def process_STACAPI_Endpoint(
 ) -> Collection:
     if headers is None:
         headers = {}
+    collection_id = endpoint_config["CollectionId"]
     collection = get_or_create_collection(
-        catalog, endpoint_config["CollectionId"], collection_config, catalog_config, endpoint_config
+        catalog, collection_id, collection_config, catalog_config, endpoint_config
     )
     datetime_query = ["1900-01-01T00:00:00Z", "3000-01-01T00:00:00Z"]
     if query := endpoint_config.get("Query"):
@@ -202,7 +206,7 @@ def process_STACAPI_Endpoint(
     if bbox is None:
         bbox = [-180, -90, 180, 90]
     results = api.search(
-        collections=[endpoint_config["CollectionId"]],
+        collections=[collection_id],
         bbox=bbox,
         datetime=datetime_query,  # type: ignore
     )
@@ -268,8 +272,13 @@ def process_STACAPI_Endpoint(
             endpoint_config,
             item,
         )
-    collection.update_extent_from_items()
-
+    if added_times:
+        collection.update_extent_from_items()
+    else:
+        LOGGER.warn(
+            f"""NO items returned for
+            bbox: {bbox}, datetime: {datetime_query}, collection: {collection_id}!"""
+        )
     # replace SH identifier with catalog identifier
     collection.id = collection_config["Name"]
     add_collection_information(catalog_config, collection, collection_config)
@@ -365,7 +374,10 @@ def handle_SH_WMS_endpoint(
             link.extra_fields["latlng"] = latlng
             link.extra_fields["country"] = location["Country"]
             link.extra_fields["city"] = location["Name"]
-            collection.update_extent_from_items()
+            if location["Times"]:
+                collection.update_extent_from_items()
+            else:
+                LOGGER.warn(f"NO datetimes configured for collection: {collection_config["Name"]}!")
             add_visualization_info(collection, collection_config, endpoint_config)
 
         root_collection.update_extent_from_items()
@@ -571,6 +583,8 @@ def handle_WMS_endpoint(
             link = collection.add_item(item)
             link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
         collection.update_extent_from_items()
+    else:
+        LOGGER.warn(f"NO datetimes returned for collection: {collection_config["Name"]}!")
 
     # Check if we should overwrite bbox
     if "OverwriteBBox" in endpoint_config:
@@ -913,6 +927,9 @@ def handle_raw_source(
         # eodash v4 compatibility, adding last referenced style to collection
         if style_link:
             collection.add_link(style_link)
+        collection.update_extent_from_items()
+    else:
+        LOGGER.warn(f"NO datetimes configured for collection: {collection_config["Name"]}!")
+
     add_collection_information(catalog_config, collection, collection_config)
-    collection.update_extent_from_items()
     return collection
