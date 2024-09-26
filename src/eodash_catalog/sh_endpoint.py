@@ -1,10 +1,11 @@
 import os
+import time
 
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
 SH_TOKEN_URL = "https://services.sentinel-hub.com/oauth/token"
-_token_cache: dict[str, str] = {}
+_token_cache: dict[str, dict] = {}
 
 
 def get_SH_token(endpoint_config: dict) -> str:
@@ -14,8 +15,10 @@ def get_SH_token(endpoint_config: dict) -> str:
     if env_id := endpoint_config.get("CustomSHEnvId"):
         client_id = os.getenv(f"SH_CLIENT_ID_{env_id}", "")
         client_secret = os.getenv(f"SH_CLIENT_SECRET_{env_id}", "")
-    if client_id in _token_cache:
-        return _token_cache[client_id]
+
+    if client_id in _token_cache and _token_cache[client_id]["expires_at"] > time.time():
+        print("returning from cache")
+        return _token_cache[client_id]["access_token"]
     # Create a session
     client = BackendApplicationClient(client_id=client_id)
     oauth = OAuth2Session(client=client)
@@ -25,6 +28,6 @@ def get_SH_token(endpoint_config: dict) -> str:
         client_secret=client_secret,
     )
     access_token = token["access_token"]
-    _token_cache[client_id] = access_token
-
+    _token_cache[client_id] = {"access_token": access_token, "expires_at": token["expires_at"]}
+    print("returning directly")
     return access_token
