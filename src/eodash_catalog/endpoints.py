@@ -212,7 +212,9 @@ def process_STACAPI_Endpoint(
     )
     # We keep track of potential duplicate times in this list
     added_times = {}
+    any_item_added = False
     for item in results.items():
+        any_item_added = True
         item_datetime = item.get_datetime()
         if item_datetime is not None:
             iso_date = item_datetime.isoformat()[:10]
@@ -272,7 +274,7 @@ def process_STACAPI_Endpoint(
             endpoint_config,
             item,
         )
-    if added_times:
+    if any_item_added:
         collection.update_extent_from_items()
     else:
         LOGGER.warn(
