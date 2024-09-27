@@ -15,9 +15,9 @@ def get_SH_token(endpoint_config: dict) -> str:
     if env_id := endpoint_config.get("CustomSHEnvId"):
         client_id = os.getenv(f"SH_CLIENT_ID_{env_id}", "")
         client_secret = os.getenv(f"SH_CLIENT_SECRET_{env_id}", "")
-
-    if client_id in _token_cache and _token_cache[client_id]["expires_at"] > time.time():
-        print("returning from cache")
+    # 10 minutes before end of validity
+    safety_buffer_validity = _token_cache[client_id]["expires_at"] - (60 * 10)
+    if client_id in _token_cache and (safety_buffer_validity) > (time.time()):
         return _token_cache[client_id]["access_token"]
     # Create a session
     client = BackendApplicationClient(client_id=client_id)
@@ -29,5 +29,4 @@ def get_SH_token(endpoint_config: dict) -> str:
     )
     access_token = token["access_token"]
     _token_cache[client_id] = {"access_token": access_token, "expires_at": token["expires_at"]}
-    print("returning directly")
     return access_token
