@@ -68,10 +68,6 @@ def process_WCS_rasdaman_Endpoint(
         LOGGER.warn(f"NO datetimes returned for collection: {endpoint_config['CoverageId']}!")
 
     add_collection_information(catalog_config, collection, collection_config)
-    # if not coll:
-    #     raise ValueError(f"Collection {collection_id} not found in endpoint {endpoint_config}")
-    # item_id = endpoint_config.get("CollectionId", "datacube")
-    # item = coll.get_item(item_id)
     return collection
 
 
