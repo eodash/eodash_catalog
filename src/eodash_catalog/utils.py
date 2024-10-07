@@ -11,6 +11,7 @@ from functools import reduce, wraps
 from typing import Any
 
 from dateutil import parser
+from owslib.wcs import WebCoverageService
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
 from pystac import Catalog, Collection, Item, RelType
@@ -54,6 +55,52 @@ def create_geojson_from_bbox(bbox: list[float | int]) -> dict:
     feature = {"type": "Feature", "geometry": polygon, "properties": {}}
     feature_collection = {"type": "FeatureCollection", "features": [feature]}
     return feature_collection
+
+
+def retrieveExtentFromWCS(
+    capabilities_url: str,
+    coverage: str,
+    version: str = "2.0.1",
+) -> tuple[list[float], list[datetime]]:
+    times = []
+    try:
+        service = WebCoverageService(capabilities_url, version)
+        if coverage in list(service.contents):
+            description = service.getDescribeCoverage(coverage)
+            area_val = description.findall(".//{http://www.rasdaman.org}areasOfValidity")
+            if len(area_val) == 1:
+                areas = area_val[0].getchildren()
+                if len(areas) > 1:
+                    times = [t.get("start") for t in areas]
+            # get unique times
+            times = reduce(lambda re, x: [*re, x] if x not in re else re, times, [])
+    except Exception as e:
+        LOGGER.warn("Issue extracting information from service capabilities")
+        template = "An exception of type {0} occurred. Arguments:\n{1!r}"
+        message = template.format(type(e).__name__, e.args)
+        LOGGER.warn(message)
+
+    bbox = [-180.0, -90.0, 180.0, 90.0]
+    owsnmspc = "{http://www.opengis.net/ows/2.0}"
+    # somehow this is not parsed from the rasdaman endpoint
+    if service and service[coverage].boundingBoxWGS84:
+        bbox = [float(x) for x in service[coverage].boundingBoxWGS84]
+    elif service:
+        # we try to get it ourselves
+        wgs84bbox = service.contents[coverage]._elem.findall(".//" + owsnmspc + "WGS84BoundingBox")
+        if len(wgs84bbox) == 1:
+            lc = wgs84bbox[0].find(".//" + owsnmspc + "LowerCorner").text
+            uc = wgs84bbox[0].find(".//" + owsnmspc + "UpperCorner").text
+            bbox = [
+                float(lc.split()[0]),
+                float(lc.split()[1]),
+                float(uc.split()[0]),
+                float(uc.split()[1]),
+            ]
+        description.findall(".//{http://www.rasdaman.org}areasOfValidity")
+
+    datetimes = [parse_datestring_to_tz_aware_datetime(time_str) for time_str in times]
+    return bbox, datetimes
 
 
 def retrieveExtentFromWMSWMTS(
