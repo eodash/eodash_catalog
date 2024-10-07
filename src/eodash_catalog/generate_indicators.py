@@ -21,6 +21,7 @@ from eodash_catalog.endpoints import (
     handle_collection_only,
     handle_custom_endpoint,
     handle_GeoDB_endpoint,
+    handle_rasdaman_endpoint,
     handle_raw_source,
     handle_SH_endpoint,
     handle_SH_WMS_endpoint,
@@ -227,6 +228,10 @@ def process_collection_file(
                         )
                     elif endpoint_config["Name"] == "xcube":
                         collection = handle_xcube_endpoint(
+                            catalog_config, endpoint_config, collection_config, catalog
+                        )
+                    elif endpoint_config["Name"] == "rasdaman":
+                        collection = handle_rasdaman_endpoint(
                             catalog_config, endpoint_config, collection_config, catalog
                         )
                     elif endpoint_config["Name"] == "WMS":

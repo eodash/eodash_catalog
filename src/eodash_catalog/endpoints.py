@@ -31,10 +31,48 @@ from eodash_catalog.utils import (
     generate_veda_cog_link,
     parse_datestring_to_tz_aware_datetime,
     replace_with_env_variables,
+    retrieveExtentFromWCS,
     retrieveExtentFromWMSWMTS,
 )
 
 LOGGER = get_logger(__name__)
+
+
+def process_WCS_rasdaman_Endpoint(
+    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+) -> Collection:
+    collection = get_or_create_collection(
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
+    )
+    bbox, datetimes = retrieveExtentFromWCS(
+        endpoint_config["EndPoint"],
+        endpoint_config["CoverageId"],
+        version=endpoint_config.get("Version", "2.0.1"),
+    )
+    for dt in datetimes:
+        item = Item(
+            id=format_datetime_to_isostring_zulu(dt),
+            bbox=bbox,
+            properties={},
+            geometry=None,
+            datetime=dt,
+        )
+        add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
+        link = collection.add_item(item)
+        # bubble up information we want to the link
+        link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
+
+    if datetimes:
+        collection.update_extent_from_items()
+    else:
+        LOGGER.warn(f"NO datetimes returned for collection: {endpoint_config['CoverageId']}!")
+
+    add_collection_information(catalog_config, collection, collection_config)
+    # if not coll:
+    #     raise ValueError(f"Collection {collection_id} not found in endpoint {endpoint_config}")
+    # item_id = endpoint_config.get("CollectionId", "datacube")
+    # item = coll.get_item(item_id)
+    return collection
 
 
 def process_STAC_Datacube_Endpoint(
@@ -427,6 +465,16 @@ def handle_xcube_endpoint(
     return collection
 
 
+def handle_rasdaman_endpoint(
+    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+) -> Collection:
+    collection = process_WCS_rasdaman_Endpoint(
+        catalog_config, endpoint_config, collection_config, catalog
+    )
+    # add_example_info(collection, collection_config, endpoint_config, catalog_config)
+    return collection
+
+
 def handle_GeoDB_endpoint(
     catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
 ) -> Collection:
@@ -693,6 +741,38 @@ def add_visualization_info(
         endpoint_url = endpoint_config["EndPoint"]
         # custom replacing of all ENV VARS present as template in URL as {VAR}
         endpoint_url = replace_with_env_variables(endpoint_url)
+        link = Link(
+            rel="wms",
+            target=endpoint_url,
+            media_type=media_type,
+            title=collection_config["Name"],
+            extra_fields=extra_fields,
+        )
+        add_projection_info(
+            endpoint_config,
+            link,
+        )
+        stac_object.add_link(link)
+    elif endpoint_config["Name"] == "rasdaman":
+        extra_fields.update(
+            {
+                "wms:layers": [endpoint_config["CoverageId"]],
+                "role": ["data"],
+            }
+        )
+        dimensions = {}
+        if dimensions_config := endpoint_config.get("Dimensions", {}):
+            for key, value in dimensions_config.items():
+                dimensions[key] = value
+        if datetimes is not None:
+            dimensions["TIME"] = format_datetime_to_isostring_zulu(datetimes[0])
+        if dimensions != {}:
+            extra_fields["wms:dimensions"] = dimensions
+        if "Styles" in endpoint_config:
+            extra_fields["wms:styles"] = endpoint_config["Styles"]
+        media_type = endpoint_config.get("MediaType", "image/png")
+        endpoint_url = endpoint_config["EndPoint"]
+        # custom replacing of all ENV VARS present as template in URL as {VAR}
         link = Link(
             rel="wms",
             target=endpoint_url,
