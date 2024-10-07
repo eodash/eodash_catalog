@@ -65,7 +65,7 @@ def process_WCS_rasdaman_Endpoint(
     if datetimes:
         collection.update_extent_from_items()
     else:
-        LOGGER.warn(f"NO datetimes returned for collection: {endpoint_config["CoverageId"]}!")
+        LOGGER.warn(f"NO datetimes returned for collection: {endpoint_config['CoverageId']}!")
 
     add_collection_information(catalog_config, collection, collection_config)
     # if not coll:
