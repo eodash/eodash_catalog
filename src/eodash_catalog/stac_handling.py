@@ -317,6 +317,8 @@ def add_collection_information(
                     roles=["metadata"],
                 ),
             )
+    if "Colorlegend" in collection_config:
+        collection.extra_fields["eox:colorlegend"] = collection_config["Colorlegend"]
 
 
 def add_base_overlay_info(
