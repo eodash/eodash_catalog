@@ -50,14 +50,15 @@ def process_WCS_rasdaman_Endpoint(
         version=endpoint_config.get("Version", "2.0.1"),
     )
     for dt in datetimes:
-        new_item = Item(
+        item = Item(
             id=format_datetime_to_isostring_zulu(dt),
             bbox=bbox,
             properties={},
             geometry=None,
             datetime=dt,
         )
-        link = collection.add_item(new_item)
+        add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
+        link = collection.add_item(item)
         # bubble up information we want to the link
         link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
 
@@ -740,6 +741,38 @@ def add_visualization_info(
         endpoint_url = endpoint_config["EndPoint"]
         # custom replacing of all ENV VARS present as template in URL as {VAR}
         endpoint_url = replace_with_env_variables(endpoint_url)
+        link = Link(
+            rel="wms",
+            target=endpoint_url,
+            media_type=media_type,
+            title=collection_config["Name"],
+            extra_fields=extra_fields,
+        )
+        add_projection_info(
+            endpoint_config,
+            link,
+        )
+        stac_object.add_link(link)
+    elif endpoint_config["Name"] == "rasdaman":
+        extra_fields.update(
+            {
+                "wms:layers": [endpoint_config["CoverageId"]],
+                "role": ["data"],
+            }
+        )
+        dimensions = {}
+        if dimensions_config := endpoint_config.get("Dimensions", {}):
+            for key, value in dimensions_config.items():
+                dimensions[key] = value
+        if datetimes is not None:
+            dimensions["TIME"] = format_datetime_to_isostring_zulu(datetimes[0])
+        if dimensions != {}:
+            extra_fields["wms:dimensions"] = dimensions
+        if "Styles" in endpoint_config:
+            extra_fields["wms:styles"] = endpoint_config["Styles"]
+        media_type = endpoint_config.get("MediaType", "image/png")
+        endpoint_url = endpoint_config["EndPoint"]
+        # custom replacing of all ENV VARS present as template in URL as {VAR}
         link = Link(
             rel="wms",
             target=endpoint_url,
