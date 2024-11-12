@@ -733,6 +733,10 @@ def add_visualization_info(
             extra_fields["wms:dimensions"] = dimensions
         if "Styles" in endpoint_config:
             extra_fields["wms:styles"] = endpoint_config["Styles"]
+        if "TileSize" in endpoint_config:
+            extra_fields["wms:tilesize"] = endpoint_config["TileSize"]
+        if "Version" in endpoint_config:
+            extra_fields["wms:version"] = endpoint_config["Version"]
         media_type = endpoint_config.get("MediaType", "image/jpeg")
         endpoint_url = endpoint_config["EndPoint"]
         # custom replacing of all ENV VARS present as template in URL as {VAR}
