@@ -297,8 +297,11 @@ def add_collection_information(
                 roles=["thumbnail"],
             ),
         )
-        # bubble up thumbnail to extra fields
-        collection.extra_fields["thumbnail"] = f'{catalog_config["assets_endpoint"]}/{collection_config["Image"]}'
+        # Bubble up thumbnail to extra fields
+        collection.extra_fields["thumbnail"] = (
+            f'{catalog_config["assets_endpoint"]}/'
+            f'{collection_config["Image"]}'
+        )
     # Add extra fields to collection if available
     add_extra_fields(collection, collection_config)
 
