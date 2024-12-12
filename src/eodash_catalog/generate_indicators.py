@@ -133,6 +133,7 @@ def extract_indicator_info(parent_collection: Collection):
         "sensor",
         "cities",
         "countries",
+        "thumbnail",
     ]
     summaries: dict[str, Any] = {}
     for key in to_extract:
