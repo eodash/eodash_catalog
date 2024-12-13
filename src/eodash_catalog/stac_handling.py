@@ -85,6 +85,26 @@ def get_or_create_collection(
     return collection
 
 
+def create_service_link(endpoint_config: dict) -> Link:
+    extra_fields = {
+        "id": endpoint_config["Identifier"],
+        "method": endpoint_config.get("Method", "GET"),
+    }
+    if "EndPoint" in endpoint_config:
+        extra_fields["endpoint"] = endpoint_config["EndPoint"]
+    if "Body" in endpoint_config:
+        extra_fields["body"] = endpoint_config["Body"]
+    if "Flatstyle" in endpoint_config:
+        extra_fields["eox:flatstyle"] = endpoint_config["Flatstyle"]
+    sl = Link(
+        rel="service",
+        target=endpoint_config["Url"],
+        media_type=endpoint_config["Type"],
+        extra_fields=extra_fields,
+    )
+    return sl
+
+
 def create_web_map_link(layer_config: dict, role: str) -> Link:
     extra_fields = {
         "roles": [role],
@@ -299,8 +319,7 @@ def add_collection_information(
         )
         # Bubble up thumbnail to extra fields
         collection.extra_fields["thumbnail"] = (
-            f'{catalog_config["assets_endpoint"]}/'
-            f'{collection_config["Image"]}'
+            f'{catalog_config["assets_endpoint"]}/' f'{collection_config["Image"]}'
         )
     # Add extra fields to collection if available
     add_extra_fields(collection, collection_config)
@@ -324,6 +343,45 @@ def add_collection_information(
             )
     if "Colorlegend" in collection_config:
         collection.extra_fields["eox:colorlegend"] = collection_config["Colorlegend"]
+
+
+def add_process_info(collection: Collection, catalog_config: dict, collection_config: dict) -> None:
+    if "Process" in collection_config:
+        if "EndPoints" in collection_config["Process"]:
+            for endpoint in collection_config["Process"]["EndPoints"]:
+                collection.add_link(create_service_link(endpoint))
+        if "JsonForm" in collection_config["Process"]:
+            collection.extra_fields["eodash:jsonform"] = collection_config["Process"]["JsonForm"]
+        if "VegaDefinition" in collection_config["Process"]:
+            collection.extra_fields["eodash:vegadefinition"] = collection_config["Process"][
+                "VegaDefinition"
+            ]
+    elif "Resources" in collection_config:
+        # see if geodb resource configured use defaults if available
+        for resource in collection_config["Resources"]:
+            if resource["Name"] == "GeoDB":
+                if "geodb_default_form" in catalog_config:
+                    collection.extra_fields["eodash:jsonform"] = catalog_config[
+                        "geodb_default_form"
+                    ]
+                if "geodb_default_vega" in catalog_config:
+                    collection.extra_fields["eodash:vegadefinition"] = catalog_config[
+                        "geodb_default_vega"
+                    ]
+                query_string = "?aoi_id=eq.{{feature}}&select=site_name,city,color_code,time,aoi,measurement_value,indicator_value,reference_time,eo_sensor,reference_value,input_data"  # noqa: E501
+                collection.add_link(
+                    Link(
+                        rel="service",
+                        target="{}{}{}".format(
+                            resource["EndPoint"], resource["Database"], query_string
+                        ),
+                        media_type="application/json",
+                        extra_fields={
+                            "method": "GET",
+                            "id": resource["CollectionId"],
+                        },
+                    )
+                )
 
 
 def add_base_overlay_info(
