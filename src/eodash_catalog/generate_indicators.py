@@ -33,6 +33,7 @@ from eodash_catalog.stac_handling import (
     add_base_overlay_info,
     add_collection_information,
     add_extra_fields,
+    add_process_info,
     add_projection_info,
     get_or_create_collection,
 )
@@ -191,6 +192,7 @@ def process_indicator_file(
                 parent_indicator.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
         # extract collection information and add it to summary indicator level
         extract_indicator_info(parent_indicator)
+        add_process_info(parent_indicator, catalog_config, indicator_config)
         # add baselayer and overview information to indicator collection
         add_base_overlay_info(parent_indicator, catalog_config, indicator_config)
         add_to_catalog(parent_indicator, catalog, {}, indicator_config)
@@ -339,6 +341,7 @@ def process_collection_file(
                     parent_collection.add_links(links)
 
             add_collection_information(catalog_config, parent_collection, collection_config)
+            add_process_info(catalog_config, parent_collection, collection_config)
             parent_collection.update_extent_from_items()
             # Add bbox extents from children
             for c_child in parent_collection.get_children():

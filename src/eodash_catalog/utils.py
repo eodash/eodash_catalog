@@ -385,3 +385,10 @@ def format_datetime_to_isostring_zulu(datetime_obj: datetime) -> str:
     # we rather convert it to Zulu based string in order for various clients
     # to understand it better (WMS)
     return (datetime_obj.replace(microsecond=0).isoformat()).replace("+00:00", "Z")
+
+
+def get_full_url(url: str, catalog_config) -> str:
+    if url.startswith("http"):
+        return url
+    else:
+        return f'{catalog_config["assets_endpoint"]}{url}'
