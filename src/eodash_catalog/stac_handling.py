@@ -19,6 +19,7 @@ from yaml.loader import SafeLoader
 
 from eodash_catalog.utils import (
     generateDatetimesFromInterval,
+    get_full_url,
     parse_datestring_to_tz_aware_datetime,
 )
 
@@ -85,7 +86,7 @@ def get_or_create_collection(
     return collection
 
 
-def create_service_link(endpoint_config: dict) -> Link:
+def create_service_link(endpoint_config: dict, catalog_config: dict) -> Link:
     extra_fields = {
         "id": endpoint_config["Identifier"],
         "method": endpoint_config.get("Method", "GET"),
@@ -93,9 +94,9 @@ def create_service_link(endpoint_config: dict) -> Link:
     if "EndPoint" in endpoint_config:
         extra_fields["endpoint"] = endpoint_config["EndPoint"]
     if "Body" in endpoint_config:
-        extra_fields["body"] = endpoint_config["Body"]
+        extra_fields["body"] = get_full_url(endpoint_config["Body"], catalog_config)
     if "Flatstyle" in endpoint_config:
-        extra_fields["eox:flatstyle"] = endpoint_config["Flatstyle"]
+        extra_fields["eox:flatstyle"] = get_full_url(endpoint_config["Flatstyle"], catalog_config)
     sl = Link(
         rel="service",
         target=endpoint_config["Url"],
@@ -349,25 +350,27 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
     if "Process" in collection_config:
         if "EndPoints" in collection_config["Process"]:
             for endpoint in collection_config["Process"]["EndPoints"]:
-                collection.add_link(create_service_link(endpoint))
+                collection.add_link(create_service_link(endpoint, catalog_config))
         if "JsonForm" in collection_config["Process"]:
-            collection.extra_fields["eodash:jsonform"] = collection_config["Process"]["JsonForm"]
+            collection.extra_fields["eodash:jsonform"] = get_full_url(
+                collection_config["Process"]["JsonForm"], catalog_config
+            )
         if "VegaDefinition" in collection_config["Process"]:
-            collection.extra_fields["eodash:vegadefinition"] = collection_config["Process"][
-                "VegaDefinition"
-            ]
+            collection.extra_fields["eodash:vegadefinition"] = get_full_url(
+                collection_config["Process"]["VegaDefinition"], catalog_config
+            )
     elif "Resources" in collection_config:
         # see if geodb resource configured use defaults if available
         for resource in collection_config["Resources"]:
             if resource["Name"] == "GeoDB":
                 if "geodb_default_form" in catalog_config:
-                    collection.extra_fields["eodash:jsonform"] = catalog_config[
-                        "geodb_default_form"
-                    ]
+                    collection.extra_fields["eodash:jsonform"] = get_full_url(
+                        catalog_config["geodb_default_form"], catalog_config
+                    )
                 if "geodb_default_vega" in catalog_config:
-                    collection.extra_fields["eodash:vegadefinition"] = catalog_config[
-                        "geodb_default_vega"
-                    ]
+                    collection.extra_fields["eodash:vegadefinition"] = get_full_url(
+                        catalog_config["geodb_default_vega"], catalog_config
+                    )
                 query_string = "?aoi_id=eq.{{feature}}&select=site_name,city,color_code,time,aoi,measurement_value,indicator_value,reference_time,eo_sensor,reference_value,input_data"  # noqa: E501
                 collection.add_link(
                     Link(
