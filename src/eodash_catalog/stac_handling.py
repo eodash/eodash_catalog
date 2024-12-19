@@ -375,8 +375,11 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
                 collection.add_link(
                     Link(
                         rel="service",
-                        target="{}{}{}".format(
-                            resource["EndPoint"], resource["Database"], query_string
+                        target="{}{}_{}{}".format(
+                            resource["EndPoint"],
+                            resource["Database"],
+                            resource["CollectionId"],
+                            query_string,
                         ),
                         media_type="application/json",
                         extra_fields={
