@@ -257,7 +257,11 @@ def process_collection_file(
                             collection_config,
                             catalog,
                         )
-                    elif endpoint_config["Name"] in ["COG source", "GeoJSON source"]:
+                    elif endpoint_config["Name"] in [
+                        "COG source",
+                        "GeoJSON source",
+                        "FlatGeobuf source",
+                    ]:
                         collection = handle_raw_source(
                             catalog_config, endpoint_config, collection_config, catalog
                         )

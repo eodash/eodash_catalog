@@ -970,6 +970,8 @@ def handle_raw_source(
             if endpoint_config["Name"] == "COG source":
                 style_type = "text/cog-styles"
                 media_type = "image/tiff"
+            if endpoint_config["Name"] == "FlatGeobuf source":
+                media_type = "application/vnd.flatgeobuf"
             for a in time_entry["Assets"]:
                 asset = Asset(
                     href=a["File"], roles=["data"], media_type=media_type, extra_fields={}
