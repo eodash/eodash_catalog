@@ -102,10 +102,10 @@ def process_catalog_file(file_path: str, options: Options):
 
         LOGGER.info("Started creation of collection files")
         start = time.time()
-        if options.ni:
+        if options.ni or options.gp:
             catalog_self_href = f'{options.outputpath}/{catalog_config["id"]}'
             catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
-            recursive_save(catalog, options.ni)
+            recursive_save(catalog, options.ni,options.gp)
         else:
             # For full catalog save with items this still seems to be faster
             catalog_self_href = catalog_config.get(
@@ -442,6 +442,11 @@ def add_to_catalog(
     is_flag=True,
     help="generate additionally thumbnail image for supported collections",
 )
+@click.option(
+    "-gp",
+    is_flag=True,
+    help="generates the items in .parquet format",
+)
 @click.argument(
     "collections",
     nargs=-1,
@@ -455,6 +460,7 @@ def process_catalogs(
     vd,
     ni,
     tn,
+    gp,
     collections,
 ):
     """STAC generator and harvester:
@@ -469,6 +475,7 @@ def process_catalogs(
         ni=ni,
         tn=tn,
         collections=collections,
+        gp=gp
     )
     tasks = []
     for file_name in os.listdir(catalogspath):
