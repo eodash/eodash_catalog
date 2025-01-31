@@ -23,6 +23,7 @@ def test_options():
         vd=None,
         ni=None,
         tn=None,
+        gp=None,
         collections=[],
     )
     # cleanup output after tests finish
