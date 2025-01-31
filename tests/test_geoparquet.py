@@ -41,7 +41,7 @@ def test_geoparquet_geojson_items(catalog_output_folder):
     collection_name = "crop_forecast_at"
     root_collection_path = os.path.join(catalog_output_folder, collection_name)
     child_collection_path = os.path.join(root_collection_path, collection_name)
-    
+
     with open(os.path.join(child_collection_path, "collection.json")) as fp:
         collection_json = json.load(fp)
         items_links = [link for link in collection_json["links"] if link["rel"] == "items"]
@@ -50,7 +50,7 @@ def test_geoparquet_geojson_items(catalog_output_folder):
         assert gp_link["type"] == "application/vnd.apache.parquet"
         items_path = os.path.join(child_collection_path,  gp_link["href"].split("/")[-1])
         assert os.path.exists(items_path)
-        
+
     with open(items_path,"rb") as fp:
        table = pa.parquet.read_table(fp)
        items = list(stac_gp.arrow.stac_table_to_items(table))
