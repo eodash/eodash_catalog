@@ -120,6 +120,7 @@ def process_STAC_Datacube_Endpoint(
             geometry=item.geometry,
             datetime=dt,
         )
+        add_visualization_info(new_item, collection_config, endpoint_config)
         link = collection.add_item(new_item)
         # bubble up information we want to the link
         link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
@@ -821,13 +822,15 @@ def add_visualization_info(
             data_projection = str(endpoint_config.get("DataProjection", 3857))
             epsg_prefix = "" if "EPSG:" in data_projection else "EPSG:"
             crs = f"{epsg_prefix}{data_projection}"
+            time = stac_object.get_datetime() if isinstance(stac_object,Item) else "{{time}}"
             target_url = (
-                "{}/tiles/{}/{}/{{z}}/{{y}}/{{x}}" "?crs={}&time={{time}}&vmin={}&vmax={}&cbar={}"
+                "{}/tiles/{}/{}/{{z}}/{{y}}/{{x}}" "?crs={}&time={}&vmin={}&vmax={}&cbar={}"
             ).format(
                 endpoint_config["EndPoint"],
                 endpoint_config["DatacubeId"],
                 endpoint_config["Variable"],
                 crs,
+                time,
                 vmin,
                 vmax,
                 cbar,
