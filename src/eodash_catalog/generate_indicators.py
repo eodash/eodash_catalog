@@ -179,6 +179,7 @@ def process_indicator_file(
                     f"{options.collectionspath}/{collection}.yaml",
                     parent_indicator,
                     options,
+                    "Disable" in indicator_config and collection in indicator_config["Disable"],
                 )
         else:
             # we assume that collection files can also be loaded directly
@@ -200,7 +201,11 @@ def process_indicator_file(
 
 @retry((Exception), tries=3, delay=5, backoff=2, logger=LOGGER)
 def process_collection_file(
-    catalog_config: dict, file_path: str, catalog: Catalog | Collection, options: Options
+    catalog_config: dict,
+    file_path: str,
+    catalog: Catalog | Collection,
+    options: Options,
+    disable=False,
 ):
     LOGGER.info(f"Processing collection: {file_path}")
     with open(file_path) as f:
@@ -270,7 +275,9 @@ def process_collection_file(
                     if collection:
                         add_single_item_if_collection_empty(collection)
                         add_projection_info(endpoint_config, collection)
-                        add_to_catalog(collection, catalog, endpoint_config, collection_config)
+                        add_to_catalog(
+                            collection, catalog, endpoint_config, collection_config, disable
+                        )
                     else:
                         raise Exception(
                             f"No collection was generated for resource {endpoint_config}"
@@ -362,7 +369,7 @@ def process_collection_file(
 
 
 def add_to_catalog(
-    collection: Collection, catalog: Catalog, endpoint: dict, collection_config: dict
+    collection: Collection, catalog: Catalog, endpoint: dict, collection_config: dict, disable=False
 ):
     # check if already in catalog, if it is do not re-add it
     # TODO: probably we should add to the catalog only when creating
@@ -392,6 +399,8 @@ def add_to_catalog(
     if "Themes" in collection_config:
         link.extra_fields["themes"] = collection_config["Themes"]
     # Check for summaries and bubble up info
+    if disable:
+        link.extra_fields["roles"] = ["disable"]
     if collection.summaries.lists:
         for summary in collection.summaries.lists:
             link.extra_fields[summary] = collection.summaries.lists[summary]

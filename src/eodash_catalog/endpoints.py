@@ -822,7 +822,7 @@ def add_visualization_info(
             data_projection = str(endpoint_config.get("DataProjection", 3857))
             epsg_prefix = "" if "EPSG:" in data_projection else "EPSG:"
             crs = f"{epsg_prefix}{data_projection}"
-            time = stac_object.get_datetime() if isinstance(stac_object,Item) else "{{time}}"
+            time = stac_object.get_datetime() if isinstance(stac_object, Item) else "{{time}}"
             target_url = (
                 "{}/tiles/{}/{}/{{z}}/{{y}}/{{x}}" "?crs={}&time={}&vmin={}&vmax={}&cbar={}"
             ).format(
