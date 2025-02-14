@@ -671,6 +671,9 @@ def add_visualization_info(
 ) -> None:
     extra_fields: dict[str, list[str] | dict[str, str]] = {}
     if "Attribution" in endpoint_config:
+        stac_object.stac_extensions.append(
+            "https://stac-extensions.github.io/attribution/v0.1.0/schema.json"
+        )
         extra_fields["attribution"] = endpoint_config["Attribution"]
     # add extension reference
     if endpoint_config["Name"] == "Sentinel Hub" or endpoint_config["Name"] == "Sentinel Hub WMS":
@@ -992,6 +995,11 @@ def handle_raw_source(
                 assets=assets,
                 extra_fields={},
             )
+            if "Attribution" in endpoint_config:
+                item.stac_extensions.append(
+                    "https://stac-extensions.github.io/attribution/v0.1.0/schema.json"
+                )
+                asset.extra_fields["attribution"] = endpoint_config["Attribution"]
             add_projection_info(
                 endpoint_config,
                 item,
