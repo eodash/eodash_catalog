@@ -9,31 +9,26 @@ from itertools import groupby
 from operator import itemgetter
 
 import requests
-from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries
+from pystac import (Asset, Catalog, Collection, Item, Link, SpatialExtent,
+                    Summaries)
 from pystac_client import Client
 from structlog import get_logger
 
 from eodash_catalog.sh_endpoint import get_SH_token
-from eodash_catalog.stac_handling import (
-    add_collection_information,
-    add_example_info,
-    add_projection_info,
-    get_collection_datetimes_from_config,
-    get_or_create_collection,
-)
+from eodash_catalog.stac_handling import (add_collection_information,
+                                          add_example_info,
+                                          add_projection_info,
+                                          get_collection_datetimes_from_config,
+                                          get_or_create_collection)
 from eodash_catalog.thumbnails import generate_thumbnail
-from eodash_catalog.utils import (
-    Options,
-    create_geojson_from_bbox,
-    create_geojson_point,
-    filter_time_entries,
-    format_datetime_to_isostring_zulu,
-    generate_veda_cog_link,
-    parse_datestring_to_tz_aware_datetime,
-    replace_with_env_variables,
-    retrieveExtentFromWCS,
-    retrieveExtentFromWMSWMTS,
-)
+from eodash_catalog.utils import (Options, create_geojson_from_bbox,
+                                  create_geojson_point, filter_time_entries,
+                                  format_datetime_to_isostring_zulu,
+                                  generate_veda_cog_link,
+                                  parse_datestring_to_tz_aware_datetime,
+                                  replace_with_env_variables,
+                                  retrieveExtentFromWCS,
+                                  retrieveExtentFromWMSWMTS)
 
 LOGGER = get_logger(__name__)
 
@@ -825,7 +820,7 @@ def add_visualization_info(
             data_projection = str(endpoint_config.get("DataProjection", 3857))
             epsg_prefix = "" if "EPSG:" in data_projection else "EPSG:"
             crs = f"{epsg_prefix}{data_projection}"
-            time = stac_object.get_datetime() if isinstance(stac_object, Item) else "{{time}}"
+            time = stac_object.get_datetime() if isinstance(stac_object, Item) else "{time}"
             target_url = (
                 "{}/tiles/{}/{}/{{z}}/{{y}}/{{x}}" "?crs={}&time={}&vmin={}&vmax={}&cbar={}"
             ).format(
