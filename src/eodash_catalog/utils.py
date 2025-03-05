@@ -10,11 +10,12 @@ from decimal import Decimal
 from functools import reduce, wraps
 from typing import Any
 
+import stac_geoparquet as stacgp
 from dateutil import parser
 from owslib.wcs import WebCoverageService
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
-from pystac import Catalog, Collection, Item, RelType
+from pystac import Asset, Catalog, Collection, Item, Link, RelType
 from pytz import timezone as pytztimezone
 from six import string_types
 from structlog import get_logger
@@ -231,17 +232,45 @@ class RaisingThread(threading.Thread):
         super().join(timeout=timeout)
         if self._exc:
             raise self._exc
-
-
-def recursive_save(stac_object: Catalog, no_items: bool = False) -> None:
-    stac_object.save_object()
+def recursive_save(stac_object: Catalog, no_items: bool = False,geo_parquet:bool = False) -> None:
     for child in stac_object.get_children():
-        recursive_save(child, no_items)
+        recursive_save(child, no_items,geo_parquet)
     if not no_items:
-        # try to save items if available
-        for item in stac_object.get_items():
-            item.save_object()
+        if geo_parquet:
+            create_geoparquet_items(stac_object)
+        else:
+           for item in stac_object.get_items():
+               item.save_object()
+    stac_object.save_object()
 
+def create_geoparquet_items(stacObject:Catalog):
+    if iter_len_at_least(stacObject.get_items(), 1):
+        stac_dir_arr = stacObject.self_href.split("/")
+        stac_dir_arr.pop()
+        stac_dir_path = "/".join(stac_dir_arr)
+        items_stacgp_path = f"{stac_dir_path}/items.parquet"
+        to_stac_geoparquet(stacObject,items_stacgp_path)
+        gp_link = Link(
+             rel="items",
+             target = items_stacgp_path,
+             media_type = "application/vnd.apache.parquet",
+             title = "GeoParquet Items",
+             )
+        stacObject.clear_links(rel="item")
+        stacObject.add_links([gp_link])
+
+def to_stac_geoparquet(stacObject:Catalog,path:str):
+    items = []
+    for item in stacObject.get_items():
+        if not item.geometry:
+            item.geometry = create_geojson_point(0,0)["geometry"]
+        if not item.assets:
+            item.assets = { "dummy_asset":Asset(href="") }
+        items.append(item.to_dict())
+    record_batch_reader = stacgp.arrow.parse_stac_items_to_arrow(items)
+    table = record_batch_reader.read_all()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    stacgp.arrow.to_parquet(table, path)
 
 def iter_len_at_least(i, n: int) -> int:
     return sum(1 for _ in zip(range(n), i, strict=False)) == n
@@ -289,6 +318,7 @@ class Options:
     vd: bool
     ni: bool
     tn: bool
+    gp: bool
     collections: list[str]
 
 

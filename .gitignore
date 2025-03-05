@@ -165,3 +165,4 @@ collections/
 layers/
 .venv
 .pytest
+.DS_Store
