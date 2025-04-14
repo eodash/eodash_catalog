@@ -17,7 +17,7 @@ structlog<22.0
 OWSLib==0.31
 spdx-lookup<=0.3.3
 pystac[validation]==1.10.1
-
+stac_geoparquet==0.6.0
 # dev tooling
 pytest==8.1.1
 pytest-watch==4.2.0
