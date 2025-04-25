@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import threading
@@ -11,6 +12,7 @@ from functools import reduce, wraps
 from typing import Any
 
 import stac_geoparquet as stacgp
+import yaml
 from dateutil import parser
 from owslib.wcs import WebCoverageService
 from owslib.wms import WebMapService
@@ -232,45 +234,50 @@ class RaisingThread(threading.Thread):
         super().join(timeout=timeout)
         if self._exc:
             raise self._exc
-def recursive_save(stac_object: Catalog, no_items: bool = False,geo_parquet:bool = False) -> None:
+
+
+def recursive_save(stac_object: Catalog, no_items: bool = False, geo_parquet: bool = False) -> None:
     for child in stac_object.get_children():
-        recursive_save(child, no_items,geo_parquet)
+        recursive_save(child, no_items, geo_parquet)
     if not no_items:
         if geo_parquet:
             create_geoparquet_items(stac_object)
         else:
-           for item in stac_object.get_items():
-               item.save_object()
+            for item in stac_object.get_items():
+                item.save_object()
     stac_object.save_object()
 
-def create_geoparquet_items(stacObject:Catalog):
+
+def create_geoparquet_items(stacObject: Catalog):
     if iter_len_at_least(stacObject.get_items(), 1):
         stac_dir_arr = stacObject.self_href.split("/")
         stac_dir_arr.pop()
         stac_dir_path = "/".join(stac_dir_arr)
         items_stacgp_path = f"{stac_dir_path}/items.parquet"
-        to_stac_geoparquet(stacObject,items_stacgp_path)
+        to_stac_geoparquet(stacObject, items_stacgp_path)
         gp_link = Link(
-             rel="items",
-             target = items_stacgp_path,
-             media_type = "application/vnd.apache.parquet",
-             title = "GeoParquet Items",
-             )
+            rel="items",
+            target=items_stacgp_path,
+            media_type="application/vnd.apache.parquet",
+            title="GeoParquet Items",
+        )
         stacObject.clear_links(rel="item")
         stacObject.add_links([gp_link])
 
-def to_stac_geoparquet(stacObject:Catalog,path:str):
+
+def to_stac_geoparquet(stacObject: Catalog, path: str):
     items = []
     for item in stacObject.get_items():
         if not item.geometry:
-            item.geometry = create_geojson_point(0,0)["geometry"]
+            item.geometry = create_geojson_point(0, 0)["geometry"]
         if not item.assets:
-            item.assets = { "dummy_asset":Asset(href="") }
+            item.assets = {"dummy_asset": Asset(href="")}
         items.append(item.to_dict())
     record_batch_reader = stacgp.arrow.parse_stac_items_to_arrow(items)
     table = record_batch_reader.read_all()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     stacgp.arrow.to_parquet(table, path)
+
 
 def iter_len_at_least(i, n: int) -> int:
     return sum(1 for _ in zip(range(n), i, strict=False)) == n
@@ -422,3 +429,32 @@ def get_full_url(url: str, catalog_config) -> str:
         return url
     else:
         return f'{catalog_config["assets_endpoint"]}{url}'
+
+
+def read_config_file(path: str) -> dict:
+    # If the given path exists directly, use it
+    if os.path.exists(path):
+        return _load_file(path)
+
+    # Otherwise, try appending supported suffixes
+    for suffix in [".json", ".yaml", ".yml", ".JSON", ".YAML", ".YML"]:
+        candidate = path + suffix
+        if os.path.exists(candidate):
+            return _load_file(candidate)
+
+    raise FileNotFoundError(
+        f"No file found for '{path}' with or without supported suffixes (.json/.yaml/.yml)"
+    )
+
+
+def _load_file(filepath):
+    with open(filepath) as file:
+        content = file.read()
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            pass
+        try:
+            return yaml.safe_load(content)
+        except yaml.YAMLError as err:
+            raise ValueError(f"Failed to parse '{filepath}' as JSON or YAML: {err}") from err

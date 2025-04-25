@@ -2,7 +2,6 @@ from datetime import datetime
 
 import requests
 import spdx_lookup as lookup
-import yaml
 from pystac import (
     Asset,
     Catalog,
@@ -15,12 +14,12 @@ from pystac import (
     TemporalExtent,
 )
 from structlog import get_logger
-from yaml.loader import SafeLoader
 
 from eodash_catalog.utils import (
     generateDatetimesFromInterval,
     get_full_url,
     parse_datestring_to_tz_aware_datetime,
+    read_config_file,
 )
 
 LOGGER = get_logger(__name__)
@@ -399,20 +398,18 @@ def add_base_overlay_info(
             collection.add_link(create_web_map_link(layer, role="baselayer"))
     # alternatively use default base layers defined
     elif "default_base_layers" in catalog_config:
-        with open(f'{catalog_config["default_base_layers"]}.yaml') as f:
-            base_layers = yaml.load(f, Loader=SafeLoader)
-            for layer in base_layers:
-                collection.add_link(create_web_map_link(layer, role="baselayer"))
+        base_layers = read_config_file(catalog_config["default_base_layers"])
+        for layer in base_layers:
+            collection.add_link(create_web_map_link(layer, role="baselayer"))
     # add custom overlays just for this indicator
     if "OverlayLayers" in collection_config:
         for layer in collection_config["OverlayLayers"]:
             collection.add_link(create_web_map_link(layer, role="overlay"))
     # check if default overlay layers defined
     elif "default_overlay_layers" in catalog_config:
-        with open("{}.yaml".format(catalog_config["default_overlay_layers"])) as f:
-            overlay_layers = yaml.load(f, Loader=SafeLoader)
-            for layer in overlay_layers:
-                collection.add_link(create_web_map_link(layer, role="overlay"))
+        overlay_layers = read_config_file(catalog_config["default_overlay_layers"])
+        for layer in overlay_layers:
+            collection.add_link(create_web_map_link(layer, role="overlay"))
 
 
 def add_extra_fields(stac_object: Collection | Link, collection_config: dict) -> None:

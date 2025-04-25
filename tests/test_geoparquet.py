@@ -48,21 +48,21 @@ def test_geoparquet_geojson_items(catalog_output_folder):
         assert len(items_links) == 1
         gp_link = items_links[0]
         assert gp_link["type"] == "application/vnd.apache.parquet"
-        items_path = os.path.join(child_collection_path,  gp_link["href"].split("/")[-1])
+        items_path = os.path.join(child_collection_path, gp_link["href"].split("/")[-1])
         assert os.path.exists(items_path)
 
-    with open(items_path,"rb") as fp:
-       table = pa.parquet.read_table(fp)
-       items = list(stac_gp.arrow.stac_table_to_items(table))
-       item = items[0]
-       # mimetype saved correctly
-       assert item["assets"]["vector_data"]["type"] == "application/geo+json"
-       assert item["collection"] == collection_name
-       # epsg code is saved to item,
-       # proj:epsg is moved to properties by stac-geoparquet
-       assert item["properties"]['proj:epsg'] == 3035
-       # epsg code is saved to assets
-       assert item["assets"]["vector_data"]["proj:epsg"] == 3035
+    with open(items_path, "rb") as fp:
+        table = pa.parquet.read_table(fp)
+        items = list(stac_gp.arrow.stac_table_to_items(table))
+        item = items[0]
+        # mimetype saved correctly
+        assert item["assets"]["vector_data"]["type"] == "application/geo+json"
+        assert item["collection"] == collection_name
+        # epsg code is saved to item,
+        # proj:epsg is moved to properties by stac-geoparquet
+        assert item["properties"]["proj:epsg"] == 3035
+        # epsg code is saved to assets
+        assert item["assets"]["vector_data"]["proj:epsg"] == 3035
 
 
 def test_cog_geoparquet_items(catalog_output_folder):
@@ -71,7 +71,7 @@ def test_cog_geoparquet_items(catalog_output_folder):
     child_collection_path = os.path.join(root_collection_path, collection_name)
     items_path = os.path.join(child_collection_path, "items.parquet")
     assert os.path.exists(items_path)
-    with open(items_path,'rb') as fp:
+    with open(items_path, "rb") as fp:
         table = pa.parquet.read_table(fp)
         items = list(stac_gp.arrow.stac_table_to_items(table))
         item = items[0]
@@ -79,4 +79,3 @@ def test_cog_geoparquet_items(catalog_output_folder):
         assert item["assets"]["solar_power"]["type"] == "image/tiff"
         # collection name is saved correctly
         assert item["collection"] == collection_name
-

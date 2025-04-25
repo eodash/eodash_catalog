@@ -30,6 +30,9 @@ def test_options():
     shutil.rmtree(outputpath)
 
 
+# --------- FIRST CATALOG FIXTURES ---------
+
+
 @pytest.fixture()
 def catalog_output_folder(process_catalog_fixture, test_options):
     # not-used fixture needs to be here to trigger catalog generation
@@ -47,9 +50,51 @@ def process_catalog_fixture(catalog_location, test_options):
     process_catalog_file(catalog_location, test_options)
 
 
+@pytest.fixture()
+def catalog_output_folder_json(process_catalog_fixture_json, test_options):
+    # not-used fixture needs to be here to trigger catalog generation
+    return os.path.join(test_options.outputpath, "testing-catalog-id-2")
+
+
+# --------- SECOND CATALOG FIXTURES ---------
+
+
+@pytest.fixture
+def catalog_location_json(test_options):
+    file_path = os.path.join(test_options.catalogspath, "testing-json.json")
+    return file_path
+
+
+@pytest.fixture
+def process_catalog_fixture_json(catalog_location_json, test_options):
+    process_catalog_file(catalog_location_json, test_options)
+
+
 def test_catalog_file_exists(catalog_output_folder):
-    # test if catalog was created in target location
+    # test if catalogs were created in target locations
     assert os.path.exists(catalog_output_folder)
+
+
+def test_catalog_file_json_exists(catalog_output_folder_json):
+    assert os.path.exists(catalog_output_folder_json)
+
+
+def test_collection_test_tif_demo_1(catalog_output_folder_json):
+    # test that following collections were created as we expect it
+    collection_name = "test_tif_demo_1_json"
+    root_collection_path = os.path.join(catalog_output_folder_json, collection_name)
+    with open(os.path.join(root_collection_path, "collection.json")) as fp:
+        collection_json = json.load(fp)
+        # test that custom bbox is set
+        assert [-45.24, 61.13, -35.15, 65.05] in collection_json["extent"]["spatial"]["bbox"]
+    child_collection_path = os.path.join(root_collection_path, collection_name)
+    child_child_collection_path = os.path.join(child_collection_path, collection_name)
+    item_dir = os.path.join(child_child_collection_path, "1970")
+    item_paths = os.listdir(item_dir)
+    assert len(item_paths) == 1
+    with open(os.path.join(item_dir, item_paths[0])) as fp:
+        item_json = json.load(fp)
+        assert item_json["collection"] == collection_name
 
 
 def test_collection_no_wms_has_a_single_item(catalog_output_folder):
