@@ -1,0 +1,34 @@
+{
+    "Name": "test_tif_demo_1_json",
+    "Title": "test_tif_demo_1_json",
+    "EodashIdentifier": "test_tif_demo_1_json",
+    "Description": "json config",
+    "Themes": [
+        "cryosphere"
+    ],
+    "Tags": [
+        "placeholder"
+    ],
+    "Satellite": [
+        "placeholder"
+    ],
+    "Sensor": [
+        "placeholder"
+    ],
+    "Agency": [
+        "ESA"
+    ],
+    "Image": "Polartep_SeaIceDetection_tif_demo/thumbnail.png",
+    "Resources": [
+        {
+            "Name": "Collection-only",
+            "EndPoint": "Collection-only",
+            "OverwriteBBox": [
+                -45.24,
+                61.13,
+                -35.15,
+                65.05
+            ]
+        }
+    ]
+}
