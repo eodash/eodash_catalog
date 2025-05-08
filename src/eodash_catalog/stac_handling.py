@@ -346,7 +346,13 @@ def add_collection_information(
 
 
 def add_process_info(collection: Collection, catalog_config: dict, collection_config: dict) -> None:
-    if "Process" in collection_config:
+    if "Locations" in collection_config:
+        # add the generic geodb-like selection process on the root collection instead of Processes
+        if "geodb_default_form" in catalog_config:
+            # adding default geodb-like map handling for Locations
+            collection.extra_fields["eodash:jsonform"] = get_full_url(
+                catalog_config["geodb_default_form"], catalog_config
+            )
         if "EndPoints" in collection_config["Process"]:
             for endpoint in collection_config["Process"]["EndPoints"]:
                 collection.add_link(create_service_link(endpoint, catalog_config))
@@ -387,6 +393,24 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
                         },
                     )
                 )
+
+
+def add_process_info_child_collection(
+    collection: Collection, catalog_config: dict, collection_config: dict
+) -> None:
+    # in case of locations, we add the process itself on a child collection
+    if "Process" in collection_config:
+        if "EndPoints" in collection_config["Process"]:
+            for endpoint in collection_config["Process"]["EndPoints"]:
+                collection.add_link(create_service_link(endpoint, catalog_config))
+        if "JsonForm" in collection_config["Process"]:
+            collection.extra_fields["eodash:jsonform"] = get_full_url(
+                collection_config["Process"]["JsonForm"], catalog_config
+            )
+        if "VegaDefinition" in collection_config["Process"]:
+            collection.extra_fields["eodash:vegadefinition"] = get_full_url(
+                collection_config["Process"]["VegaDefinition"], catalog_config
+            )
 
 
 def add_base_overlay_info(
