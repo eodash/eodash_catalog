@@ -348,11 +348,27 @@ def add_collection_information(
 def add_process_info(collection: Collection, catalog_config: dict, collection_config: dict) -> None:
     if "Locations" in collection_config:
         # add the generic geodb-like selection process on the root collection instead of Processes
+
         if "geodb_default_form" in catalog_config:
             # adding default geodb-like map handling for Locations
             collection.extra_fields["eodash:jsonform"] = get_full_url(
                 catalog_config["geodb_default_form"], catalog_config
             )
+        # link a process definition for getting a collection with {{feature}} placeholder
+        sl = Link(
+            rel="service",
+            target="./" + collection.id + "/{{feature}}/collection.json",
+            media_type="application/json; profile=collection",
+            extra_fields={
+                "id": "locations",
+                "method": "GET",
+                "type": "application/json; profile=collection",
+            },
+        )
+        collection.add_link(sl)
+    # elif is intentional for cases when Process is defined on collection with Locations
+    # then we want to only add it to the "children", not the root
+    elif "Process" in collection_config:
         if "EndPoints" in collection_config["Process"]:
             for endpoint in collection_config["Process"]["EndPoints"]:
                 collection.add_link(create_service_link(endpoint, catalog_config))

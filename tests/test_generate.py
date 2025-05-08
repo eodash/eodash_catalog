@@ -233,3 +233,27 @@ def test_baselayer_with_custom_projection_added(catalog_output_folder):
         assert len(baselayer_links) == 1
         # test that custom proj4 definition is added to link
         assert baselayer_links[0]["eodash:proj4_def"]["name"] == "ORTHO:680500"
+
+
+def test_collection_locations_processing(catalog_output_folder_json):
+    # test that locations is true on root and process was added
+    collection_name = "test_locations_processing"
+    root_collection_path = os.path.join(catalog_output_folder_json, collection_name)
+    # perform checks on child locations
+    with open(os.path.join(root_collection_path, "collection.json")) as fp:
+        collection_json: dict = json.load(fp)
+        # test that locations is set to true
+        assert collection_json["locations"] is True
+        links = collection_json["links"]
+        # test that link for custom process exists
+        assert any([link.get("type") == "application/json; profile=collection" for link in links])
+    child_collection_path = os.path.join(root_collection_path, collection_name)
+    location_dir = os.path.join(child_collection_path, "Balaton")
+    item_paths = os.listdir(location_dir)
+    # we specify two locations in this test config
+    assert len(item_paths) == 2
+    with open(os.path.join(location_dir, item_paths[0])) as fp:
+        # check that child Location has a process defined
+        child_json = json.load(fp)
+        links = child_json["links"]
+        assert any([link.get("endpoint") == "eoxhub_workspaces" for link in links])
