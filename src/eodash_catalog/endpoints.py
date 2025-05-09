@@ -17,6 +17,7 @@ from eodash_catalog.sh_endpoint import get_SH_token
 from eodash_catalog.stac_handling import (
     add_collection_information,
     add_example_info,
+    add_process_info_child_collection,
     add_projection_info,
     get_collection_datetimes_from_config,
     get_or_create_collection,
@@ -174,7 +175,7 @@ def handle_STAC_based_endpoint(
                 collection.description = location["Name"]
             # TODO: should we remove all assets from sub collections?
             link = root_collection.add_child(collection)
-            latlng = f'{location["Point"][1]},{location["Point"][0]}'
+            latlng = f'{location["Point"][1]},{location["Point"][0]}'.strip()
             # Add extra properties we need
             link.extra_fields["id"] = location["Identifier"]
             link.extra_fields["latlng"] = latlng
@@ -182,6 +183,7 @@ def handle_STAC_based_endpoint(
             add_example_info(collection, collection_config, endpoint_config, catalog_config)
             # eodash v4 compatibility
             add_visualization_info(collection, collection_config, endpoint_config)
+            add_process_info_child_collection(collection, catalog_config, collection_config)
             if "OverwriteBBox" in location:
                 collection.extent.spatial = SpatialExtent(
                     [
@@ -406,7 +408,7 @@ def handle_SH_WMS_endpoint(
 
             link = root_collection.add_child(collection)
             # bubble up information we want to the link
-            latlng = "{},{}".format(location["Point"][1], location["Point"][0])
+            latlng = "{},{}".format(location["Point"][1], location["Point"][0]).strip()
             link.extra_fields["id"] = location["Identifier"]
             link.extra_fields["latlng"] = latlng
             link.extra_fields["country"] = location["Country"]
@@ -416,6 +418,7 @@ def handle_SH_WMS_endpoint(
             else:
                 LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
             add_visualization_info(collection, collection_config, endpoint_config)
+            add_process_info_child_collection(collection, catalog_config, collection_config)
 
         root_collection.update_extent_from_items()
         # Add bbox extents from children

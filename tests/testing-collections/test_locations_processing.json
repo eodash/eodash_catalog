@@ -1,0 +1,69 @@
+{
+  "Name": "test_locations_processing",
+  "Title": "Lakes collection (Sentinel 2)",
+  "EodashIdentifier": "Lakes_S2L2A",
+  "Description": "Lakes_S2L2A/Lakes_S2L2A.md",
+  "Themes": ["water"],
+  "Tags": ["Sentinel", "Open data", "Water extent"],
+  "DataSource": {
+    "Spaceborne": {
+      "Satellite": ["Sentinel-2"],
+      "Sensor": ["MSI"]
+    }
+  },
+  "Agency": ["European Commission", "ESA"],
+  "Image": "Lakes_S2L2A/thumbnail.png",
+  "References": [
+    {
+      "Name": "Copernicus Sentinel-2 mission",
+      "Url": "https://www.esa.int/Applications/Observing_the_Earth/Copernicus/Sentinel-2"
+    }
+  ],
+  "Locations": [
+    {
+      "Identifier": "Tonle_sap",
+      "Country": ["KH"],
+      "Name": "Tonl\u00e9 Sap",
+      "Point": [104.2, 12.7],
+      "Bbox": [101.938, 11.945, 106.37, 14.0674],
+      "Times": ["2023-04-03", "2023-04-18"]
+    },
+    {
+      "Identifier": "Balaton",
+      "Country": ["HU"],
+      "Name": "Balaton",
+      "Point": [17.77, 46.825],
+      "Bbox": [17.08, 46.55, 18.24, 47.12],
+      "Times": ["2023-05-22", "2023-06-01"]
+    }
+  ],
+  "Resources": [
+    {
+      "EndPoint": "https://services.sentinel-hub.com",
+      "Name": "Sentinel Hub WMS",
+      "CollectionId": "sentinel-2-l2a",
+      "LayerId": "SENTINEL-2-L2A-TRUE-COLOR"
+    }
+  ],
+  "Process": {
+    "Name": "Test Process",
+    "JsonForm": "https://santilland.github.io/process_example/master/definitions/geodbform.json",
+    "EndPoints": [
+      {
+        "Identifier": "polarwarpcollection",
+        "Url": "https://example.com/",
+        "Method": "POST",
+        "EndPoint": "eoxhub_workspaces",
+        "Body": "https://santilland.github.io/process_example/definitions/harshness_body.json",
+        "Type": "image/tiff",
+        "Flatstyle": "https://santilland.github.io/process_example/definitions/harshness_style.json"
+      }
+    ]
+  },
+  "Provider": [
+    {
+      "Name": "Copernicus",
+      "Url": "https://www.copernicus.eu/en/access-data/conventional-data-access-hubs"
+    }
+  ]
+}
