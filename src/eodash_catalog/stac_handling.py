@@ -362,6 +362,7 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
                 "id": "locations",
                 "method": "GET",
                 "type": "application/json; profile=collection",
+                "endpoint": "STAC",
             },
         )
         collection.add_link(sl)
