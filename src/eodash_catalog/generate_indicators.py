@@ -178,7 +178,7 @@ def process_indicator_file(
     else:
         # we assume that collection files can also be loaded directly
         process_collection_file(catalog_config, file_path, parent_indicator, options)
-    add_collection_information(catalog_config, parent_indicator, indicator_config)
+    add_collection_information(catalog_config, parent_indicator, indicator_config, True)
     if iter_len_at_least(parent_indicator.get_items(recursive=True), 1):
         parent_indicator.update_extent_from_items()
     # Add bbox extents from children

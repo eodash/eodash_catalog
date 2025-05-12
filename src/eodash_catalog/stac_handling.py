@@ -213,7 +213,10 @@ def add_example_info(
 
 
 def add_collection_information(
-    catalog_config: dict, collection: Collection, collection_config: dict
+    catalog_config: dict,
+    collection: Collection,
+    collection_config: dict,
+    is_root_collection: bool = False,
 ) -> None:
     # Add metadata information
     # Check license identifier
@@ -322,7 +325,7 @@ def add_collection_information(
             f'{catalog_config["assets_endpoint"]}/' f'{collection_config["Image"]}'
         )
     # Add extra fields to collection if available
-    add_extra_fields(collection, collection_config)
+    add_extra_fields(collection, collection_config, is_root_collection)
 
     if "References" in collection_config:
         generic_counter = 1
@@ -452,12 +455,16 @@ def add_base_overlay_info(
             collection.add_link(create_web_map_link(layer, role="overlay"))
 
 
-def add_extra_fields(stac_object: Collection | Link, collection_config: dict) -> None:
+def add_extra_fields(
+    stac_object: Collection | Link, collection_config: dict, is_root_collection: bool = False
+) -> None:
     if "yAxis" in collection_config:
         stac_object.extra_fields["yAxis"] = collection_config["yAxis"]
     if "Themes" in collection_config:
         stac_object.extra_fields["themes"] = collection_config["Themes"]
-    if "Locations" in collection_config or "Subcollections" in collection_config:
+    if (
+        "Locations" in collection_config or "Subcollections" in collection_config
+    ) and is_root_collection:
         stac_object.extra_fields["locations"] = True
     if "Tags" in collection_config:
         stac_object.extra_fields["tags"] = collection_config["Tags"]

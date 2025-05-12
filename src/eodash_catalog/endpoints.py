@@ -210,7 +210,7 @@ def handle_STAC_based_endpoint(
         )
     # eodash v4 compatibility
     add_visualization_info(root_collection, collection_config, endpoint_config)
-    add_collection_information(catalog_config, root_collection, collection_config)
+    add_collection_information(catalog_config, root_collection, collection_config, True)
     add_example_info(root_collection, collection_config, endpoint_config, catalog_config)
     return root_collection
 
@@ -446,7 +446,7 @@ def handle_SH_WMS_endpoint(
             item_link = root_collection.add_item(item)
             item_link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
     # eodash v4 compatibility
-    add_collection_information(catalog_config, root_collection, collection_config)
+    add_collection_information(catalog_config, root_collection, collection_config, True)
     add_visualization_info(root_collection, collection_config, endpoint_config)
     return root_collection
 
