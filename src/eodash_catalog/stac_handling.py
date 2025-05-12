@@ -213,7 +213,10 @@ def add_example_info(
 
 
 def add_collection_information(
-    catalog_config: dict, collection: Collection, collection_config: dict
+    catalog_config: dict,
+    collection: Collection,
+    collection_config: dict,
+    is_root_collection: bool = False,
 ) -> None:
     # Add metadata information
     # Check license identifier
@@ -322,7 +325,7 @@ def add_collection_information(
             f'{catalog_config["assets_endpoint"]}/' f'{collection_config["Image"]}'
         )
     # Add extra fields to collection if available
-    add_extra_fields(collection, collection_config)
+    add_extra_fields(collection, collection_config, is_root_collection)
 
     if "References" in collection_config:
         generic_counter = 1
@@ -346,7 +349,29 @@ def add_collection_information(
 
 
 def add_process_info(collection: Collection, catalog_config: dict, collection_config: dict) -> None:
-    if "Process" in collection_config:
+    if any(key in collection_config for key in ["Locations", "Subcollections"]):
+        # add the generic geodb-like selection process on the root collection instead of Processes
+        if "geodb_default_form" in catalog_config:
+            # adding default geodb-like map handling for Locations
+            collection.extra_fields["eodash:jsonform"] = get_full_url(
+                catalog_config["geodb_default_form"], catalog_config
+            )
+        # link a process definition for getting a collection with {{feature}} placeholder
+        sl = Link(
+            rel="service",
+            target="./" + collection.id + "/{{feature}}/collection.json",
+            media_type="application/json; profile=collection",
+            extra_fields={
+                "id": "locations",
+                "method": "GET",
+                "type": "application/json; profile=collection",
+                "endpoint": "STAC",
+            },
+        )
+        collection.add_link(sl)
+    # elif is intentional for cases when Process is defined on collection with Locations
+    # then we want to only add it to the "children", not the root
+    elif "Process" in collection_config:
         if "EndPoints" in collection_config["Process"]:
             for endpoint in collection_config["Process"]["EndPoints"]:
                 collection.add_link(create_service_link(endpoint, catalog_config))
@@ -389,6 +414,24 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
                 )
 
 
+def add_process_info_child_collection(
+    collection: Collection, catalog_config: dict, collection_config: dict
+) -> None:
+    # in case of locations, we add the process itself on a child collection
+    if "Process" in collection_config:
+        if "EndPoints" in collection_config["Process"]:
+            for endpoint in collection_config["Process"]["EndPoints"]:
+                collection.add_link(create_service_link(endpoint, catalog_config))
+        if "JsonForm" in collection_config["Process"]:
+            collection.extra_fields["eodash:jsonform"] = get_full_url(
+                collection_config["Process"]["JsonForm"], catalog_config
+            )
+        if "VegaDefinition" in collection_config["Process"]:
+            collection.extra_fields["eodash:vegadefinition"] = get_full_url(
+                collection_config["Process"]["VegaDefinition"], catalog_config
+            )
+
+
 def add_base_overlay_info(
     collection: Collection, catalog_config: dict, collection_config: dict
 ) -> None:
@@ -412,12 +455,16 @@ def add_base_overlay_info(
             collection.add_link(create_web_map_link(layer, role="overlay"))
 
 
-def add_extra_fields(stac_object: Collection | Link, collection_config: dict) -> None:
+def add_extra_fields(
+    stac_object: Collection | Link, collection_config: dict, is_root_collection: bool = False
+) -> None:
     if "yAxis" in collection_config:
         stac_object.extra_fields["yAxis"] = collection_config["yAxis"]
     if "Themes" in collection_config:
         stac_object.extra_fields["themes"] = collection_config["Themes"]
-    if "Locations" in collection_config or "Subcollections" in collection_config:
+    if (
+        "Locations" in collection_config or "Subcollections" in collection_config
+    ) and is_root_collection:
         stac_object.extra_fields["locations"] = True
     if "Tags" in collection_config:
         stac_object.extra_fields["tags"] = collection_config["Tags"]
