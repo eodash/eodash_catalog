@@ -1,7 +1,7 @@
 # This workflows will upload a Python Package using Twine when a release is created
 # For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
 
-name: Upload Python Package
+name: Upload Python Package and Docker image
 
 on:
     push:
@@ -11,6 +11,9 @@ jobs:
   deploy:
 
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
 
     steps:
     - uses: actions/checkout@v4
@@ -29,3 +32,11 @@ jobs:
       run: |
         hatch build
         hatch publish
+    - name: Build and push docker image
+      run: |
+        IMAGE_ID=ghcr.io/${{ github.repository }}
+        VERSION=${{ github.ref_name }}
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $ --password-stdin
+        docker build -t $IMAGE_ID:latest -t $IMAGE_ID:$VERSION .
+        docker push $IMAGE_ID:latest
+        docker push $IMAGE_ID:$VERSION

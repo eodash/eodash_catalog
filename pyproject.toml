@@ -28,14 +28,9 @@ dependencies = [
   "python-dotenv<1.1.0",
   "pystac-client<1",
   "pyyaml<7",
-  "redis<4",
-  "pygeofilter[backend-native]==0.2.0",
   "click<9",
   "requests<3",
-  "lxml<5",
   "python-dateutil<3",
-  "swiftspec==0.0.2",
-  "mergedeep",
   "structlog<22.0",
   "OWSLib",
   "spdx-lookup<=0.3.3",
@@ -49,7 +44,7 @@ Documentation = "https://github.com/eodash/eodash_catalog#readme"
 Issues = "https://github.com/eodash/eodash_catalog/issues"
 Source = "https://github.com/eodash/eodash_catalog"
 [project.optional-dependencies]
-dev = ["pre-commit"]
+
 
 [tool.hatch.version]
 path = "src/eodash_catalog/__about__.py"
