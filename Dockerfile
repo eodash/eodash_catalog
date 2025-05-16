@@ -24,8 +24,6 @@ RUN  apt-get autoremove -y && \
 COPY . .
 RUN pip install --break-system-packages .
 
-USER www-data
-
 # test if was installed
 RUN eodash_catalog --help
 
