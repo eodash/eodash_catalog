@@ -82,6 +82,7 @@ def retrieveExtentFromWCS(
         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
         message = template.format(type(e).__name__, e.args)
         LOGGER.warn(message)
+        raise e
 
     bbox = [-180.0, -90.0, 180.0, 90.0]
     owsnmspc = "{http://www.opengis.net/ows/2.0}"
@@ -143,6 +144,7 @@ def retrieveExtentFromWMSWMTS(
         template = "An exception of type {0} occurred. Arguments:\n{1!r}"
         message = template.format(type(e).__name__, e.args)
         LOGGER.warn(message)
+        raise e
 
     bbox = [-180.0, -90.0, 180.0, 90.0]
     if service and service[layer].boundingBoxWGS84:
