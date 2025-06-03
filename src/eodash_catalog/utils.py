@@ -302,6 +302,10 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
         # it could be nice to allow a json and better convert it on the fly
         # colormap = "&colormap=%s"%(urllib.parse.quote(str(endpoint_config["Colormap"])))
 
+    Nodata = ""
+    if "Nodata" in endpoint_config:
+        Nodata = "&nodata={}".format(endpoint_config["Nodata"])
+
     colormap_name = ""
     if "ColormapName" in endpoint_config:
         colormap_name = "&colormap_name={}".format(endpoint_config["ColormapName"])
@@ -314,7 +318,7 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
 
     file_url = f"url={file_url}&" if file_url else ""
 
-    target_url = f"https://openveda.cloud/api/raster/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{file_url}resampling_method=nearest{bidx}{colormap}{colormap_name}{rescale}"
+    target_url = f"https://openveda.cloud/api/raster/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{file_url}resampling_method=nearest{bidx}{colormap}{colormap_name}{rescale}{Nodata}"
     return target_url
 
 
