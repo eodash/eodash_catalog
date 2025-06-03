@@ -11,6 +11,8 @@ from operator import itemgetter
 import requests
 from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries
 from pystac_client import Client
+from shapely import wkt
+from shapely.geometry import mapping
 from structlog import get_logger
 
 from eodash_catalog.sh_endpoint import get_SH_token
@@ -26,7 +28,6 @@ from eodash_catalog.thumbnails import generate_thumbnail
 from eodash_catalog.utils import (
     Options,
     create_geojson_from_bbox,
-    create_geojson_point,
     filter_time_entries,
     format_datetime_to_isostring_zulu,
     generate_veda_cog_link,
@@ -483,7 +484,7 @@ def handle_GeoDB_endpoint(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    select = "?select=aoi,aoi_id,country,city,time"
+    select = "?select=aoi,aoi_id,country,city,time,input_data,sub_aoi"
     url = (
         endpoint_config["EndPoint"]
         + endpoint_config["Database"]
@@ -501,12 +502,12 @@ def handle_GeoDB_endpoint(
     for key, value in groupby(sorted_locations, key=itemgetter("aoi_id")):
         # Finding min and max values for date
         values = list(value)
-        times = [datetime.fromisoformat(t["time"]) for t in values]
         unique_values = next(iter({v["aoi_id"]: v for v in values}.values()))
         country = unique_values["country"]
         city = unique_values["city"]
         IdKey = endpoint_config.get("IdKey", "city")
         IdValue = unique_values[IdKey]
+
         if country not in countries:
             countries.append(country)
         # sanitize unique key identifier to be sure it is saveable as a filename
@@ -520,28 +521,88 @@ def handle_GeoDB_endpoint(
             IdValue = key
         if city not in cities:
             cities.append(city)
-        min_date = min(times)
-        max_date = max(times)
         latlon = unique_values["aoi"]
         [lat, lon] = [float(x) for x in latlon.split(",")]
         # create item for unique locations
         buff = 0.01
         bbox = [lon - buff, lat - buff, lon + buff, lat + buff]
-        item = Item(
-            id=IdValue,
-            bbox=bbox,
-            properties={},
-            geometry=create_geojson_point(lon, lat)["geometry"],
-            datetime=None,
-            start_datetime=min_date,
-            end_datetime=max_date,
+
+        # create collection per available inputdata information
+        sc_config = {
+            "Title": city,
+            "Description": f"{city} - {country}",
+        }
+        locations_collection = get_or_create_collection(
+            collection, city, sc_config, catalog_config, endpoint_config
         )
-        link = collection.add_item(item)
+        input_data = endpoint_config.get("InputData")
+        if input_data:
+            for v in values:
+                # add items based on inputData fields for each time step available in values
+                first_match = next(
+                    (item for item in input_data if item.get("Identifier") == v["input_data"]), None
+                )
+                time_object = datetime.fromisoformat(v["time"])
+                # extract wkt geometry from sub_aoi
+                if "sub_aoi" in v and v["sub_aoi"] != "/":
+                    # create geometry from wkt
+                    geometry = mapping(wkt.loads(v["sub_aoi"]))
+                else:
+                    geometry = create_geojson_from_bbox(bbox)
+                item = Item(
+                    id=v["time"],
+                    bbox=bbox,
+                    properties={},
+                    geometry=geometry,
+                    datetime=time_object,
+                )
+                if first_match:
+                    match first_match["Type"]:
+                        case "WMS":
+                            url = first_match["Url"]
+                            extra_fields = {
+                                "wms:layers": [first_match["Layers"]],
+                                "role": ["data"],
+                            }
+                            if url.startswith("https://services.sentinel-hub.com/ogc/wms/"):
+                                instanceId = os.getenv("SH_INSTANCE_ID")
+                                if "InstanceId" in endpoint_config:
+                                    instanceId = endpoint_config["InstanceId"]
+                                start_date = format_datetime_to_isostring_zulu(time_object)
+                                used_delta = timedelta(days=1)
+                                if "TimeDelta" in first_match:
+                                    used_delta = timedelta(minutes=first_match["TimeDelta"])
+                                end_date = format_datetime_to_isostring_zulu(
+                                    time_object + used_delta - timedelta(milliseconds=1)
+                                )
+                                extra_fields.update(
+                                    {"wms:dimensions": {"TIME": f"{start_date}/{end_date}"}}
+                                )
+                                # we add the instance id to the url
+                                url = f"https://services.sentinel-hub.com/ogc/wms/{instanceId}"
+                            else:
+                                extra_fields.update({"wms:dimensions": {"TIME": v["time"]}})
+                            link = Link(
+                                rel="wms",
+                                target=url,
+                                media_type=(endpoint_config.get("MimeType", "image/png")),
+                                title=collection_config["Name"],
+                                extra_fields=extra_fields,
+                            )
+                            item.add_link(link)
+                            locations_collection.add_item(item)
+
+            # add_visualization_info(
+            #     item, collection_config, endpoint_config, file_url=first_match.get("FileUrl")
+            # )
+        collection.add_child(locations_collection)
+        locations_collection.update_extent_from_items()
+        # collection.update_extent_from_items()
         # bubble up information we want to the link
-        link.extra_fields["id"] = key
-        link.extra_fields["latlng"] = latlon
-        link.extra_fields["country"] = country
-        link.extra_fields["city"] = city
+        # link.extra_fields["id"] = key
+        # link.extra_fields["latlng"] = latlon
+        # link.extra_fields["country"] = country
+        # link.extra_fields["city"] = city
 
     if "yAxis" not in collection_config:
         # fetch yAxis and store it to data, preventing need to save it per dataset in yml
