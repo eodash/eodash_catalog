@@ -533,7 +533,7 @@ def handle_GeoDB_endpoint(
             "Description": f"{city} - {country}",
         }
         locations_collection = get_or_create_collection(
-            collection, city, sc_config, catalog_config, endpoint_config
+            collection, key, sc_config, catalog_config, endpoint_config
         )
         input_data = endpoint_config.get("InputData")
         if input_data:
@@ -595,14 +595,14 @@ def handle_GeoDB_endpoint(
             # add_visualization_info(
             #     item, collection_config, endpoint_config, file_url=first_match.get("FileUrl")
             # )
-        collection.add_child(locations_collection)
+        link = collection.add_child(locations_collection)
         locations_collection.update_extent_from_items()
         # collection.update_extent_from_items()
         # bubble up information we want to the link
-        # link.extra_fields["id"] = key
-        # link.extra_fields["latlng"] = latlon
-        # link.extra_fields["country"] = country
-        # link.extra_fields["city"] = city
+        link.extra_fields["id"] = key
+        link.extra_fields["latlng"] = latlon
+        link.extra_fields["country"] = country
+        link.extra_fields["name"] = city
 
     if "yAxis" not in collection_config:
         # fetch yAxis and store it to data, preventing need to save it per dataset in yml
@@ -618,7 +618,8 @@ def handle_GeoDB_endpoint(
         collection_config["yAxis"] = yAxis
     add_collection_information(catalog_config, collection, collection_config)
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
-    collection.extra_fields["geoDBID"] = endpoint_config["CollectionId"]
+    # collection.extra_fields["geoDBID"] = endpoint_config["CollectionId"]
+    collection.extra_fields["locations"] = True
 
     collection.update_extent_from_items()
     collection.summaries = Summaries(
