@@ -95,7 +95,18 @@ def create_service_link(endpoint_config: dict, catalog_config: dict) -> Link:
     if "Body" in endpoint_config:
         extra_fields["body"] = get_full_url(endpoint_config["Body"], catalog_config)
     if "Flatstyle" in endpoint_config:
-        extra_fields["eox:flatstyle"] = get_full_url(endpoint_config["Flatstyle"], catalog_config)
+        # either a string
+        if isinstance(endpoint_config["Flatstyle"], str):
+            extra_fields["eox:flatstyle"] = get_full_url(
+                endpoint_config["Flatstyle"], catalog_config
+            )
+        elif isinstance(endpoint_config["Flatstyle"], dict):
+            # or an object
+            extra_fields["eox:flatstyle"] = {}
+            for key, value in endpoint_config["Flatstyle"].items():
+                extra_fields["eox:flatstyle"][key] = get_full_url(value, catalog_config)
+        else:
+            LOGGER.warn("Flatstyle is invalid type", endpoint_config["Flatstyle"])
     sl = Link(
         rel="service",
         target=endpoint_config["Url"],
