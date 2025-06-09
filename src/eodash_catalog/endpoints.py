@@ -733,6 +733,11 @@ def add_visualization_info(
         dimensions = {}
         if dimensions_config := endpoint_config.get("Dimensions", {}):
             for key, value in dimensions_config.items():
+                # special replace for world_settlement_footprint
+                if collection_config["EodashIdentifier"] == "WSF":
+                    value = value.replace(
+                        "{time}", datetimes is not None and str(datetimes[0].year) or "{time}"
+                    )
                 dimensions[key] = value
         if datetimes is not None:
             dimensions["TIME"] = format_datetime_to_isostring_zulu(datetimes[0])
