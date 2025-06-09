@@ -340,7 +340,7 @@ def process_collection_file(
 
                 parent_collection.add_links(links)
 
-        add_collection_information(catalog_config, parent_collection, collection_config)
+        add_collection_information(catalog_config, parent_collection, collection_config, True)
         add_process_info(parent_collection, catalog_config, collection_config)
         parent_collection.update_extent_from_items()
         # Add bbox extents from children
