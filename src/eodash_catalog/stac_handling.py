@@ -201,26 +201,6 @@ def add_example_info(
                         },
                     )
                 )
-    elif "Resources" in collection_config:
-        for service in collection_config["Resources"]:
-            if service.get("Name") == "xcube":
-                target_url = "{}/timeseries/{}/{}?aggMethods=median".format(
-                    endpoint_config["EndPoint"],
-                    endpoint_config["DatacubeId"],
-                    endpoint_config["Variable"],
-                )
-                stac_object.add_link(
-                    Link(
-                        rel="example",
-                        target=target_url,
-                        title=service["Name"] + " analytics",
-                        media_type="application/json",
-                        extra_fields={
-                            "example:language": "JSON",
-                            "example:method": "POST",
-                        },
-                    )
-                )
 
 
 def add_collection_information(
@@ -423,6 +403,34 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
                         },
                     )
                 )
+            elif resource["Name"] == "xcube" and "default_xcube_process" in catalog_config:
+                target_url = "{}/timeseries/{}/{}?aggMethods=median".format(
+                    resource["EndPoint"],
+                    resource["DatacubeId"],
+                    resource["Variable"],
+                )
+                process_endpoint_config = catalog_config["default_xcube_process"]["EndPoints"][0]
+                extra_fields = {
+                    "id": process_endpoint_config["Identifier"],
+                    "method": process_endpoint_config.get("Method", "GET"),
+                }
+                extra_fields["body"] = get_full_url(process_endpoint_config["Body"], catalog_config)
+                if "JsonForm" in catalog_config["default_xcube_process"]:
+                    collection.extra_fields["eodash:jsonform"] = get_full_url(
+                        catalog_config["default_xcube_process"]["JsonForm"], catalog_config
+                    )
+                if "VegaDefinition" in catalog_config["default_xcube_process"]:
+                    collection.extra_fields["eodash:vegadefinition"] = get_full_url(
+                        catalog_config["default_xcube_process"]["VegaDefinition"], catalog_config
+                    )
+
+                sl = Link(
+                    rel="service",
+                    target=target_url,
+                    media_type=process_endpoint_config["Type"],
+                    extra_fields=extra_fields,
+                )
+                collection.add_link(sl)
 
 
 def add_process_info_child_collection(
