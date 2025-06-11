@@ -338,7 +338,7 @@ def add_collection_information(
 
 
 def add_process_info(collection: Collection, catalog_config: dict, collection_config: dict) -> None:
-    if any(key in collection_config for key in ["Locations", "Subcollections"]):
+    if any(collection_config.get(key) for key in ["Locations", "Subcollections"]):
         # add the generic geodb-like selection process on the root collection instead of Processes
         if catalog_config.get("geodb_default_form"):
             # adding default geodb-like map handling for Locations
