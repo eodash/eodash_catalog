@@ -147,7 +147,7 @@ def handle_STAC_based_endpoint(
     options: Options,
     headers=None,
 ) -> Collection:
-    if "Locations" in collection_config:
+    if collection_config.get("Locations"):
         root_collection = get_or_create_collection(
             catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
         )
@@ -169,7 +169,7 @@ def handle_STAC_based_endpoint(
             collection.id = location.get("Identifier", uuid.uuid4())
             collection.title = location.get("Name")
             # See if description should be overwritten
-            if "Description" in location:
+            if location.get("Description"):
                 collection.description = location["Description"]
             else:
                 collection.description = location["Name"]
@@ -184,7 +184,7 @@ def handle_STAC_based_endpoint(
             # eodash v4 compatibility
             add_visualization_info(collection, collection_config, endpoint_config)
             add_process_info_child_collection(collection, catalog_config, collection_config)
-            if "OverwriteBBox" in location:
+            if location.get("OverwriteBBox"):
                 collection.extent.spatial = SpatialExtent(
                     [
                         location["OverwriteBBox"],
@@ -197,7 +197,7 @@ def handle_STAC_based_endpoint(
                 root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
     else:
         bbox = None
-        if "Bbox" in endpoint_config:
+        if endpoint_config.get("Bbox"):
             bbox = ",".join(map(str, endpoint_config["Bbox"]))
         root_collection = process_STACAPI_Endpoint(
             catalog_config=catalog_config,
@@ -263,17 +263,17 @@ def process_STACAPI_Endpoint(
             added_times[iso_date] = True
         link = collection.add_item(item)
         if options.tn:
-            if "cog_default" in item.assets:
+            if item.assets.get("cog_default"):
                 generate_thumbnail(
                     item, collection_config, endpoint_config, item.assets["cog_default"].href
                 )
             else:
                 generate_thumbnail(item, collection_config, endpoint_config)
         # Check if we can create visualization link
-        if "Assets" in endpoint_config:
+        if endpoint_config.get("Assets"):
             add_visualization_info(item, collection_config, endpoint_config, item.id)
             link.extra_fields["item"] = item.id
-        elif "cog_default" in item.assets:
+        elif item.assets.get("cog_default"):
             add_visualization_info(
                 item, collection_config, endpoint_config, item.assets["cog_default"].href
             )
@@ -282,7 +282,7 @@ def process_STACAPI_Endpoint(
             add_visualization_info(
                 item, collection_config, endpoint_config, datetimes=[item_datetime]
             )
-        elif "start_datetime" in item.properties and "end_datetime" in item.properties:
+        elif item.properties.get("start_datetime") and item.properties.get("end_datetime"):
             add_visualization_info(
                 item,
                 collection_config,
@@ -323,7 +323,7 @@ def process_STACAPI_Endpoint(
     add_collection_information(catalog_config, collection, collection_config)
 
     # Check if we need to overwrite the bbox after update from items
-    if "OverwriteBBox" in endpoint_config:
+    if endpoint_config.get("OverwriteBBox"):
         collection.extent.spatial = SpatialExtent(
             [
                 endpoint_config["OverwriteBBox"],
@@ -377,7 +377,7 @@ def handle_SH_WMS_endpoint(
     root_collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    if "Locations" in collection_config:
+    if collection_config.get("Locations"):
         for location in collection_config["Locations"]:
             # create  and populate location collections based on times
             # TODO: Should we add some new description per location?
@@ -580,7 +580,7 @@ def handle_SH_endpoint(
     headers = {"Authorization": f"Bearer {token}"}
     endpoint_config["EndPoint"] = "https://services.sentinel-hub.com/api/v1/catalog/1.0.0/"
     # Overwrite collection id with type, such as ZARR or BYOC
-    if "Type" in endpoint_config:
+    if endpoint_config.get("Type"):
         endpoint_config["CollectionId"] = (
             endpoint_config["Type"] + "-" + endpoint_config["CollectionId"]
         )
@@ -637,7 +637,7 @@ def handle_WMS_endpoint(
         LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
 
     # Check if we should overwrite bbox
-    if "OverwriteBBox" in endpoint_config:
+    if endpoint_config.get("OverwriteBBox"):
         collection.extent.spatial = SpatialExtent(
             [
                 endpoint_config["OverwriteBBox"],
@@ -655,10 +655,10 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     for asset in endpoint_config["Assets"]:
         assets += f"&assets={asset}"
     color_formula = ""
-    if "ColorFormula" in endpoint_config:
+    if endpoint_config.get("ColorFormula"):
         color_formula = "&color_formula={}".format(endpoint_config["ColorFormula"])
     no_data = ""
-    if "NoData" in endpoint_config:
+    if endpoint_config.get("NoData"):
         no_data = "&no_data={}".format(endpoint_config["NoData"])
     item = item if item else "{item}"
     target_url = f"https://openveda.cloud/api/raster/collections/{collection}/items/{item}/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{color_formula}{no_data}"
@@ -673,7 +673,7 @@ def add_visualization_info(
     datetimes: list[datetime] | None = None,
 ) -> None:
     extra_fields: dict[str, list[str] | dict[str, str]] = {}
-    if "Attribution" in endpoint_config:
+    if endpoint_config.get("Attribution"):
         stac_object.stac_extensions.append(
             "https://stac-extensions.github.io/attribution/v0.1.0/schema.json"
         )
@@ -681,7 +681,7 @@ def add_visualization_info(
     # add extension reference
     if endpoint_config["Name"] == "Sentinel Hub" or endpoint_config["Name"] == "Sentinel Hub WMS":
         instanceId = os.getenv("SH_INSTANCE_ID")
-        if "InstanceId" in endpoint_config:
+        if endpoint_config.get("InstanceId"):
             instanceId = endpoint_config["InstanceId"]
         if env_id := endpoint_config.get("CustomSHEnvId"):
             # special handling for custom environment
@@ -743,11 +743,11 @@ def add_visualization_info(
             dimensions["TIME"] = format_datetime_to_isostring_zulu(datetimes[0])
         if dimensions != {}:
             extra_fields["wms:dimensions"] = dimensions
-        if "Styles" in endpoint_config:
+        if endpoint_config.get("Styles"):
             extra_fields["wms:styles"] = endpoint_config["Styles"]
-        if "TileSize" in endpoint_config:
+        if endpoint_config.get("TileSize"):
             extra_fields["wms:tilesize"] = endpoint_config["TileSize"]
-        if "Version" in endpoint_config:
+        if endpoint_config.get("Version"):
             extra_fields["wms:version"] = endpoint_config["Version"]
         media_type = endpoint_config.get("MediaType", "image/jpeg")
         endpoint_url = endpoint_config["EndPoint"]
@@ -780,7 +780,7 @@ def add_visualization_info(
             dimensions["TIME"] = format_datetime_to_isostring_zulu(datetimes[0])
         if dimensions != {}:
             extra_fields["wms:dimensions"] = dimensions
-        if "Styles" in endpoint_config:
+        if endpoint_config.get("Styles"):
             extra_fields["wms:styles"] = endpoint_config["Styles"]
         media_type = endpoint_config.get("MediaType", "image/png")
         endpoint_url = endpoint_config["EndPoint"]
@@ -826,7 +826,7 @@ def add_visualization_info(
             # either preset Rescale of left as a template
             vmin = "{vmin}"
             vmax = "{vmax}"
-            if "Rescale" in endpoint_config:
+            if endpoint_config.get("Rescale"):
                 vmin = endpoint_config["Rescale"][0]
                 vmax = endpoint_config["Rescale"][1]
             # depending on numerical input only
@@ -1007,7 +1007,7 @@ def handle_raw_source(
                 assets=assets,
                 extra_fields={},
             )
-            if "Attribution" in endpoint_config:
+            if endpoint_config.get("Attribution"):
                 item.stac_extensions.append(
                     "https://stac-extensions.github.io/attribution/v0.1.0/schema.json"
                 )
