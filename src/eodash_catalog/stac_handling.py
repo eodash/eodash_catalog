@@ -51,7 +51,7 @@ def get_or_create_collection(
             temporal_extent = TemporalExtent([[times_datetimes[0], times_datetimes[-1]]])
 
     extent = Extent(spatial=spatial_extent, temporal=temporal_extent)
-
+    description = ""
     # Check if description is link to markdown file
     if collection_config.get("Description"):
         description = collection_config["Description"]
