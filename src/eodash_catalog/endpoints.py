@@ -591,8 +591,8 @@ def handle_GeoDB_endpoint(
                             )
                             item.add_link(link)
                             itemlink = locations_collection.add_item(item)
-                            itemlink.extra_fields["datetime"] = format_datetime_to_isostring_zulu(
-                                time_object
+                            itemlink.extra_fields["datetime"] = (
+                                f"{format_datetime_to_isostring_zulu(time_object)}Z"
                             )
 
             # add_visualization_info(
