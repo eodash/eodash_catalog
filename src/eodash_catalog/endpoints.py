@@ -590,11 +590,15 @@ def handle_GeoDB_endpoint(
                                 extra_fields=extra_fields,
                             )
                             item.add_link(link)
-                            locations_collection.add_item(item)
+                            itemlink = locations_collection.add_item(item)
+                            itemlink.extra_fields["datetime"] = format_datetime_to_isostring_zulu(
+                                time_object
+                            )
 
             # add_visualization_info(
             #     item, collection_config, endpoint_config, file_url=first_match.get("FileUrl")
             # )
+        locations_collection.extra_fields["subcode"] = key
         link = collection.add_child(locations_collection)
         locations_collection.update_extent_from_items()
         # collection.update_extent_from_items()
