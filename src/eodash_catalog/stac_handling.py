@@ -358,6 +358,17 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
             },
         )
         collection.add_link(sl)
+        # adding additional service links
+        if "EndPoints" in collection_config["Process"]:
+            for endpoint in collection_config["Process"]["EndPoints"]:
+                collection.add_link(create_service_link(endpoint, catalog_config))
+
+        # for geodb collections now based on locations, we want to make sure
+        # also manually defined processes are added to the collection
+        if "VegaDefinition" in collection_config["Process"]:
+            collection.extra_fields["eodash:vegadefinition"] = get_full_url(
+                collection_config["Process"]["VegaDefinition"], catalog_config
+            )
     # elif is intentional for cases when Process is defined on collection with Locations
     # then we want to only add it to the "children", not the root
     elif collection_config.get("Process"):
