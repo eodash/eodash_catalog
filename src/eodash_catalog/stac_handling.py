@@ -97,14 +97,19 @@ def create_service_link(endpoint_config: dict, catalog_config: dict) -> Link:
     if endpoint_config.get("Flatstyle"):
         # either a string
         if isinstance(endpoint_config["Flatstyle"], str):
+            # update URL if needed
             extra_fields["eox:flatstyle"] = get_full_url(
                 endpoint_config["Flatstyle"], catalog_config
             )
-        elif isinstance(endpoint_config["Flatstyle"], dict):
-            # or an object
-            extra_fields["eox:flatstyle"] = {}
-            for key, value in endpoint_config["Flatstyle"].items():
-                extra_fields["eox:flatstyle"][key] = get_full_url(value, catalog_config)
+        elif isinstance(endpoint_config["Flatstyle"], list):
+            # or a list of objects - update URL if needed
+            extra_fields["eox:flatstyle"] = []
+            for flatstyle_config in endpoint_config["Flatstyle"]:
+                flatstyle_obj = {
+                    "Identifier": flatstyle_config.get("Identifier"),
+                    "Url": get_full_url(flatstyle_config.get("Url"), catalog_config),
+                }
+                extra_fields["eox:flatstyle"].append(flatstyle_obj)
         else:
             LOGGER.warn("Flatstyle is invalid type", endpoint_config["Flatstyle"])
     sl = Link(
