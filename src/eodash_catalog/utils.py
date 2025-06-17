@@ -287,7 +287,7 @@ def iter_len_at_least(i, n: int) -> int:
 
 def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
     bidx = ""
-    if "Bidx" in endpoint_config:
+    if endpoint_config.get("Bidx"):
         # Check if an array was provided
         if hasattr(endpoint_config["Bidx"], "__len__"):
             for band in endpoint_config["Bidx"]:
@@ -296,25 +296,29 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
             bidx = "&bidx={}".format(endpoint_config["Bidx"])
 
     colormap = ""
-    if "Colormap" in endpoint_config:
+    if endpoint_config.get("Colormap"):
         colormap = "&colormap={}".format(endpoint_config["Colormap"])
         # TODO: For now we assume a already urlparsed colormap definition
         # it could be nice to allow a json and better convert it on the fly
         # colormap = "&colormap=%s"%(urllib.parse.quote(str(endpoint_config["Colormap"])))
 
+    Nodata = ""
+    if endpoint_config.get("Nodata"):
+        Nodata = "&nodata={}".format(endpoint_config["Nodata"])
+
     colormap_name = ""
-    if "ColormapName" in endpoint_config:
+    if endpoint_config.get("ColormapName"):
         colormap_name = "&colormap_name={}".format(endpoint_config["ColormapName"])
 
     rescale = ""
-    if "Rescale" in endpoint_config:
+    if endpoint_config.get("Rescale"):
         rescale = "&rescale={},{}".format(
             endpoint_config["Rescale"][0], endpoint_config["Rescale"][1]
         )
 
     file_url = f"url={file_url}&" if file_url else ""
 
-    target_url = f"https://openveda.cloud/api/raster/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{file_url}resampling_method=nearest{bidx}{colormap}{colormap_name}{rescale}"
+    target_url = f"https://openveda.cloud/api/raster/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{file_url}resampling_method=nearest{bidx}{colormap}{colormap_name}{rescale}{Nodata}"
     return target_url
 
 

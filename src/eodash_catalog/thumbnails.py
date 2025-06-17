@@ -31,7 +31,7 @@ def generate_thumbnail(
 ) -> None:
     if endpoint_config["Name"] == "Sentinel Hub" or endpoint_config["Name"] == "WMS":
         instanceId = os.getenv("SH_INSTANCE_ID")
-        if "InstanceId" in endpoint_config:
+        if endpoint_config.get("InstanceId"):
             instanceId = endpoint_config["InstanceId"]
         # Build example url
         wms_config = (

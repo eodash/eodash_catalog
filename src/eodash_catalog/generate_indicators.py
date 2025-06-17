@@ -88,7 +88,7 @@ def process_catalog_file(file_path: str, options: Options):
                 )
             except FileNotFoundError:
                 LOGGER.info(f"Warning: neither collection nor indicator found for {collection}")
-    if "MapProjection" in catalog_config:
+    if catalog_config.get("MapProjection"):
         catalog.extra_fields["eodash:mapProjection"] = catalog_config["MapProjection"]
 
     strategy = TemplateLayoutStrategy(item_template="${collection}/${year}")
@@ -166,7 +166,7 @@ def process_indicator_file(
     parent_indicator = get_or_create_collection(
         catalog, indicator_config["Name"], indicator_config, catalog_config, {}
     )
-    if "Collections" in indicator_config:
+    if indicator_config.get("Collections"):
         for collection in indicator_config["Collections"]:
             process_collection_file(
                 catalog_config,
@@ -203,7 +203,7 @@ def process_collection_file(
 ):
     LOGGER.info(f"Processing collection: {file_path}")
     collection_config = read_config_file(file_path)
-    if "Resources" in collection_config:
+    if collection_config.get("Resources"):
         for endpoint_config in collection_config["Resources"]:
             try:
                 collection = None
@@ -275,7 +275,7 @@ def process_collection_file(
                 LOGGER.warn(f"""Exception: {e.args[0]} with config: {endpoint_config}""")
                 raise e
 
-    elif "Subcollections" in collection_config:
+    elif collection_config.get("Subcollections"):
         # if no endpoint is specified we check for definition of subcollections
         parent_collection = get_or_create_collection(
             catalog, collection_config["Name"], collection_config, catalog_config, {}
@@ -286,7 +286,7 @@ def process_collection_file(
         for sub_coll_def in collection_config["Subcollections"]:
             # Subcollection has only data on one location which
             # is defined for the entire collection
-            if "Name" in sub_coll_def and "Point" in sub_coll_def:
+            if sub_coll_def.get("Name") and sub_coll_def.get("Point"):
                 locations.append(sub_coll_def["Name"])
                 if isinstance(sub_coll_def["Country"], list):
                     countries.extend(sub_coll_def["Country"])
@@ -302,7 +302,7 @@ def process_collection_file(
                 for link in parent_collection.links:
                     if (
                         link.rel == "child"
-                        and "id" in link.extra_fields
+                        and link.extra_fields.get("id")
                         and link.extra_fields["id"] == sub_coll_def["Identifier"]
                     ):
                         latlng = "{},{}".format(
@@ -330,9 +330,9 @@ def process_collection_file(
                 links = tmp_catalog.get_child(sub_coll_def["Identifier"]).get_links()  # type: ignore
                 for link in links:
                     # extract summary information
-                    if "city" in link.extra_fields:
+                    if link.extra_fields.get("city"):
                         locations.append(link.extra_fields["city"])
-                    if "country" in link.extra_fields:
+                    if link.extra_fields.get("country"):
                         if isinstance(link.extra_fields["country"], list):
                             countries.extend(link.extra_fields["country"])
                         else:
@@ -340,7 +340,7 @@ def process_collection_file(
 
                 parent_collection.add_links(links)
 
-        add_collection_information(catalog_config, parent_collection, collection_config)
+        add_collection_information(catalog_config, parent_collection, collection_config, True)
         add_process_info(parent_collection, catalog_config, collection_config)
         parent_collection.update_extent_from_items()
         # Add bbox extents from children
@@ -368,7 +368,7 @@ def add_to_catalog(
 
     link: Link = catalog.add_child(collection)
     # bubble fields we want to have up to collection link and add them to collection
-    if endpoint and "Type" in endpoint and endpoint["Type"] not in ["GeoDB"]:
+    if endpoint and endpoint.get("Type") and endpoint["Type"] not in ["GeoDB"]:
         print(
             f"Adding endpoint type {endpoint['Type']} for collection {collection.id} "
             f"with name {endpoint['Name']}"
@@ -381,13 +381,15 @@ def add_to_catalog(
             endpoint["Name"],
             endpoint["Type"],
         )
-
-    if "Subtitle" in collection_config:
+    elif endpoint:
+        collection.extra_fields["endpointtype"] = endpoint["Name"]
+        link.extra_fields["endpointtype"] = endpoint["Name"]
+    if collection_config.get("Subtitle"):
         link.extra_fields["subtitle"] = collection_config["Subtitle"]
     link.extra_fields["title"] = collection.title
     link.extra_fields["code"] = collection_config["EodashIdentifier"]
     link.extra_fields["id"] = collection_config["Name"]
-    if "Themes" in collection_config:
+    if collection_config.get("Themes"):
         link.extra_fields["themes"] = collection_config["Themes"]
     # Check for summaries and bubble up info
     if disable:
