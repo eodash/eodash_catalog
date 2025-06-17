@@ -398,10 +398,6 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
         # see if geodb resource configured use defaults if available
         for resource in collection_config["Resources"]:
             if resource["Name"] == "GeoDB":
-                # if "geodb_default_form" in catalog_config:
-                #     collection.extra_fields["eodash:jsonform"] = get_full_url(
-                #         catalog_config["geodb_default_form"], catalog_config
-                #     )
                 if "geodb_default_vega" in catalog_config:
                     collection.extra_fields["eodash:vegadefinition"] = get_full_url(
                         catalog_config["geodb_default_vega"], catalog_config

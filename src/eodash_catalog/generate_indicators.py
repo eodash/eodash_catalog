@@ -381,10 +381,7 @@ def add_to_catalog(
             endpoint["Name"],
             endpoint["Type"],
         )
-    elif endpoint:
-        pass
-        # collection.extra_fields["endpointtype"] = endpoint["Name"]
-        # link.extra_fields["endpointtype"] = endpoint["Name"]
+
     if "Subtitle" in collection_config:
         link.extra_fields["subtitle"] = collection_config["Subtitle"]
     link.extra_fields["title"] = collection.title

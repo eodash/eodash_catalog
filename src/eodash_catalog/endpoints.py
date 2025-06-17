@@ -622,7 +622,6 @@ def handle_GeoDB_endpoint(
         collection_config["yAxis"] = yAxis
     add_collection_information(catalog_config, collection, collection_config)
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
-    # collection.extra_fields["geoDBID"] = endpoint_config["CollectionId"]
     collection.extra_fields["locations"] = True
 
     collection.update_extent_from_items()
