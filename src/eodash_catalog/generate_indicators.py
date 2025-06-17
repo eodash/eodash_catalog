@@ -370,7 +370,8 @@ def add_to_catalog(
     # bubble fields we want to have up to collection link and add them to collection
     if endpoint and "Type" in endpoint and endpoint["Type"] not in ["GeoDB"]:
         print(
-            f"Adding endpoint type {endpoint['Type']} for collection {collection.id} with name {endpoint['Name']}"
+            f"Adding endpoint type {endpoint['Type']} for collection {collection.id} "
+            f"with name {endpoint['Name']}"
         )
         collection.extra_fields["endpointtype"] = "{}_{}".format(
             endpoint["Name"],
