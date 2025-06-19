@@ -464,3 +464,20 @@ def _load_file(filepath):
             return yaml.safe_load(content)
         except yaml.YAMLError as err:
             raise ValueError(f"Failed to parse '{filepath}' as JSON or YAML: {err}") from err
+
+
+def merge_bboxes(bboxes: list[list[float]]) -> list[float]:
+    """
+    Merge  bounding boxes into one bounding box that contains them all.
+    Returns:
+        A list representing the merged bbox: [min_lon, min_lat, max_lon, max_lat]
+    """
+    if not bboxes:
+        raise ValueError("No bounding boxes provided.")
+
+    min_lon = min(b[0] for b in bboxes)
+    min_lat = min(b[1] for b in bboxes)
+    max_lon = max(b[2] for b in bboxes)
+    max_lat = max(b[3] for b in bboxes)
+
+    return [min_lon, min_lat, max_lon, max_lat]

@@ -39,7 +39,7 @@ from eodash_catalog.utils import (
     Options,
     RaisingThread,
     add_single_item_if_collection_empty,
-    iter_len_at_least,
+    merge_bboxes,
     read_config_file,
     recursive_save,
     retry,
@@ -163,6 +163,7 @@ def process_indicator_file(
 ):
     LOGGER.info(f"Processing indicator: {file_path}")
     indicator_config = read_config_file(file_path)
+
     parent_indicator = get_or_create_collection(
         catalog, indicator_config["Name"], indicator_config, catalog_config, {}
     )
@@ -179,11 +180,20 @@ def process_indicator_file(
         # we assume that collection files can also be loaded directly
         process_collection_file(catalog_config, file_path, parent_indicator, options)
     add_collection_information(catalog_config, parent_indicator, indicator_config, True)
-    if iter_len_at_least(parent_indicator.get_items(recursive=True), 1):
-        parent_indicator.update_extent_from_items()
+    # get shared extent of all of the collections
+    # we do not want to use update_extent_from_items() because
+    # they might have OverwriteBBox and that would discard it for indicator
+    merged_bbox = merge_bboxes(
+        [
+            c_child.extent.spatial.bboxes[0]
+            for c_child in parent_indicator.get_children()
+            if isinstance(c_child, Collection)
+        ]
+    )
+    parent_indicator.extent.spatial.bboxes = [merged_bbox]
     # Add bbox extents from children
     for c_child in parent_indicator.get_children():
-        if isinstance(c_child, Collection):  # typing reason
+        if isinstance(c_child, Collection) and merged_bbox != c_child.extent.spatial.bboxes[0]:
             parent_indicator.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
     # extract collection information and add it to summary indicator level
     extract_indicator_info(parent_indicator)
