@@ -39,6 +39,7 @@ from eodash_catalog.utils import (
     Options,
     RaisingThread,
     add_single_item_if_collection_empty,
+    iter_len_at_least,
     merge_bboxes,
     read_config_file,
     recursive_save,
@@ -180,8 +181,9 @@ def process_indicator_file(
         # we assume that collection files can also be loaded directly
         process_collection_file(catalog_config, file_path, parent_indicator, options)
     add_collection_information(catalog_config, parent_indicator, indicator_config, True)
+    if iter_len_at_least(parent_indicator.get_items(recursive=True), 1):
+        parent_indicator.update_extent_from_items()
     # get shared extent of all of the collections
-    # we do not want to use update_extent_from_items() because
     # they might have OverwriteBBox and that would discard it for indicator
     merged_bbox = merge_bboxes(
         [

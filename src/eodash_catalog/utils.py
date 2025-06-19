@@ -342,7 +342,7 @@ def add_single_item_if_collection_empty(collection: Collection) -> None:
     else:
         item = Item(
             id=str(uuid.uuid4()),
-            bbox=[-180, -85, 180, 85],
+            bbox=[-180.0, -90.0, 180.0, 90.0],
             properties={},
             geometry=None,
             datetime=datetime(1970, 1, 1, 0, 0, 0, tzinfo=pytztimezone("UTC")),

@@ -105,7 +105,7 @@ def test_collection_no_wms_has_a_single_item(catalog_output_folder):
     with open(os.path.join(root_collection_path, "collection.json")) as fp:
         collection_json = json.load(fp)
         # test that custom bbox is set
-        assert [-180, -85, 180, 85] in collection_json["extent"]["spatial"]["bbox"]
+        assert [-180.0, -90.0, 180.0, 90.0] in collection_json["extent"]["spatial"]["bbox"]
         # test that time interval is 1970-today
         assert collection_json["extent"]["temporal"]["interval"][0][0] == start_date
         assert (
