@@ -363,18 +363,17 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
             },
         )
         collection.add_link(sl)
+        has_geodb = any(
+            item.get("Name") == "GeoDB" for item in collection_config.get("Resources", [])
+        )
         # adding additional service links
-        if collection_config["Name"] == "GeoDB" and collection_config.get("Process", {}).get(
-            "EndPoints"
-        ):
+        if has_geodb and collection_config.get("Process", {}).get("EndPoints"):
             for endpoint in collection_config["Process"]["EndPoints"]:
                 collection.add_link(create_service_link(endpoint, catalog_config))
 
         # for geodb collections now based on locations, we want to make sure
         # also manually defined processes are added to the collection
-        if collection_config["Name"] == "GeoDB" and collection_config.get("Process", {}).get(
-            "VegaDefinition"
-        ):
+        if has_geodb and collection_config.get("Process", {}).get("VegaDefinition"):
             collection.extra_fields["eodash:vegadefinition"] = get_full_url(
                 collection_config["Process"]["VegaDefinition"], catalog_config
             )
