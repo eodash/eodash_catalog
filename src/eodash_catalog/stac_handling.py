@@ -106,8 +106,8 @@ def create_service_link(endpoint_config: dict, catalog_config: dict) -> Link:
             extra_fields["eox:flatstyle"] = []
             for flatstyle_config in endpoint_config["Flatstyle"]:
                 flatstyle_obj = {
-                    "Identifier": flatstyle_config.get("Identifier"),
-                    "Url": get_full_url(flatstyle_config.get("Url"), catalog_config),
+                    "id": flatstyle_config.get("Identifier"),
+                    "url": get_full_url(flatstyle_config.get("Url"), catalog_config),
                 }
                 extra_fields["eox:flatstyle"].append(flatstyle_obj)
         else:
