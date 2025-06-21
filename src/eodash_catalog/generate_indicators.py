@@ -6,11 +6,12 @@ Indicator generator to harvest information from endpoints and generate catalog
 
 import os
 import time
+from datetime import datetime
 from typing import Any
 
 import click
 from dotenv import load_dotenv
-from pystac import Catalog, CatalogType, Collection, Link, Summaries
+from pystac import Catalog, CatalogType, Collection, Link, Summaries, TemporalExtent
 from pystac.layout import TemplateLayoutStrategy
 from pystac.validation import validate_all
 from structlog import get_logger
@@ -197,6 +198,17 @@ def process_indicator_file(
     for c_child in parent_indicator.get_children():
         if isinstance(c_child, Collection) and merged_bbox != c_child.extent.spatial.bboxes[0]:
             parent_indicator.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+    # aggregate all time extents from the child collections and make it a indicator extent
+    individual_datetimes: list[datetime] = []
+    for c_child in parent_indicator.get_children():
+        if isinstance(c_child, Collection) and isinstance(
+            c_child.extent.temporal.intervals[0], list
+        ):
+            individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
+    # filter out None
+    individual_datetimes = list(filter(lambda x: x is not None, individual_datetimes))
+    time_extent = [min(individual_datetimes), max(individual_datetimes)]
+    parent_indicator.extent.temporal = TemporalExtent([time_extent])
     # extract collection information and add it to summary indicator level
     extract_indicator_info(parent_indicator)
     add_process_info(parent_indicator, catalog_config, indicator_config)
@@ -278,7 +290,7 @@ def process_collection_file(
                 else:
                     raise ValueError("Type of Resource is not supported")
                 if collection:
-                    add_single_item_if_collection_empty(collection)
+                    add_single_item_if_collection_empty(endpoint_config, collection)
                     add_projection_info(endpoint_config, collection)
                     add_to_catalog(collection, catalog, endpoint_config, collection_config, disable)
                 else:

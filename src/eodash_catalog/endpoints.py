@@ -9,7 +9,7 @@ from itertools import groupby
 from operator import itemgetter
 
 import requests
-from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries
+from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries, TemporalExtent
 from pystac_client import Client
 from shapely import wkt
 from shapely.geometry import mapping
@@ -31,6 +31,7 @@ from eodash_catalog.utils import (
     filter_time_entries,
     format_datetime_to_isostring_zulu,
     generate_veda_cog_link,
+    merge_bboxes,
     parse_datestring_to_tz_aware_datetime,
     replace_with_env_variables,
     retrieveExtentFromWCS,
@@ -499,6 +500,7 @@ def handle_GeoDB_endpoint(
     sorted_locations = sorted(response, key=itemgetter("aoi_id"))
     cities = []
     countries = []
+    input_data = endpoint_config.get("InputData")
     for key, value in groupby(sorted_locations, key=itemgetter("aoi_id")):
         # Finding min and max values for date
         values = list(value)
@@ -535,7 +537,6 @@ def handle_GeoDB_endpoint(
         locations_collection = get_or_create_collection(
             collection, key, sc_config, catalog_config, endpoint_config
         )
-        input_data = endpoint_config.get("InputData")
         if input_data:
             for v in values:
                 # add items based on inputData fields for each time step available in values
@@ -598,9 +599,16 @@ def handle_GeoDB_endpoint(
             # add_visualization_info(
             #     item, collection_config, endpoint_config, file_url=first_match.get("FileUrl")
             # )
+            locations_collection.update_extent_from_items()
+        else:
+            # set spatial extent from geodb
+            locations_collection.extent.spatial.bboxes = [bbox]
+            # set time extent from geodb
+            individual_datetimes = [datetime.fromisoformat(v["time"]) for v in values]
+            time_extent = [min(individual_datetimes), max(individual_datetimes)]
+            locations_collection.extent.temporal = TemporalExtent([time_extent])
         locations_collection.extra_fields["subcode"] = key
         link = collection.add_child(locations_collection)
-        locations_collection.update_extent_from_items()
         # collection.update_extent_from_items()
         # bubble up information we want to the link
         link.extra_fields["id"] = key
@@ -623,8 +631,32 @@ def handle_GeoDB_endpoint(
     add_collection_information(catalog_config, collection, collection_config)
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
     collection.extra_fields["locations"] = True
-
-    collection.update_extent_from_items()
+    if not input_data:
+        # we have no items, extents of collection need to be updated manually
+        merged_bbox = merge_bboxes(
+            [
+                c_child.extent.spatial.bboxes[0]
+                for c_child in collection.get_children()
+                if isinstance(c_child, Collection)
+            ]
+        )
+        collection.extent.spatial.bboxes = [merged_bbox]
+        # Add bbox extents from children
+        for c_child in collection.get_children():
+            if isinstance(c_child, Collection) and merged_bbox != c_child.extent.spatial.bboxes[0]:
+                collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+        # set time extent of collection
+        individual_datetimes = []
+        for c_child in collection.get_children():
+            if isinstance(c_child, Collection) and isinstance(
+                c_child.extent.temporal.intervals[0], list
+            ):
+                individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
+        time_extent = [min(individual_datetimes), max(individual_datetimes)]
+        collection.extent.temporal = TemporalExtent([time_extent])
+    else:
+        # we can update from items
+        collection.update_extent_from_items()
     collection.summaries = Summaries(
         {
             "cities": cities,

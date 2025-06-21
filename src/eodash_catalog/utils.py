@@ -335,7 +335,7 @@ class Options:
     collections: list[str]
 
 
-def add_single_item_if_collection_empty(collection: Collection) -> None:
+def add_single_item_if_collection_empty(endpoint_config: dict, collection: Collection) -> None:
     for link in collection.links:
         if link.rel in [RelType.CHILD, RelType.ITEM]:
             break
@@ -350,6 +350,8 @@ def add_single_item_if_collection_empty(collection: Collection) -> None:
             end_datetime=datetime.now(tz=pytztimezone("UTC")),
         )
         collection.add_item(item)
+        if not endpoint_config.get("OverwriteBBox"):
+            collection.update_extent_from_items()
 
 
 def replace_with_env_variables(s: str) -> str:
