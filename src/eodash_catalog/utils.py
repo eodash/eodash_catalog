@@ -11,14 +11,17 @@ from decimal import Decimal
 from functools import reduce, wraps
 from typing import Any
 
+import pyarrow.compute as pc
 import stac_geoparquet as stacgp
 import yaml
 from dateutil import parser
 from owslib.wcs import WebCoverageService
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
-from pystac import Asset, Catalog, Collection, Item, Link, RelType
+from pystac import Asset, Catalog, Collection, Item, Link, RelType, SpatialExtent, TemporalExtent
 from pytz import timezone as pytztimezone
+from shapely import geometry as sgeom
+from shapely import wkb
 from six import string_types
 from structlog import get_logger
 
@@ -441,6 +444,54 @@ def get_full_url(url: str, catalog_config) -> str:
         return url
     else:
         return f'{catalog_config["assets_endpoint"]}{url}'
+
+
+def save_items(
+    collection: Collection,
+    items: list[Item],
+    output_path: str,
+    catalog_id: str,
+    use_geoparquet: bool = False,
+) -> None:
+    """
+    Save a list of items for a collection either as single geoparquet or
+    by adding them to the collection in order to be saved by pystac as individual items.
+    Args:
+        collection (Collection): The collection to which the items will be added.
+        items (list[Item]): The list of items to save.
+        output_path (str): The path where the items will be saved.
+        catalog_id (str): The ID of the catalog to which the collection belongs.
+        use_geoparquet (bool): If True, save items as a single GeoParquet file.
+            If False, add items to the collection and save them individually.
+    """
+    if use_geoparquet:
+        buildcatpath = f"{output_path}/{catalog_id}"
+        colpath = f"{collection.id}/{collection.id}"
+        record_batch_reader = stacgp.arrow.parse_stac_items_to_arrow(items)
+        table = record_batch_reader.read_all()
+        output_path = f"{buildcatpath}/{colpath}"
+        os.makedirs(output_path, exist_ok=True)
+        stacgp.arrow.to_parquet(table, f"{output_path}/{collection.id}.parquet")
+        gp_link = Link(
+            rel="items",
+            target=f"./{collection.id}.parquet",
+            media_type="application/vnd.apache.parquet",
+            title="GeoParquet Items",
+        )
+        collection.add_link(gp_link)
+        # add extent information to the collection
+        min_datetime = pc.min(table["datetime"]).as_py()
+        max_datetime = pc.max(table["datetime"]).as_py()
+        collection.extent.temporal = TemporalExtent([min_datetime, max_datetime])
+        geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
+        bbox = sgeom.MultiPolygon(geoms).bounds
+        collection.extent.spatial = SpatialExtent([bbox])
+    else:
+        # go over items and add them to the collection
+        for item in items:
+            link = collection.add_item(item)
+            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(item.datetime)
+        collection.update_extent_from_items()
 
 
 def read_config_file(path: str) -> dict:

@@ -8,13 +8,10 @@ from datetime import datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
 
-import pyarrow.compute as pc
 import requests
-import stac_geoparquet as stacgp
 from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries, TemporalExtent
 from pystac_client import Client
-from shapely import geometry as sgeom
-from shapely import wkb, wkt
+from shapely import wkt
 from shapely.geometry import mapping
 from structlog import get_logger
 
@@ -39,6 +36,7 @@ from eodash_catalog.utils import (
     replace_with_env_variables,
     retrieveExtentFromWCS,
     retrieveExtentFromWMSWMTS,
+    save_items,
 )
 
 LOGGER = get_logger(__name__)
@@ -740,61 +738,8 @@ def handle_WMS_endpoint(
     else:
         LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
 
-    if options.gp:
-        buildcatpath = f"{options.outputpath}/{catalog_config['id']}"
-        colpath = f"{collection_config['Name']}/{collection_config['Name']}"
-        """
-        # try to find default geoparquet file url
-        base_url = f"{catalog_config.get('endpoint')}{catalog_config['id']}/{colpath}"
-        gp_url = f"{base_url}/{collection_config['Name']}.parquet"
-        # check if geoparquet location is specified in collection_config
-        if endpoint_config.get("GeoParquetPath"):
-            gp_url = endpoint_config.get("GeoParquetPath")
-        # try to fetch and load geoparquet file
-        if gp_url and not options.force:
-            try:
-                table = stacgp.arrow.read_parquet(gp_url)
-                # check if datetime is present
-                if "datetime" in table.column_names:
-                    collection.extent.temporal = TemporalExtent(
-                        [pc.min(table["datetime"]).as_py(), pc.max(table["datetime"]).as_py()]
-                    )
-                if "geometry" in table.column_names:
-                    geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
-                    bbox = sgeom.MultiPolygon(geoms).bounds
-                    collection.extent.spatial = SpatialExtent([bbox])
-                collection.id = collection_config["Name"]
-                collection.title = collection_config["Name"]
-                collection.description = collection_config.get("Description", "")
-                return collection
-            except Exception as e:
-                LOGGER.error(f"Failed to read geoparquet file: {e}")
-        """
-        record_batch_reader = stacgp.arrow.parse_stac_items_to_arrow(items)
-        table = record_batch_reader.read_all()
-        output_path = f"{buildcatpath}/{colpath}"
-        os.makedirs(output_path, exist_ok=True)
-        stacgp.arrow.to_parquet(table, f"{output_path}/{collection.id}.parquet")
-        gp_link = Link(
-            rel="items",
-            target=f"./{collection.id}.parquet",
-            media_type="application/vnd.apache.parquet",
-            title="GeoParquet Items",
-        )
-        collection.add_link(gp_link)
-        # add extent information to the collection
-        min_datetime = pc.min(table["datetime"]).as_py()
-        max_datetime = pc.max(table["datetime"]).as_py()
-        collection.extent.temporal = TemporalExtent([min_datetime, max_datetime])
-        geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
-        bbox = sgeom.MultiPolygon(geoms).bounds
-        collection.extent.spatial = SpatialExtent([bbox])
-    else:
-        # go over items and add them to the collection
-        for item in items:
-            link = collection.add_item(item)
-            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
-        collection.update_extent_from_items()
+    # Save items either into collection as individual items or as geoparquet
+    save_items(collection, items, options.outputpath, catalog.id, options.gp)
 
     # Check if we should overwrite bbox
     if endpoint_config.get("OverwriteBBox"):
