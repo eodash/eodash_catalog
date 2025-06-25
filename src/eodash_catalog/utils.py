@@ -490,7 +490,24 @@ def save_items(
         # go over items and add them to the collection
         for item in items:
             link = collection.add_item(item)
-            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(item.datetime)
+            # bubble up information we want to the link
+            # it is possible for datetime to be null, if it is start and end datetime have to exist
+            item_datetime = item.get_datetime()
+            if item_datetime:
+                link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(item_datetime)
+            else:
+                link.extra_fields["start_datetime"] = format_datetime_to_isostring_zulu(
+                    parse_datestring_to_tz_aware_datetime(item.properties["start_datetime"])
+                )
+                link.extra_fields["end_datetime"] = format_datetime_to_isostring_zulu(
+                    parse_datestring_to_tz_aware_datetime(item.properties["end_datetime"])
+                )
+
+            # if endpoint_config.get("Assets")
+            link.extra_fields["item"] = item.id
+
+            if item.assets.get("cog_default"):
+                link.extra_fields["cog_href"] = item.assets["cog_default"].href
         collection.update_extent_from_items()
 
 

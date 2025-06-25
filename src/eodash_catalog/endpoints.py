@@ -252,9 +252,8 @@ def process_STACAPI_Endpoint(
     )
     # We keep track of potential duplicate times in this list
     added_times = {}
-    any_item_added = False
+    items = []
     for item in results.items():
-        any_item_added = True
         item_datetime = item.get_datetime()
         if item_datetime is not None:
             iso_date = item_datetime.isoformat()[:10]
@@ -264,7 +263,6 @@ def process_STACAPI_Endpoint(
             if iso_date in added_times:
                 continue
             added_times[iso_date] = True
-        link = collection.add_item(item)
         if options.tn:
             if item.assets.get("cog_default"):
                 generate_thumbnail(
@@ -275,12 +273,10 @@ def process_STACAPI_Endpoint(
         # Check if we can create visualization link
         if endpoint_config.get("Assets"):
             add_visualization_info(item, collection_config, endpoint_config, item.id)
-            link.extra_fields["item"] = item.id
         elif item.assets.get("cog_default"):
             add_visualization_info(
                 item, collection_config, endpoint_config, item.assets["cog_default"].href
             )
-            link.extra_fields["cog_href"] = item.assets["cog_default"].href
         elif item_datetime:
             add_visualization_info(
                 item, collection_config, endpoint_config, datetimes=[item_datetime]
@@ -299,23 +295,20 @@ def process_STACAPI_Endpoint(
         if root_collection:
             item.set_collection(root_collection)
 
-        # bubble up information we want to the link
-        # it is possible for datetime to be null, if it is start and end datetime have to exist
-        if item_datetime:
-            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(item_datetime)
-        else:
-            link.extra_fields["start_datetime"] = format_datetime_to_isostring_zulu(
-                parse_datestring_to_tz_aware_datetime(item.properties["start_datetime"])
-            )
-            link.extra_fields["end_datetime"] = format_datetime_to_isostring_zulu(
-                parse_datestring_to_tz_aware_datetime(item.properties["end_datetime"])
-            )
         add_projection_info(
             endpoint_config,
             item,
         )
-    if any_item_added:
-        collection.update_extent_from_items()
+        items.append(item)
+
+    if len(items) > 0:
+        save_items(
+            collection,
+            items,
+            options.outputpath,
+            catalog.id,
+            options.gp,
+        )
     else:
         LOGGER.warn(
             f"""NO items returned for
