@@ -39,7 +39,6 @@ from eodash_catalog.stac_handling import (
 from eodash_catalog.utils import (
     Options,
     RaisingThread,
-    add_single_item_if_collection_empty,
     iter_len_at_least,
     merge_bboxes,
     read_config_file,
@@ -249,7 +248,12 @@ def process_collection_file(
                     )
                 elif endpoint_config["Name"] == "marinedatastore":
                     collection = handle_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, wmts=True
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        catalog,
+                        options,
+                        wmts=True,
                     )
                 elif endpoint_config["Name"] == "xcube":
                     collection = handle_xcube_endpoint(
@@ -257,16 +261,21 @@ def process_collection_file(
                     )
                 elif endpoint_config["Name"] == "rasdaman":
                     collection = handle_rasdaman_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config, endpoint_config, collection_config, catalog, options
                     )
                 elif endpoint_config["Name"] == "WMS":
                     collection = handle_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config, endpoint_config, collection_config, catalog, options
                     )
                 elif endpoint_config["Name"] == "JAXA_WMTS_PALSAR":
                     # somewhat one off creation of individual WMTS layers as individual items
                     collection = handle_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, wmts=True
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        catalog,
+                        options,
+                        wmts=True,
                     )
                 elif endpoint_config["Name"] == "Collection-only":
                     collection = handle_collection_only(
@@ -290,7 +299,7 @@ def process_collection_file(
                 else:
                     raise ValueError("Type of Resource is not supported")
                 if collection:
-                    add_single_item_if_collection_empty(endpoint_config, collection)
+                    # add_single_item_if_collection_empty(endpoint_config, collection)
                     add_projection_info(endpoint_config, collection)
                     add_to_catalog(collection, catalog, endpoint_config, collection_config, disable)
                 else:

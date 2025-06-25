@@ -8,10 +8,13 @@ from datetime import datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
 
+import pyarrow.compute as pc
 import requests
+import stac_geoparquet as stacgp
 from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries, TemporalExtent
 from pystac_client import Client
-from shapely import wkt
+from shapely import geometry as sgeom
+from shapely import wkb, wkt
 from shapely.geometry import mapping
 from structlog import get_logger
 
@@ -27,7 +30,7 @@ from eodash_catalog.stac_handling import (
 from eodash_catalog.thumbnails import generate_thumbnail
 from eodash_catalog.utils import (
     Options,
-    create_geojson_from_bbox,
+    create_geometry_from_bbox,
     filter_time_entries,
     format_datetime_to_isostring_zulu,
     generate_veda_cog_link,
@@ -549,7 +552,7 @@ def handle_GeoDB_endpoint(
                     # create geometry from wkt
                     geometry = mapping(wkt.loads(v["sub_aoi"]))
                 else:
-                    geometry = create_geojson_from_bbox(bbox)
+                    geometry = create_geometry_from_bbox(bbox)
                 item = Item(
                     id=v["time"],
                     bbox=bbox,
@@ -692,6 +695,7 @@ def handle_WMS_endpoint(
     endpoint_config: dict,
     collection_config: dict,
     catalog: Catalog,
+    options: Options,
     wmts: bool = False,
 ) -> Collection:
     collection = get_or_create_collection(
@@ -712,6 +716,10 @@ def handle_WMS_endpoint(
     # optionally filter time results
     if query := endpoint_config.get("Query"):
         datetimes = filter_time_entries(datetimes, query)
+
+    # we first collect the items and then decide if to save as geoparquet or individual items
+    items = []
+
     # Create an item per time to allow visualization in stac clients
     if len(datetimes) > 0:
         for dt in datetimes:
@@ -719,19 +727,75 @@ def handle_WMS_endpoint(
                 id=format_datetime_to_isostring_zulu(dt),
                 bbox=spatial_extent,
                 properties={},
-                geometry=None,
+                geometry=create_geometry_from_bbox(spatial_extent),
                 datetime=dt,
                 stac_extensions=[
                     "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                 ],
+                assets={"dummy_asset": Asset(href="")},
             )
             add_projection_info(endpoint_config, item)
             add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
+            items.append(item)
+    else:
+        LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
+
+    if options.gp:
+        buildcatpath = f"{options.outputpath}/{catalog_config["id"]}"
+        colpath = f"{collection_config["Name"]}/{collection_config["Name"]}"
+        # try to find default geoparquet file url
+        base_url = f"{catalog_config.get("endpoint")}{catalog_config["id"]}/{colpath}"
+        gp_url = f"{base_url}/{collection_config["Name"]}.parquet"
+        """
+        # check if geoparquet location is specified in collection_config
+        if endpoint_config.get("GeoParquetPath"):
+            gp_url = endpoint_config.get("GeoParquetPath")
+        # try to fetch and load geoparquet file
+        if gp_url and not options.force:
+            try:
+                table = stacgp.arrow.read_parquet(gp_url)
+                # check if datetime is present
+                if "datetime" in table.column_names:
+                    collection.extent.temporal = TemporalExtent(
+                        [pc.min(table["datetime"]).as_py(), pc.max(table["datetime"]).as_py()]
+                    )
+                if "geometry" in table.column_names:
+                    geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
+                    bbox = sgeom.MultiPolygon(geoms).bounds
+                    collection.extent.spatial = SpatialExtent([bbox])
+                collection.id = collection_config["Name"]
+                collection.title = collection_config["Name"]
+                collection.description = collection_config.get("Description", "")
+                return collection
+            except Exception as e:
+                LOGGER.error(f"Failed to read geoparquet file: {e}")
+        """
+        record_batch_reader = stacgp.arrow.parse_stac_items_to_arrow(items)
+        table = record_batch_reader.read_all()
+        output_path = f"{buildcatpath}/{colpath}"
+        os.makedirs(output_path, exist_ok=True)
+        stacgp.arrow.to_parquet(table, f"{output_path}/{collection.id}.parquet")
+        gp_link = Link(
+            rel="items",
+            target=f"./{collection.id}.parquet",
+            media_type="application/vnd.apache.parquet",
+            title="GeoParquet Items",
+        )
+        collection.add_link(gp_link)
+        # add extent information to the collection
+        min_datetime = pc.min(table["datetime"]).as_py()
+        max_datetime = pc.max(table["datetime"]).as_py()
+        print(f"Min datetime: {min_datetime}, Max datetime: {max_datetime}")
+        collection.extent.temporal = TemporalExtent([min_datetime, max_datetime])
+        geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
+        bbox = sgeom.MultiPolygon(geoms).bounds
+        collection.extent.spatial = SpatialExtent([bbox])
+    else:
+        # go over items and add them to the collection
+        for item in items:
             link = collection.add_item(item)
             link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
         collection.update_extent_from_items()
-    else:
-        LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
 
     # Check if we should overwrite bbox
     if endpoint_config.get("OverwriteBBox"):
@@ -1099,7 +1163,7 @@ def handle_raw_source(
                 id=format_datetime_to_isostring_zulu(dt),
                 bbox=bbox,
                 properties={},
-                geometry=create_geojson_from_bbox(bbox)["features"][0]["geometry"],
+                geometry=create_geometry_from_bbox(bbox),
                 datetime=dt,
                 assets=assets,
                 extra_fields={},

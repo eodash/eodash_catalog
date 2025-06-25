@@ -45,7 +45,14 @@ def create_geojson_point(lon: int | float, lat: int | float) -> dict[str, Any]:
     return {"type": "Feature", "geometry": point, "properties": {}}
 
 
-def create_geojson_from_bbox(bbox: list[float | int]) -> dict:
+def create_geometry_from_bbox(bbox: list[float | int]) -> dict:
+    """
+    Create a GeoJSON geometry from a bounding box.
+    Args:
+        bbox (list[float | int]): A list containing the bounding box coordinates in the format [min_lon, min_lat, max_lon, max_lat].
+    Returns:
+        dict: A GeoJSON geometry object representing the bounding box.
+    """
     coordinates = [
         [bbox[0], bbox[1]],
         [bbox[2], bbox[1]],
@@ -53,11 +60,7 @@ def create_geojson_from_bbox(bbox: list[float | int]) -> dict:
         [bbox[0], bbox[3]],
         [bbox[0], bbox[1]],
     ]
-    polygon = {"type": "Polygon", "coordinates": [coordinates]}
-
-    feature = {"type": "Feature", "geometry": polygon, "properties": {}}
-    feature_collection = {"type": "FeatureCollection", "features": [feature]}
-    return feature_collection
+    return {"type": "Polygon", "coordinates": [coordinates]}
 
 
 def retrieveExtentFromWCS(
