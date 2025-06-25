@@ -49,7 +49,8 @@ def create_geometry_from_bbox(bbox: list[float | int]) -> dict:
     """
     Create a GeoJSON geometry from a bounding box.
     Args:
-        bbox (list[float | int]): A list containing the bounding box coordinates in the format [min_lon, min_lat, max_lon, max_lat].
+        bbox (list[float | int]): A list containing the bounding box coordinates in the format
+        [min_lon, min_lat, max_lon, max_lat].
     Returns:
         dict: A GeoJSON geometry object representing the bounding box.
     """

@@ -743,10 +743,10 @@ def handle_WMS_endpoint(
     if options.gp:
         buildcatpath = f"{options.outputpath}/{catalog_config["id"]}"
         colpath = f"{collection_config["Name"]}/{collection_config["Name"]}"
+        """
         # try to find default geoparquet file url
         base_url = f"{catalog_config.get("endpoint")}{catalog_config["id"]}/{colpath}"
         gp_url = f"{base_url}/{collection_config["Name"]}.parquet"
-        """
         # check if geoparquet location is specified in collection_config
         if endpoint_config.get("GeoParquetPath"):
             gp_url = endpoint_config.get("GeoParquetPath")
