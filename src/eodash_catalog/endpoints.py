@@ -306,7 +306,8 @@ def process_STACAPI_Endpoint(
             collection,
             items,
             options.outputpath,
-            catalog.id,
+            catalog_config["id"],
+            collection_config["Name"],
             options.gp,
         )
     else:
@@ -732,7 +733,9 @@ def handle_WMS_endpoint(
         LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
 
     # Save items either into collection as individual items or as geoparquet
-    save_items(collection, items, options.outputpath, catalog.id, options.gp)
+    save_items(
+        collection, items, options.outputpath, catalog.id, collection_config["Name"], options.gp
+    )
 
     # Check if we should overwrite bbox
     if endpoint_config.get("OverwriteBBox"):

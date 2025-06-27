@@ -451,6 +451,7 @@ def save_items(
     items: list[Item],
     output_path: str,
     catalog_id: str,
+    collection_id: str,
     use_geoparquet: bool = False,
 ) -> None:
     """
@@ -461,16 +462,20 @@ def save_items(
         items (list[Item]): The list of items to save.
         output_path (str): The path where the items will be saved.
         catalog_id (str): The ID of the catalog to which the collection belongs.
+        collection_id (str): The ID of the collection to which the items belong.
         use_geoparquet (bool): If True, save items as a single GeoParquet file.
             If False, add items to the collection and save them individually.
     """
     if use_geoparquet:
+        if collection_id is None:
+            collection_id = collection.id
         buildcatpath = f"{output_path}/{catalog_id}"
-        colpath = f"{collection.id}/{collection.id}"
+        colpath = f"{collection_id}/{collection_id}"
         record_batch_reader = stacgp.arrow.parse_stac_items_to_arrow(items)
         table = record_batch_reader.read_all()
         output_path = f"{buildcatpath}/{colpath}"
         os.makedirs(output_path, exist_ok=True)
+        print(f"{output_path}/{collection.id}.parquet")
         stacgp.arrow.to_parquet(table, f"{output_path}/{collection.id}.parquet")
         gp_link = Link(
             rel="items",
@@ -486,6 +491,15 @@ def save_items(
         geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
         bbox = sgeom.MultiPolygon(geoms).bounds
         collection.extent.spatial = SpatialExtent([bbox])
+        # Make sure to also reference the geoparquet as asset
+        collection.add_asset(
+            "geoparquet",
+            Asset(
+                href=f"./{collection.id}.parquet",
+                media_type="application/vnd.apache.parquet",
+                title="GeoParquet Items",
+            ),
+        )
     else:
         # go over items and add them to the collection
         for item in items:

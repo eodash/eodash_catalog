@@ -39,6 +39,7 @@ from eodash_catalog.stac_handling import (
 from eodash_catalog.utils import (
     Options,
     RaisingThread,
+    add_single_item_if_collection_empty,
     iter_len_at_least,
     merge_bboxes,
     read_config_file,
@@ -299,7 +300,9 @@ def process_collection_file(
                 else:
                     raise ValueError("Type of Resource is not supported")
                 if collection:
-                    # add_single_item_if_collection_empty(endpoint_config, collection)
+                    # check if geoparquet flag is used, as these collections have no items
+                    if not options.gp:
+                        add_single_item_if_collection_empty(endpoint_config, collection)
                     add_projection_info(endpoint_config, collection)
                     add_to_catalog(collection, catalog, endpoint_config, collection_config, disable)
                 else:
