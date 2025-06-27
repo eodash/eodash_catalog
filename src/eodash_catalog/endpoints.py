@@ -307,7 +307,7 @@ def process_STACAPI_Endpoint(
             items,
             options.outputpath,
             catalog_config["id"],
-            collection_config["Name"],
+            f"{collection_config['Name']}/{collection_config['Name']}",
             options.gp,
         )
     else:
@@ -473,7 +473,11 @@ def handle_rasdaman_endpoint(
 
 
 def handle_GeoDB_endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    catalog: Catalog,
+    options: Options,
 ) -> Collection:
     # ID of collection is data["Name"] instead of CollectionId to be able to
     # create more STAC collections from one geoDB table
@@ -533,6 +537,7 @@ def handle_GeoDB_endpoint(
             collection, key, sc_config, catalog_config, endpoint_config
         )
         if input_data:
+            items = []
             for v in values:
                 # add items based on inputData fields for each time step available in values
                 first_match = next(
@@ -551,6 +556,7 @@ def handle_GeoDB_endpoint(
                     properties={},
                     geometry=geometry,
                     datetime=time_object,
+                    assets={"dummy_asset": Asset(href="")},
                 )
                 if first_match:
                     match first_match["Type"]:
@@ -586,15 +592,15 @@ def handle_GeoDB_endpoint(
                                 extra_fields=extra_fields,
                             )
                             item.add_link(link)
-                            itemlink = locations_collection.add_item(item)
-                            itemlink.extra_fields["datetime"] = (
-                                f"{format_datetime_to_isostring_zulu(time_object)}Z"
-                            )
-
-            # add_visualization_info(
-            #     item, collection_config, endpoint_config, file_url=first_match.get("FileUrl")
-            # )
-            locations_collection.update_extent_from_items()
+                            items.append(item)
+            save_items(
+                locations_collection,
+                items,
+                options.outputpath,
+                catalog_config["id"],
+                f"{collection_config['Name']}/{collection_config['Name']}/{locations_collection.id}",
+                options.gp,
+            )
         else:
             # set spatial extent from geodb
             locations_collection.extent.spatial.bboxes = [bbox]
@@ -626,32 +632,30 @@ def handle_GeoDB_endpoint(
     add_collection_information(catalog_config, collection, collection_config)
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
     collection.extra_fields["locations"] = True
-    if not input_data:
-        # we have no items, extents of collection need to be updated manually
-        merged_bbox = merge_bboxes(
-            [
-                c_child.extent.spatial.bboxes[0]
-                for c_child in collection.get_children()
-                if isinstance(c_child, Collection)
-            ]
-        )
-        collection.extent.spatial.bboxes = [merged_bbox]
-        # Add bbox extents from children
-        for c_child in collection.get_children():
-            if isinstance(c_child, Collection) and merged_bbox != c_child.extent.spatial.bboxes[0]:
-                collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
-        # set time extent of collection
-        individual_datetimes = []
-        for c_child in collection.get_children():
-            if isinstance(c_child, Collection) and isinstance(
-                c_child.extent.temporal.intervals[0], list
-            ):
-                individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
-        time_extent = [min(individual_datetimes), max(individual_datetimes)]
-        collection.extent.temporal = TemporalExtent([time_extent])
-    else:
-        # we can update from items
-        collection.update_extent_from_items()
+    # retrieve extents from children
+    merged_bbox = merge_bboxes(
+        [
+            c_child.extent.spatial.bboxes[0]
+            for c_child in collection.get_children()
+            if isinstance(c_child, Collection)
+        ]
+    )
+    collection.extent.spatial.bboxes = [merged_bbox]
+    # Add bbox extents from children
+    for c_child in collection.get_children():
+        if isinstance(c_child, Collection) and merged_bbox != c_child.extent.spatial.bboxes[0]:
+            collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+    # set time extent of collection
+    individual_datetimes = []
+    for c_child in collection.get_children():
+        if isinstance(c_child, Collection) and isinstance(
+            c_child.extent.temporal.intervals[0], list
+        ):
+            individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
+    individual_datetimes = list(filter(lambda x: x is not None, individual_datetimes))
+    time_extent = [min(individual_datetimes), max(individual_datetimes)]
+    collection.extent.temporal = TemporalExtent([time_extent])
+
     collection.summaries = Summaries(
         {
             "cities": cities,
@@ -734,7 +738,12 @@ def handle_WMS_endpoint(
 
     # Save items either into collection as individual items or as geoparquet
     save_items(
-        collection, items, options.outputpath, catalog.id, collection_config["Name"], options.gp
+        collection,
+        items,
+        options.outputpath,
+        catalog_config["id"],
+        f"{collection_config['Name']}/{collection_config['Name']}",
+        options.gp,
     )
 
     # Check if we should overwrite bbox
