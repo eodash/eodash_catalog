@@ -76,7 +76,11 @@ def process_WCS_rasdaman_Endpoint(
 
 
 def process_STAC_Datacube_Endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    catalog: Catalog,
+    options: Options,
 ) -> Collection:
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
@@ -115,7 +119,7 @@ def process_STAC_Datacube_Endpoint(
     # optionally subset time results based on config
     if query := endpoint_config.get("Query"):
         datetimes = filter_time_entries(datetimes, query)
-
+    items = []
     for dt in datetimes:
         new_item = Item(
             id=format_datetime_to_isostring_zulu(dt),
@@ -123,16 +127,23 @@ def process_STAC_Datacube_Endpoint(
             properties={},
             geometry=item.geometry,
             datetime=dt,
+            assets={"dummy_asset": Asset(href="")},
         )
         add_visualization_info(new_item, collection_config, endpoint_config)
-        link = collection.add_item(new_item)
-        # bubble up information we want to the link
-        link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
+        items.append(new_item)
 
+    save_items(
+        collection,
+        items,
+        options.outputpath,
+        catalog_config["id"],
+        f"{collection_config['Name']}/{collection_config['Name']}",
+        options.gp,
+    )
     unit = variables.get(endpoint_config.get("Variable")).get("unit")
     if unit and "yAxis" not in collection_config:
         collection_config["yAxis"] = unit
-    if datetimes:
+    if datetimes and not options.gp:
         collection.update_extent_from_items()
     else:
         LOGGER.warn(f"NO datetimes returned for collection: {collection_id}!")
@@ -477,13 +488,18 @@ def handle_SH_WMS_endpoint(
 
 
 def handle_xcube_endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    catalog: Catalog,
+    options: Options,
 ) -> Collection:
     collection = process_STAC_Datacube_Endpoint(
         catalog_config=catalog_config,
         endpoint_config=endpoint_config,
         collection_config=collection_config,
         catalog=catalog,
+        options=options,
     )
 
     add_example_info(collection, collection_config, endpoint_config, catalog_config)

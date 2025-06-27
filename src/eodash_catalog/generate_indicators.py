@@ -258,7 +258,7 @@ def process_collection_file(
                     )
                 elif endpoint_config["Name"] == "xcube":
                     collection = handle_xcube_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config, endpoint_config, collection_config, catalog, options
                     )
                 elif endpoint_config["Name"] == "rasdaman":
                     collection = handle_rasdaman_endpoint(
