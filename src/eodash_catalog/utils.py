@@ -249,43 +249,9 @@ def recursive_save(stac_object: Catalog, no_items: bool = False, geo_parquet: bo
     for child in stac_object.get_children():
         recursive_save(child, no_items, geo_parquet)
     if not no_items:
-        if geo_parquet:
-            create_geoparquet_items(stac_object)
-        else:
-            for item in stac_object.get_items():
-                item.save_object()
+        for item in stac_object.get_items():
+            item.save_object()
     stac_object.save_object()
-
-
-def create_geoparquet_items(stacObject: Catalog):
-    if iter_len_at_least(stacObject.get_items(), 1):
-        stac_dir_arr = stacObject.self_href.split("/")
-        stac_dir_arr.pop()
-        stac_dir_path = "/".join(stac_dir_arr)
-        items_stacgp_path = f"{stac_dir_path}/items.parquet"
-        to_stac_geoparquet(stacObject, items_stacgp_path)
-        gp_link = Link(
-            rel="items",
-            target=items_stacgp_path,
-            media_type="application/vnd.apache.parquet",
-            title="GeoParquet Items",
-        )
-        stacObject.clear_links(rel="item")
-        stacObject.add_links([gp_link])
-
-
-def to_stac_geoparquet(stacObject: Catalog, path: str):
-    items = []
-    for item in stacObject.get_items():
-        if not item.geometry:
-            item.geometry = create_geojson_point(0, 0)["geometry"]
-        if not item.assets:
-            item.assets = {"dummy_asset": Asset(href="")}
-        items.append(item.to_dict())
-    record_batch_reader = stacgp.arrow.parse_stac_items_to_arrow(items)
-    table = record_batch_reader.read_all()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    stacgp.arrow.to_parquet(table, path)
 
 
 def iter_len_at_least(i, n: int) -> int:
@@ -451,7 +417,7 @@ def save_items(
     items: list[Item],
     output_path: str,
     catalog_id: str,
-    collection_id: str,
+    colpath: str,
     use_geoparquet: bool = False,
 ) -> None:
     """
@@ -462,20 +428,23 @@ def save_items(
         items (list[Item]): The list of items to save.
         output_path (str): The path where the items will be saved.
         catalog_id (str): The ID of the catalog to which the collection belongs.
-        collection_id (str): The ID of the collection to which the items belong.
+        colpath (str): The expected path where to save the files relative to the catalog root.
         use_geoparquet (bool): If True, save items as a single GeoParquet file.
             If False, add items to the collection and save them individually.
     """
-    if use_geoparquet:
-        if collection_id is None:
-            collection_id = collection.id
+    if use_geoparquet and len(items) > 0:
+        LOGGER.info(
+            "Saving items as GeoParquet file",
+            collection_id=collection.id,
+            item_count=len(items),
+        )
+        if colpath is None:
+            colpath = f"{collection.id}/{collection.id}"
         buildcatpath = f"{output_path}/{catalog_id}"
-        colpath = f"{collection_id}/{collection_id}"
         record_batch_reader = stacgp.arrow.parse_stac_items_to_arrow(items)
         table = record_batch_reader.read_all()
         output_path = f"{buildcatpath}/{colpath}"
         os.makedirs(output_path, exist_ok=True)
-        print(f"{output_path}/{collection.id}.parquet")
         stacgp.arrow.to_parquet(table, f"{output_path}/{collection.id}.parquet")
         gp_link = Link(
             rel="items",
@@ -502,6 +471,11 @@ def save_items(
         )
     else:
         # go over items and add them to the collection
+        LOGGER.info(
+            "Adding items to collection to be saved individually",
+            collection_id=collection.id,
+            item_count=len(items),
+        )
         for item in items:
             link = collection.add_item(item)
             # bubble up information we want to the link
