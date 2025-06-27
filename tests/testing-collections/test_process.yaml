@@ -1,0 +1,31 @@
+Name: process
+Title: process_demo
+EodashIdentifier: process
+Description: ''
+Themes:
+  - agriculture
+Tags:
+  - placeholder
+Satellite:
+  - placeholder
+Sensor:
+  - placeholder
+Agency:
+  - placeholder
+Resources:
+  - Name: Collection-only
+    EndPoint: Collection-only
+    OverwriteBBox: [-180, 90, 180, -90]
+Process:
+  Name: harshness
+  JsonForm: process_example/definitions/harshness_form.json
+  # VegaDefinition: https://santilland.github.io/process_example/definitions/geodbvega.json
+  EndPoints:
+    - Identifier: harshnesscollection
+      Url: https://harshness-map.gtif.eox.at/processes/execute-create-harshness/execution
+      Method: POST
+      EndPoint: eoxhub_workspaces
+      Body: process_example/definitions/harshness_body.json
+      Type: image/tiff
+      Flatstyle: process_example/definitions/harshness_style.json
+      

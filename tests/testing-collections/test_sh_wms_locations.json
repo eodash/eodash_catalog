@@ -1,0 +1,81 @@
+{
+  "Name": "Lakes_Sentinel1",
+  "Title": "SH WMS with Locations",
+  "EodashIdentifier": "Lakes_Sentinel1",
+  "Description": "Lakes_Sentinel1/Lakes_Sentinel1.md",
+  "Themes": [
+    "water"
+  ],
+  "Tags": [
+    "Sentinel",
+    "Open data",
+    "Water quality",
+    "Water extent"
+  ],
+  "DataSource": {
+    "Spaceborne": {
+      "Satellite": [
+        "Sentinel-1"
+      ],
+      "Sensor": [
+        "C-SAR"
+      ]
+    }
+  },
+  "Agency": [
+    "European Commission",
+    "ESA"
+  ],
+  "Image": "Lakes_Sentinel1/thumbnail.jpg",
+  "Locations": [
+    {
+      "Identifier": "TonleSap_VV",
+      "Country": [
+        "KH"
+      ],
+      "Name": "Tonl\u00e9 Sap (S1-VV)",
+      "Point": [
+        104.2,
+        12.7
+      ],
+      "Bbox": [
+        101.938,
+        11.945,
+        106.37,
+        14.0674
+      ],
+      "Times": [
+        "2015-05-15",
+        "2015-10-18",
+        "2016-03-22",
+        "2016-10-24",
+        "2017-10-07",
+        "2018-05-11",
+        "2018-10-20",
+        "2019-05-06",
+        "2019-10-09",
+        "2020-05-12",
+        "2020-10-15",
+        "2021-05-07",
+        "2021-10-10",
+        "2021-10-24",
+        "2022-05-14",
+        "2022-10-17"
+      ]
+    }
+  ],
+  "Resources": [
+    {
+      "EndPoint": "https://services.sentinel-hub.com",
+      "Name": "Sentinel Hub WMS",
+      "CollectionId": "sentinel-1-grd",
+      "LayerId": "SENTINEL_1_IW_VV"
+    }
+  ],
+  "Provider": [
+    {
+      "Name": "Copernicus",
+      "Url": "https://www.copernicus.eu/en/access-data/conventional-data-access-hubs"
+    }
+  ]
+}

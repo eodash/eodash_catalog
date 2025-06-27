@@ -1,0 +1,142 @@
+{
+  "Name": "4D_Greenland_Melt_Duration",
+  "Title": "SentinelHub with projection",
+  "EodashIdentifier": "4D_Greenland_Melt_Duration",
+  "Subtitle": "Greenland Melt Duration from 4D Greenland",
+  "Description": "4D_Greenland_Melt_Duration/4D_Greenland_Melt_Duration.md",
+  "Themes": [
+    "cryosphere"
+  ],
+  "Tags": [
+    "Greenland",
+    "Arctic",
+    "climate change",
+    "Polar regions",
+    "Open data",
+    "Open Science",
+    "Cryosphere",
+    "Glaciers",
+    "Ice cap",
+    "Melt",
+    "Scatterometer",
+    "C-SAR",
+    "Ice monitoring"
+  ],
+  "DataSource": {
+    "Spaceborne": {
+      "Satellite": [
+        "MetOp"
+      ],
+      "Sensor": [
+        "ASCAT"
+      ]
+    }
+  },
+  "Agency": [
+    "ESA",
+    "EUMETSAT"
+  ],
+  "Provider": [
+    {
+      "Name": "ESA",
+      "Url": "https://sentinel.esa.int/web/sentinel/"
+    },
+    {
+      "Name": "EUMETSAT",
+      "Url": "https://www.eumetsat.int/"
+    }
+  ],
+  "Citation": {
+    "Citation": "Citing the data:\nLindsley, R. D. and Long, D. G. (2010): Standard BYU ASCAT land/ice image products. Microwave Earth Remote Sensing Laboratory, 3\n"
+  },
+  "References": [
+    {
+      "Name": "4D Greenland Project Page",
+      "Url": "https://4dgreenland.eo4cryo.dk/"
+    },
+    {
+      "Name": "ESA Open Science Data Catalogue: 4D-Greenland",
+      "Url": "https://opensciencedata.esa.int/projects/4d-greenland/collection"
+    }
+  ],
+  "Resources": [
+    {
+      "EndPoint": "https://services.sentinel-hub.com/ogc/wms/{SH_INSTANCE_ID}",
+      "LayerId": "VIS_4D_GREENLAND_DAYS",
+      "Name": "Sentinel Hub",
+      "Type": "byoc",
+      "CollectionId": "6868b841-2c93-4a7d-bf0b-2f11c24bf9dd",
+      "DataProjection": {
+        "name": "EPSG:3413",
+        "def": "+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs"
+      }
+    }
+  ],
+  "Image": "4D_Greenland_Melt_Duration/thumbnail.jpg",
+  "Legend": "4D_Greenland_Melt_Duration/legend.png",
+  "Colorlegend": {
+    "domain": [
+      3,
+      210
+    ],
+    "range": [
+      "#306bff",
+      "#488eff",
+      "#5ca5ff",
+      "#6fb4ff",
+      "#82beff",
+      "#94c7ff",
+      "#a3d0ff",
+      "#b2d8ff",
+      "#c2deff",
+      "#cee5ff",
+      "#d8ecff",
+      "#e1f2ff",
+      "#e9f6ff",
+      "#f2fbff",
+      "#fbffff"
+    ],
+    "scaleType": "continuous",
+    "tickFormat": ".0f",
+    "title": "Ice melting [days]"
+  },
+  "MapProjection": {
+    "name": "EPSG:3413",
+    "def": "+proj=stere +lat_0=90 +lat_ts=70 +lon_0=-45 +x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs +type=crs",
+    "extent": [-5314763.31, -5314763.31, 5314763.31, 5314763.31]
+  },
+  "BaseLayers": [
+    {
+      "id": "cloudless-2023",
+      "name": "EOxCloudless 2023",
+      "url": "//s2maps-tiles.eu/wmts/1.0.0/s2cloudless-2023_3857/default/g/{z}/{y}/{x}.jpeg",
+      "media_type": "image/jpeg",
+      "attribution": "{ EOxCloudless 2023: <a xmlns:dct=\"http://purl.org/dc/terms/\" href=\"//s2maps.eu\" target=\"_blank\" property=\"dct:title\">Sentinel-2 cloudless - s2maps.eu</a> by <a xmlns:cc=\"http://creativecommons.org/ns#\" href=\"//eox.at\" target=\"_blank\" property=\"cc:attributionName\" rel=\"cc:attributionURL\">EOX IT Services GmbH</a> (Contains modified Copernicus Sentinel data 2023) }",
+      "maxNativeZoom": 17,
+      "protocol": "xyz",
+      "visible": false
+    },
+    {
+      "id": "OSM",
+      "name": "OSM Background",
+      "url": "//s2maps-tiles.eu/wmts/1.0.0/osm_3857/default/g/{z}/{y}/{x}.jpeg",
+      "media_type": "image/jpeg",
+      "attribution": "{ OSM: Data &copy; <a href=\"http://www.openstreetmap.org/copyright\" target=\"_blank\">OpenStreetMap</a> contributors and <a href=\"//maps.eox.at/#data\" target=\"_blank\">others</a>, Rendering &copy; <a href=\"http://eox.at\" target=\"_blank\">EOX</a> }",
+      "protocol": "xyz",
+      "visible": false
+    },
+    {
+      "id": "sx-cat_ortho680500",
+      "name": "Terrain Light Stereographic South",
+      "url": "//sxcat-demo.eox.at/sxcat_maps/wms",
+      "layers": "sx-cat_ortho680500",
+      "visible": true,
+      "protocol": "wms",
+      "DataProjection": {
+        "name": "ORTHO:680500",
+        "def": "+proj=ortho +lat_0=90 +lon_0=0 +x_0=0 +y_0=0 +ellps=WGS84 +units=m +no_defs"
+      },
+      "Attribution": "{ Terrain light: Data &copy; <a href=\"http://www.openstreetmap.org/copyright\" target=\"_blank\">OpenStreetMap</a> contributors and <a href=\"//maps.eox.at/#data\" target=\"_blank\">others</a>, Rendering &copy; <a href=\"http://eox.at\" target=\"_blank\">EOX</a> }"
+    }
+  ]
+}

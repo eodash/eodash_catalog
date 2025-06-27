@@ -1,0 +1,68 @@
+{
+  "Name": "phosphate",
+  "Title": "Phosphate",
+  "EodashIdentifier": "PO4",
+  "Description": "N/A\n",
+  "Themes": [
+    "Aquaculture"
+  ],
+  "CollectionGroup": "Water Chemistry",
+  "Satellite": [
+    "placeholder"
+  ],
+  "Sensor": [
+    "placeholder"
+  ],
+  "Agency": [
+    "CMEMS"
+  ],
+  "Tags": [
+    "model"
+  ],
+  "Colorlegend": {
+    "title": "Phosphate [mmol m-3]",
+    "range": [
+      "rgb(229, 239, 241)",
+      "rgb(112, 122, 212)",
+      "rgb(59, 15, 40)"
+    ],
+    "domain": [
+      0.0297,
+      3
+    ]
+  },
+  "Resources": [
+    {
+      "EndPoint": "https://wmts.marine.copernicus.eu/teroWmts/GLOBAL_ANALYSISFORECAST_BGC_001_028/cmems_mod_glo_bgc-nut_anfc_0.25deg_P1D-m_202311",
+      "Type": "WMTSCapabilities",
+      "Name": "marinedatastore",
+      "LayerId": "GLOBAL_ANALYSISFORECAST_BGC_001_028/cmems_mod_glo_bgc-nut_anfc_0.25deg_P1D-m_202311/po4",
+      "Query": {
+        "Start": "2021-01-01T00:00:00Z",
+        "End": "2030-01-01T00:00:00Z"
+      },
+      "Dimensions": {
+        "elevation": 0,
+        "style": "cmap:dense"
+      }
+    }
+  ],
+  "Provider": [
+    {
+      "Name": "E.U. Copernicus Marine Service Information (CMEMS)",
+      "Url": "https://data.marine.copernicus.eu/"
+    }
+  ],
+  "Process": {
+    "Name": "process_cmems",
+    "JsonForm": "https://raw.githubusercontent.com/gtif-cerulean/assets/refs/heads/main/jsonforms/cmems_jsonform.json",
+    "VegaDefinition": "https://raw.githubusercontent.com/gtif-cerulean/assets/refs/heads/main/chartdefs/po4.json",
+    "EndPoints": [
+      {
+        "Identifier": "process_cmems",
+        "Url": "https://cmems.gtif.eox.at/cmems?dataset_id=cmems_mod_glo_bgc-nut_anfc_0.25deg_P1D-m&variables=po4&start_datetime={{date_start}}&end_datetime={{date_end}}&minimum_longitude={{bbox.0}}&minimum_latitude={{bbox.1}}&maximum_longitude={{bbox.2}}&maximum_latitude={{bbox.3}}&minimum_depth={{depth}}&maximum_depth={{depth}}",
+        "Type": "application/json"
+      }
+    ]
+  }
+}

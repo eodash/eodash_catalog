@@ -1,0 +1,56 @@
+---
+Name: car_containers
+Title: GeoDB with locations
+EodashIdentifier: E9
+Subtitle: Change in the number of new cars at automobile factory
+Description: E9_car_containers/E9_car_containers.md
+Themes:
+- economy
+Tags:
+- Mobility
+- SAR
+- Multi-sensors
+- Production
+- Finished goods
+- Automotive
+- Motor vehicles
+DataSource:
+  Spaceborne:
+    Satellite:
+    - ALOS-2
+    - Sentinel-1
+    Sensor:
+    - PALSAR-2
+    - C-SAR
+Agency:
+- JAXA
+- ESA
+Locations: True
+Resources:
+- EndPoint: https://xcube-geodb.brockmann-consult.de/eodash/6bf15325-f6a0-4b6a-bf80-a2491753f8f2/
+  Name: GeoDB
+  Database: eodash
+  CollectionId: E9_tri
+  InputData:
+  - Identifier: ALOS-2
+    Url: https://services.sentinel-hub.com/ogc/wms/
+    Type: WMS
+    Layers: 'AWS_JAXA_CARS_CONTAINERS_ALOS2'
+    # TimeDelta: 720 # in minutes
+  - Identifier: Sentinel-1
+    Url: https://services.sentinel-hub.com/ogc/wms/
+    Type: WMS
+    Layers: 'E8_SENTINEL1'
+Provider:
+- Name: JAXA
+  Url: https://global.jaxa.jp/
+- Name: ESA
+  Url: https://www.esa.int/
+Process:
+  Name: GeoDB Statistics
+  JsonForm: https://santilland.github.io/process_example/definitions/geodbform.json
+  VegaDefinition: https://raw.githubusercontent.com/eurodatacube/eodash-assets/refs/heads/main/collections/E9_car_containers/chart.json
+  EndPoints:
+  - Identifier: process_geodb
+    Url: https://xcube-geodb.brockmann-consult.de/eodash/6bf15325-f6a0-4b6a-bf80-a2491753f8f2/eodash_E9_tri?aoi_id=eq.{{feature}}&select=site_name,city,color_code,time,aoi,measurement_value,indicator_value,reference_time,eo_sensor,reference_value,input_data
+    Type: application/json

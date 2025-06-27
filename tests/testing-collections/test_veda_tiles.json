@@ -1,0 +1,37 @@
+{
+  "Name": "NLK_lake_biwa",
+  "Title": "VEDA Tiles",
+  "EodashIdentifier": "NLK_lake_biwa",
+  "Description": "Biwa lake Landsat-8",
+  "Themes": [
+    "water"
+  ],
+  "Tags": [
+    "Lakes"
+  ],
+  "Satellite": [
+    "Landsat-8"
+  ],
+  "Sensor": [
+    "OLI"
+  ],
+  "Agency": [
+    "NASA"
+  ],
+  "Image": "NLK_lakes/thumbnail.jpg",
+  "Resources": [
+    {
+      "EndPoint": "https://openveda.cloud/api/stac/",
+      "Type": "tiles",
+      "Name": "VEDA",
+      "CollectionId": "landsat-c2l2-sr-lakes-lake-biwa",
+      "Assets": [
+        "red",
+        "green",
+        "blue"
+      ],
+      "ColorFormula": "gamma+RGB+2.7%2C+saturation+1.5%2C+sigmoidal+RGB+15+0.55",
+      "NoData": 0
+    }
+  ]
+}
