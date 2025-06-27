@@ -99,10 +99,10 @@ def process_catalog_file(file_path: str, options: Options):
 
     LOGGER.info("Started creation of collection files")
     start = time.time()
-    if options.ni or options.gp:
+    if options.ni:
         catalog_self_href = f'{options.outputpath}/{catalog_config["id"]}'
         catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
-        recursive_save(catalog, options.ni, options.gp)
+        recursive_save(catalog, options.ni)
     else:
         # For full catalog save with items this still seems to be faster
         catalog_self_href = catalog_config.get(
@@ -241,7 +241,7 @@ def process_collection_file(
                     )
                 elif endpoint_config["Name"] == "GeoDB":
                     collection = handle_GeoDB_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config, endpoint_config, collection_config, catalog, options
                     )
                 elif endpoint_config["Name"] == "VEDA":
                     collection = handle_VEDA_endpoint(
