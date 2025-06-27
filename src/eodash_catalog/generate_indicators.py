@@ -237,7 +237,7 @@ def process_collection_file(
                     )
                 elif endpoint_config["Name"] == "Sentinel Hub WMS":
                     collection = handle_SH_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config, endpoint_config, collection_config, catalog, options
                     )
                 elif endpoint_config["Name"] == "GeoDB":
                     collection = handle_GeoDB_endpoint(

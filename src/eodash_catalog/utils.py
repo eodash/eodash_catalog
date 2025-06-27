@@ -412,6 +412,38 @@ def get_full_url(url: str, catalog_config) -> str:
         return f'{catalog_config["assets_endpoint"]}{url}'
 
 
+def update_extents_from_collection_children(collection: Collection):
+    # retrieve extents from children
+    c_bboxes = [
+        c_child.extent.spatial.bboxes[0]
+        for c_child in collection.get_children()
+        if isinstance(c_child, Collection)
+    ]
+    if len(c_bboxes) > 0:
+        merged_bbox = merge_bboxes(c_bboxes)
+    else:
+        LOGGER.warn(
+            "No bounding boxes found in children of collection, using default bbox",
+        )
+        merged_bbox = [-180.0, -90.0, 180.0, 90.0]
+
+    collection.extent.spatial.bboxes = [merged_bbox]
+    # Add bbox extents from children
+    for c_child in collection.get_children():
+        if isinstance(c_child, Collection) and merged_bbox != c_child.extent.spatial.bboxes[0]:
+            collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+    # set time extent of collection
+    individual_datetimes = []
+    for c_child in collection.get_children():
+        if isinstance(c_child, Collection) and isinstance(
+            c_child.extent.temporal.intervals[0], list
+        ):
+            individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
+    individual_datetimes = list(filter(lambda x: x is not None, individual_datetimes))
+    time_extent = [min(individual_datetimes), max(individual_datetimes)]
+    collection.extent.temporal = TemporalExtent([time_extent])
+
+
 def save_items(
     collection: Collection,
     items: list[Item],
