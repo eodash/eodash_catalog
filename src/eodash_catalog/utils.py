@@ -432,7 +432,22 @@ def save_items(
         use_geoparquet (bool): If True, save items as a single GeoParquet file.
             If False, add items to the collection and save them individually.
     """
-    if use_geoparquet and len(items) > 0:
+    if len(items) == 0:
+        LOGGER.info(
+            "No items to save for collection, adding placeholder extents",
+            collection_id=collection.id,
+            item_count=len(items),
+        )
+        # we need to add some generic extent to the collection
+        collection.extent.spatial = SpatialExtent([[-180.0, -90.0, 180.0, 90.0]])
+        collection.extent.temporal = TemporalExtent(
+            [
+                datetime(1970, 1, 1, 0, 0, 0, tzinfo=pytztimezone("UTC")),
+                datetime.now(tz=pytztimezone("UTC")),
+            ]
+        )
+        return
+    if use_geoparquet:
         LOGGER.info(
             "Saving items as GeoParquet file",
             collection_id=collection.id,
@@ -445,10 +460,10 @@ def save_items(
         table = record_batch_reader.read_all()
         output_path = f"{buildcatpath}/{colpath}"
         os.makedirs(output_path, exist_ok=True)
-        stacgp.arrow.to_parquet(table, f"{output_path}/{collection.id}.parquet")
+        stacgp.arrow.to_parquet(table, f"{output_path}/items.parquet")
         gp_link = Link(
             rel="items",
-            target=f"./{collection.id}.parquet",
+            target="./items.parquet",
             media_type="application/vnd.apache.parquet",
             title="GeoParquet Items",
         )
@@ -464,9 +479,10 @@ def save_items(
         collection.add_asset(
             "geoparquet",
             Asset(
-                href=f"./{collection.id}.parquet",
+                href="./items.parquet",
                 media_type="application/vnd.apache.parquet",
                 title="GeoParquet Items",
+                roles=["collection-mirror"],
             ),
         )
     else:
@@ -491,9 +507,16 @@ def save_items(
                     parse_datestring_to_tz_aware_datetime(item.properties["end_datetime"])
                 )
 
-            # if endpoint_config.get("Assets")
+            # bubble up data assets based on role
+            collected_assets = [
+                asset.href
+                for asset in item.assets.values()
+                if asset.roles and ("data" in asset.roles or "default" in asset.roles)
+            ]
+            if collected_assets:
+                link.extra_fields["assets"] = collected_assets
+            # also bubble up item id and cog_href if available
             link.extra_fields["item"] = item.id
-
             if item.assets.get("cog_default"):
                 link.extra_fields["cog_href"] = item.assets["cog_default"].href
         collection.update_extent_from_items()

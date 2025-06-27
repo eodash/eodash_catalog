@@ -1085,11 +1085,13 @@ def handle_raw_source(
     endpoint_config: dict,
     collection_config: dict,
     catalog: Catalog,
+    options: Options,
 ) -> Collection:
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
     if len(endpoint_config.get("TimeEntries", [])) > 0:
+        items = []
         style_link = None
         for time_entry in endpoint_config["TimeEntries"]:
             assets = {}
@@ -1138,13 +1140,19 @@ def handle_raw_source(
                     },
                 )
                 item.add_link(style_link)
-            link = collection.add_item(item)
-            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
-            link.extra_fields["assets"] = [a["File"] for a in time_entry["Assets"]]
+            items.append(item)
+
+        save_items(
+            collection,
+            items,
+            options.outputpath,
+            catalog_config["id"],
+            f"{collection_config['Name']}/{collection_config['Name']}",
+            options.gp,
+        )
         # eodash v4 compatibility, adding last referenced style to collection
         if style_link:
             collection.add_link(style_link)
-        collection.update_extent_from_items()
     else:
         LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
 

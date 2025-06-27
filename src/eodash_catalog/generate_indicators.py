@@ -295,7 +295,7 @@ def process_collection_file(
                     "FlatGeobuf source",
                 ]:
                     collection = handle_raw_source(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config, endpoint_config, collection_config, catalog, options
                     )
                 else:
                     raise ValueError("Type of Resource is not supported")
