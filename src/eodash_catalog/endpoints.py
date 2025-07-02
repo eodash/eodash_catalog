@@ -831,7 +831,7 @@ def add_visualization_info(
         if dimensions_config := endpoint_config.get("Dimensions", {}):
             for key, value in dimensions_config.items():
                 # special replace for world_settlement_footprint
-                if collection_config["EodashIdentifier"] == "WSF":
+                if collection_config.get("EodashIdentifier") == "WSF":
                     value = value.replace(
                         "{time}", datetimes is not None and str(datetimes[0].year) or "{time}"
                     )

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 import requests
 import spdx_lookup as lookup
@@ -44,7 +44,7 @@ def get_or_create_collection(
             spatial_extent,
         ]
     )
-    temporal_extent = TemporalExtent([[datetime.now(), None]])
+    temporal_extent = TemporalExtent([[datetime.now(tz=timezone.utc), None]])
     if endpoint_config:
         times_datetimes = get_collection_datetimes_from_config(endpoint_config)
         if len(times_datetimes) > 0:

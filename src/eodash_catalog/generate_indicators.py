@@ -407,7 +407,8 @@ def add_to_catalog(
     if collection_config.get("Subtitle"):
         link.extra_fields["subtitle"] = collection_config["Subtitle"]
     link.extra_fields["title"] = collection.title
-    link.extra_fields["code"] = collection_config["EodashIdentifier"]
+    if collection_config.get("EodashIdentifier"):
+        link.extra_fields["code"] = collection_config["EodashIdentifier"]
     link.extra_fields["id"] = collection_config["Name"]
     if collection_config.get("Themes"):
         link.extra_fields["themes"] = collection_config["Themes"]
