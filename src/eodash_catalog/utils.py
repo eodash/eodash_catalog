@@ -503,6 +503,11 @@ def save_items(
         # add extent information to the collection
         min_datetime = pc.min(table["datetime"]).as_py()
         max_datetime = pc.max(table["datetime"]).as_py()
+        if not min_datetime:
+            # cases when datetime was null
+            # fallback to start_datetime
+            min_datetime = pc.min(table["start_datetime"]).as_py()
+            max_datetime = pc.max(table["start_datetime"]).as_py()
         collection.extent.temporal = TemporalExtent([min_datetime, max_datetime])
         geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
         bbox = sgeom.MultiPolygon(geoms).bounds
