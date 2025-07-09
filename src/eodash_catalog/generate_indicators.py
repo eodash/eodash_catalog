@@ -360,7 +360,7 @@ def process_collection_file(
             catalog, collection_config["Name"], collection_config, catalog_config, {}
         )
         coll_path_rel_to_root_catalog = (
-            f"{coll_path_rel_to_root_catalog}/{collection_config["Name"]}"
+            f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
         )
         locations = []
         countries = []

@@ -163,7 +163,7 @@ def handle_STAC_based_endpoint(
     options: Options,
     headers=None,
 ) -> Collection:
-    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config["Name"]}"
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     if collection_config.get("Locations"):
         root_collection = get_or_create_collection(
             catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
@@ -413,7 +413,7 @@ def handle_SH_WMS_endpoint(
     root_collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config["Name"]}"
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     if collection_config.get("Locations"):
         for location in collection_config["Locations"]:
             # create  and populate location collections based on times
@@ -556,7 +556,7 @@ def handle_GeoDB_endpoint(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config["Name"]}"
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     select = "?select=aoi,aoi_id,country,city,time,input_data,sub_aoi"
     url = (
         endpoint_config["EndPoint"]
@@ -757,7 +757,7 @@ def handle_WMS_endpoint(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config["Name"]}"
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     datetimes = get_collection_datetimes_from_config(endpoint_config)
     spatial_extent = collection.extent.spatial.to_dict().get("bbox", [-180, -90, 180, 90])[0]
     if endpoint_config.get("Type") != "OverwriteTimes" or not endpoint_config.get("OverwriteBBox"):
@@ -1152,7 +1152,7 @@ def handle_raw_source(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config["Name"]}"
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     if len(endpoint_config.get("TimeEntries", [])) > 0:
         items = []
         style_link = None
