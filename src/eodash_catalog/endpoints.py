@@ -320,11 +320,13 @@ def process_STACAPI_Endpoint(
         # we check if the item has any assets, if not we create a dummy asset
         if not item.assets:
             item.assets["dummy_asset"] = Asset(href="")
-        if 'cog_default' in item.assets and item.assets['cog_default'].extra_fields.get('raster:bands'):
+        if "cog_default" in item.assets and item.assets["cog_default"].extra_fields.get(
+            "raster:bands"
+        ):
             # saving via pyarrow does not work well with statistics ranges
             # Integer value -10183824872833024 is outside of the range exactly
             # representable by a IEEE 754 double precision value
-            item.assets['cog_default'].extra_fields.pop('raster:bands')
+            item.assets["cog_default"].extra_fields.pop("raster:bands")
         items.append(item)
 
     if len(items) > 0:
@@ -365,7 +367,12 @@ def handle_VEDA_endpoint(
     options: Options,
 ) -> Collection:
     collection = handle_STAC_based_endpoint(
-        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog, options
+        catalog_config,
+        endpoint_config,
+        collection_config,
+        coll_path_rel_to_root_catalog,
+        catalog,
+        options,
     )
     return collection
 
@@ -523,7 +530,11 @@ def handle_xcube_endpoint(
 
 
 def handle_rasdaman_endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, coll_path_rel_to_root_catalog: str, catalog: Catalog
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
 ) -> Collection:
     collection = process_WCS_rasdaman_Endpoint(
         catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog
@@ -723,7 +734,13 @@ def handle_SH_endpoint(
             endpoint_config["Type"] + "-" + endpoint_config["CollectionId"]
         )
     collection = handle_STAC_based_endpoint(
-        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog, options, headers
+        catalog_config,
+        endpoint_config,
+        collection_config,
+        coll_path_rel_to_root_catalog,
+        catalog,
+        options,
+        headers,
     )
     return collection
 

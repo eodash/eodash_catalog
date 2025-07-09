@@ -170,7 +170,7 @@ def process_indicator_file(
         catalog, indicator_config["Name"], indicator_config, catalog_config, {}
     )
     if indicator_config.get("Collections"):
-        coll_path_rel_to_root_catalog = indicator_config['Name']
+        coll_path_rel_to_root_catalog = indicator_config["Name"]
         for collection in indicator_config["Collections"]:
             process_collection_file(
                 catalog_config,
@@ -239,19 +239,39 @@ def process_collection_file(
                 collection = None
                 if endpoint_config["Name"] == "Sentinel Hub":
                     collection = handle_SH_endpoint(
-                        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog, options
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "Sentinel Hub WMS":
                     collection = handle_SH_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog, options
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "GeoDB":
                     collection = handle_GeoDB_endpoint(
-                        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog, options
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "VEDA":
                     collection = handle_VEDA_endpoint(
-                        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog, options
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "marinedatastore":
                     collection = handle_WMS_endpoint(
@@ -265,7 +285,12 @@ def process_collection_file(
                     )
                 elif endpoint_config["Name"] == "xcube":
                     collection = handle_xcube_endpoint(
-                        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog, options
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "rasdaman":
                     collection = handle_rasdaman_endpoint(
@@ -273,7 +298,12 @@ def process_collection_file(
                     )
                 elif endpoint_config["Name"] == "WMS":
                     collection = handle_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog, options
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "JAXA_WMTS_PALSAR":
                     # somewhat one off creation of individual WMTS layers as individual items
@@ -303,7 +333,12 @@ def process_collection_file(
                     "FlatGeobuf source",
                 ]:
                     collection = handle_raw_source(
-                        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog, options
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 else:
                     raise ValueError("Type of Resource is not supported")
@@ -324,7 +359,9 @@ def process_collection_file(
         parent_collection = get_or_create_collection(
             catalog, collection_config["Name"], collection_config, catalog_config, {}
         )
-        coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config["Name"]}"
+        coll_path_rel_to_root_catalog = (
+            f"{coll_path_rel_to_root_catalog}/{collection_config["Name"]}"
+        )
         locations = []
         countries = []
         for sub_coll_def in collection_config["Subcollections"]:
@@ -336,7 +373,9 @@ def process_collection_file(
                     countries.extend(sub_coll_def["Country"])
                 else:
                     countries.append(sub_coll_def["Country"])
-                coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{sub_coll_def['Collection']}"
+                coll_path_rel_to_root_catalog = (
+                    f"{coll_path_rel_to_root_catalog}/{sub_coll_def['Collection']}"
+                )
                 process_collection_file(
                     catalog_config,
                     "{}/{}".format(options.collectionspath, sub_coll_def["Collection"]),
@@ -368,7 +407,9 @@ def process_collection_file(
             else:
                 # create temp catalog to save collection
                 tmp_catalog = Catalog(id="tmp_catalog", description="temp catalog placeholder")
-                coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{sub_coll_def['Collection']}"
+                coll_path_rel_to_root_catalog = (
+                    f"{coll_path_rel_to_root_catalog}/{sub_coll_def['Collection']}"
+                )
                 process_collection_file(
                     catalog_config,
                     "{}/{}".format(options.collectionspath, sub_coll_def["Collection"]),

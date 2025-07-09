@@ -35,7 +35,7 @@ dependencies = [
   "OWSLib",
   "spdx-lookup<=0.3.3",
   "pystac[validation]<2",
-  "stac_geoparquet<=0.6.0"
+  "stac_geoparquet<=0.7.0"
 ]
 [project.scripts]
 eodash_catalog = "eodash_catalog.generate_indicators:process_catalogs"

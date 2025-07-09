@@ -13,4 +13,4 @@ stac_geoparquet==0.7.0
 # dev tooling
 pytest==8.1.1
 pytest-watch==4.2.0
-ruff==0.4.2
+ruff==0.6.9
