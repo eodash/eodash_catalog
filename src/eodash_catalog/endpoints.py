@@ -87,7 +87,7 @@ def process_STAC_Datacube_Endpoint(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
     add_visualization_info(collection, collection_config, endpoint_config)
-
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     stac_endpoint_url = endpoint_config["EndPoint"]
     if endpoint_config.get("Name") == "xcube":
         stac_endpoint_url = stac_endpoint_url + endpoint_config.get("StacEndpoint", "")
@@ -146,7 +146,7 @@ def process_STAC_Datacube_Endpoint(
         collection_config["yAxis"] = unit
     if datetimes and not options.gp:
         collection.update_extent_from_items()
-    else:
+    elif not datetimes:
         LOGGER.warn(f"NO datetimes returned for collection: {collection_id}!")
 
     add_collection_information(catalog_config, collection, collection_config)
@@ -209,11 +209,7 @@ def handle_STAC_based_endpoint(
                         location["OverwriteBBox"],
                     ]
                 )
-        root_collection.update_extent_from_items()
-        # Add bbox extents from children
-        for c_child in root_collection.get_children():
-            if isinstance(c_child, Collection):
-                root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+        update_extents_from_collection_children(root_collection)
     else:
         bbox = None
         if endpoint_config.get("Bbox"):
@@ -460,14 +456,11 @@ def handle_SH_WMS_endpoint(
             link.extra_fields["city"] = location["Name"]
             if location["Times"] and not options.gp:
                 collection.update_extent_from_items()
-            else:
+            elif not location["Times"]:
                 LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
             add_visualization_info(collection, collection_config, endpoint_config)
             add_process_info_child_collection(collection, catalog_config, collection_config)
-            if options.gp:
-                update_extents_from_collection_children(root_collection)
-            else:
-                root_collection.update_extent_from_items()
+        update_extents_from_collection_children(root_collection)
     else:
         # if locations are not provided, treat the collection as a
         # general proxy to the sentinel hub layer

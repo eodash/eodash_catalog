@@ -6,12 +6,11 @@ Indicator generator to harvest information from endpoints and generate catalog
 
 import os
 import time
-from datetime import datetime
 from typing import Any
 
 import click
 from dotenv import load_dotenv
-from pystac import Catalog, CatalogType, Collection, Link, Summaries, TemporalExtent
+from pystac import Catalog, CatalogType, Collection, Link, Summaries
 from pystac.layout import TemplateLayoutStrategy
 from pystac.validation import validate_all
 from structlog import get_logger
@@ -41,7 +40,6 @@ from eodash_catalog.utils import (
     RaisingThread,
     add_single_item_if_collection_empty,
     iter_len_at_least,
-    merge_bboxes,
     read_config_file,
     recursive_save,
     retry,
@@ -189,30 +187,7 @@ def process_indicator_file(
         parent_indicator.update_extent_from_items()
     # get shared extent of all of the collections
     # they might have OverwriteBBox and that would discard it for indicator
-    merged_bbox = merge_bboxes(
-        [
-            c_child.extent.spatial.bboxes[0]
-            for c_child in parent_indicator.get_children()
-            if isinstance(c_child, Collection)
-        ]
-    )
-    parent_indicator.extent.spatial.bboxes = [merged_bbox]
-    # Add bbox extents from children
-    for c_child in parent_indicator.get_children():
-        if isinstance(c_child, Collection) and merged_bbox != c_child.extent.spatial.bboxes[0]:
-            parent_indicator.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
-    # aggregate all time extents from the child collections and make it a indicator extent
-    individual_datetimes: list[datetime] = []
-    for c_child in parent_indicator.get_children():
-        if isinstance(c_child, Collection) and isinstance(
-            c_child.extent.temporal.intervals[0], list
-        ):
-            individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
-    # filter out None
-    individual_datetimes = list(filter(lambda x: x is not None, individual_datetimes))
-
-    time_extent = [min(individual_datetimes), max(individual_datetimes)]
-    parent_indicator.extent.temporal = TemporalExtent([time_extent])
+    update_extents_from_collection_children(parent_indicator)
     # extract collection information and add it to summary indicator level
     extract_indicator_info(parent_indicator)
     add_process_info(parent_indicator, catalog_config, indicator_config)
