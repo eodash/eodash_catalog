@@ -448,7 +448,7 @@ def handle_SH_WMS_endpoint(
                 items,
                 options.outputpath,
                 catalog_config["id"],
-                f"{coll_path_rel_to_root_catalog/{collection.id}}",
+                f"{coll_path_rel_to_root_catalog}/{collection.id}",
                 options.gp,
             )
             link = root_collection.add_child(collection)
