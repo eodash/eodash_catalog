@@ -1,0 +1,37 @@
+---
+Name: agricultural_production_area
+Title: GeoDB chart only
+EodashIdentifier: E10a2
+Subtitle: Agricultural production in Europe
+Description: E10a2_agricultural_production_area/E10a2_agricultural_production_area.md
+Themes:
+- agriculture
+Tags:
+- Copernicus
+- Open data
+DataSource:
+  Spaceborne:
+    Satellite:
+    - Sentinel-2
+    Sensor:
+    - MSI
+Agency:
+- ESA
+Provider:
+- Name: Université catholique de Louvain
+  Url: https://uclouvain.be/en/index.html
+- Name: Copernicus
+  Url: https://www.copernicus.eu/en/access-data/conventional-data-access-hubs
+Resources:
+- EndPoint: https://xcube-geodb.brockmann-consult.de/eodash/6bf15325-f6a0-4b6a-bf80-a2491753f8f2/
+  Name: GeoDB
+  Database: eodash
+  CollectionId: E10a2_tri
+Process:
+  Name: GeoDB Statistics
+  JsonForm: https://santilland.github.io/process_example/definitions/geodbform.json
+  VegaDefinition: https://raw.githubusercontent.com/eurodatacube/eodash-assets/refs/heads/main/collections/E10a2_agricultural_production_area/chart.json
+  EndPoints:
+  - Identifier: process_geodb
+    Url: https://xcube-geodb.brockmann-consult.de/eodash/6bf15325-f6a0-4b6a-bf80-a2491753f8f2/eodash_E10a2_tri?aoi_id=eq.{{feature}}&select=site_name,city,color_code,time,aoi,measurement_value,indicator_value,reference_time,eo_sensor,reference_value,input_data
+    Type: application/json

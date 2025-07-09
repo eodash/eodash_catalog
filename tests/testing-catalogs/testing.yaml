@@ -6,7 +6,22 @@ default_base_layers: "testing-layers/baselayers"
 default_overlay_layers: "testing-layers/overlays"
 assets_endpoint: "https://raw.githubusercontent.com/eurodatacube/eodash-assets/main/"
 collections:
+  # - test_cmems
+  # - test_cog
+  - test_CROPOMAT1
+  # - test_geodb_locations
+  # - test_geodb
+  # - test_geojson
+  - test_locations_processing
+  # - test_process
+  # - test_projection
+  - test_see_solar_energy
+  # - test_sh_wms_locations
+  # - test_sh_wms
+  - test_tif_demo1_json
+  - test_tif_demo1
+  - test_tif_demo2
+  # - test_veda_tiles
+  # - test_veda
   - test_wms_no_time
   - test_indicator
-  - test_CROPOMAT1
-  - test_see_solar_energy

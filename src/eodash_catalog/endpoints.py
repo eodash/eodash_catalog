@@ -27,15 +27,16 @@ from eodash_catalog.stac_handling import (
 from eodash_catalog.thumbnails import generate_thumbnail
 from eodash_catalog.utils import (
     Options,
-    create_geojson_from_bbox,
+    create_geometry_from_bbox,
     filter_time_entries,
     format_datetime_to_isostring_zulu,
     generate_veda_cog_link,
-    merge_bboxes,
     parse_datestring_to_tz_aware_datetime,
     replace_with_env_variables,
     retrieveExtentFromWCS,
     retrieveExtentFromWMSWMTS,
+    save_items,
+    update_extents_from_collection_children,
 )
 
 LOGGER = get_logger(__name__)
@@ -75,13 +76,18 @@ def process_WCS_rasdaman_Endpoint(
 
 
 def process_STAC_Datacube_Endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
+    options: Options,
 ) -> Collection:
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
     add_visualization_info(collection, collection_config, endpoint_config)
-
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     stac_endpoint_url = endpoint_config["EndPoint"]
     if endpoint_config.get("Name") == "xcube":
         stac_endpoint_url = stac_endpoint_url + endpoint_config.get("StacEndpoint", "")
@@ -114,7 +120,7 @@ def process_STAC_Datacube_Endpoint(
     # optionally subset time results based on config
     if query := endpoint_config.get("Query"):
         datetimes = filter_time_entries(datetimes, query)
-
+    items = []
     for dt in datetimes:
         new_item = Item(
             id=format_datetime_to_isostring_zulu(dt),
@@ -122,18 +128,25 @@ def process_STAC_Datacube_Endpoint(
             properties={},
             geometry=item.geometry,
             datetime=dt,
+            assets={"dummy_asset": Asset(href="")},
         )
         add_visualization_info(new_item, collection_config, endpoint_config)
-        link = collection.add_item(new_item)
-        # bubble up information we want to the link
-        link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
+        items.append(new_item)
 
+    save_items(
+        collection,
+        items,
+        options.outputpath,
+        catalog_config["id"],
+        coll_path_rel_to_root_catalog,
+        options.gp,
+    )
     unit = variables.get(endpoint_config.get("Variable")).get("unit")
     if unit and "yAxis" not in collection_config:
         collection_config["yAxis"] = unit
-    if datetimes:
+    if datetimes and not options.gp:
         collection.update_extent_from_items()
-    else:
+    elif not datetimes:
         LOGGER.warn(f"NO datetimes returned for collection: {collection_id}!")
 
     add_collection_information(catalog_config, collection, collection_config)
@@ -145,19 +158,23 @@ def handle_STAC_based_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
     headers=None,
 ) -> Collection:
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     if collection_config.get("Locations"):
         root_collection = get_or_create_collection(
             catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
         )
         for location in collection_config["Locations"]:
+            identifier = location.get("Identifier", uuid.uuid4())
             collection = process_STACAPI_Endpoint(
                 catalog_config=catalog_config,
                 endpoint_config=endpoint_config,
                 collection_config=collection_config,
+                coll_path_rel_to_root_catalog=f"{coll_path_rel_to_root_catalog}/{identifier}",
                 catalog=catalog,
                 options=options,
                 headers=headers,
@@ -168,7 +185,7 @@ def handle_STAC_based_endpoint(
             # Update identifier to use location as well as title
             # TODO: should we use the name as id? it provides much more
             # information in the clients
-            collection.id = location.get("Identifier", uuid.uuid4())
+            collection.id = identifier
             collection.title = location.get("Name")
             # See if description should be overwritten
             if location.get("Description"):
@@ -192,11 +209,7 @@ def handle_STAC_based_endpoint(
                         location["OverwriteBBox"],
                     ]
                 )
-        root_collection.update_extent_from_items()
-        # Add bbox extents from children
-        for c_child in root_collection.get_children():
-            if isinstance(c_child, Collection):
-                root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+        update_extents_from_collection_children(root_collection)
     else:
         bbox = None
         if endpoint_config.get("Bbox"):
@@ -205,6 +218,7 @@ def handle_STAC_based_endpoint(
             catalog_config=catalog_config,
             endpoint_config=endpoint_config,
             collection_config=collection_config,
+            coll_path_rel_to_root_catalog=coll_path_rel_to_root_catalog,
             catalog=catalog,
             options=options,
             headers=headers,
@@ -221,6 +235,7 @@ def process_STACAPI_Endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
     headers: dict[str, str] | None = None,
@@ -251,9 +266,8 @@ def process_STACAPI_Endpoint(
     )
     # We keep track of potential duplicate times in this list
     added_times = {}
-    any_item_added = False
+    items = []
     for item in results.items():
-        any_item_added = True
         item_datetime = item.get_datetime()
         if item_datetime is not None:
             iso_date = item_datetime.isoformat()[:10]
@@ -263,7 +277,6 @@ def process_STACAPI_Endpoint(
             if iso_date in added_times:
                 continue
             added_times[iso_date] = True
-        link = collection.add_item(item)
         if options.tn:
             if item.assets.get("cog_default"):
                 generate_thumbnail(
@@ -274,12 +287,10 @@ def process_STACAPI_Endpoint(
         # Check if we can create visualization link
         if endpoint_config.get("Assets"):
             add_visualization_info(item, collection_config, endpoint_config, item.id)
-            link.extra_fields["item"] = item.id
         elif item.assets.get("cog_default"):
             add_visualization_info(
                 item, collection_config, endpoint_config, item.assets["cog_default"].href
             )
-            link.extra_fields["cog_href"] = item.assets["cog_default"].href
         elif item_datetime:
             add_visualization_info(
                 item, collection_config, endpoint_config, datetimes=[item_datetime]
@@ -298,23 +309,31 @@ def process_STACAPI_Endpoint(
         if root_collection:
             item.set_collection(root_collection)
 
-        # bubble up information we want to the link
-        # it is possible for datetime to be null, if it is start and end datetime have to exist
-        if item_datetime:
-            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(item_datetime)
-        else:
-            link.extra_fields["start_datetime"] = format_datetime_to_isostring_zulu(
-                parse_datestring_to_tz_aware_datetime(item.properties["start_datetime"])
-            )
-            link.extra_fields["end_datetime"] = format_datetime_to_isostring_zulu(
-                parse_datestring_to_tz_aware_datetime(item.properties["end_datetime"])
-            )
         add_projection_info(
             endpoint_config,
             item,
         )
-    if any_item_added:
-        collection.update_extent_from_items()
+        # we check if the item has any assets, if not we create a dummy asset
+        if not item.assets:
+            item.assets["dummy_asset"] = Asset(href="")
+        if "cog_default" in item.assets and item.assets["cog_default"].extra_fields.get(
+            "raster:bands"
+        ):
+            # saving via pyarrow does not work well with statistics ranges
+            # Integer value -10183824872833024 is outside of the range exactly
+            # representable by a IEEE 754 double precision value
+            item.assets["cog_default"].extra_fields.pop("raster:bands")
+        items.append(item)
+
+    if len(items) > 0:
+        save_items(
+            collection,
+            items,
+            options.outputpath,
+            catalog_config["id"],
+            coll_path_rel_to_root_catalog,
+            options.gp,
+        )
     else:
         LOGGER.warn(
             f"""NO items returned for
@@ -339,11 +358,17 @@ def handle_VEDA_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
 ) -> Collection:
     collection = handle_STAC_based_endpoint(
-        catalog_config, endpoint_config, collection_config, catalog, options
+        catalog_config,
+        endpoint_config,
+        collection_config,
+        coll_path_rel_to_root_catalog,
+        catalog,
+        options,
     )
     return collection
 
@@ -373,12 +398,18 @@ def handle_collection_only(
 
 
 def handle_SH_WMS_endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
+    options: Options,
 ) -> Collection:
     # create collection and subcollections (based on locations)
     root_collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     if collection_config.get("Locations"):
         for location in collection_config["Locations"]:
             # create  and populate location collections based on times
@@ -391,23 +422,31 @@ def handle_SH_WMS_endpoint(
                 catalog, location["Identifier"], location_config, catalog_config, endpoint_config
             )
             collection.extra_fields["endpointtype"] = endpoint_config["Name"]
+            items = []
             for time_string in location["Times"]:
                 dt = parse_datestring_to_tz_aware_datetime(time_string)
                 item = Item(
                     id=format_datetime_to_isostring_zulu(dt),
                     bbox=location["Bbox"],
                     properties={},
-                    geometry=None,
+                    geometry=create_geometry_from_bbox(location["Bbox"]),
                     datetime=dt,
                     stac_extensions=[
                         "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                     ],
+                    assets={"dummy_asset": Asset(href="")},
                 )
                 add_projection_info(endpoint_config, item)
                 add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
-                item_link = collection.add_item(item)
-                item_link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
-
+                items.append(item)
+            save_items(
+                collection,
+                items,
+                options.outputpath,
+                catalog_config["id"],
+                f"{coll_path_rel_to_root_catalog}/{collection.id}",
+                options.gp,
+            )
             link = root_collection.add_child(collection)
             # bubble up information we want to the link
             latlng = "{},{}".format(location["Point"][1], location["Point"][0]).strip()
@@ -415,38 +454,47 @@ def handle_SH_WMS_endpoint(
             link.extra_fields["latlng"] = latlng
             link.extra_fields["country"] = location["Country"]
             link.extra_fields["city"] = location["Name"]
-            if location["Times"]:
+            if location["Times"] and not options.gp:
                 collection.update_extent_from_items()
-            else:
+            elif not location["Times"]:
                 LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
             add_visualization_info(collection, collection_config, endpoint_config)
             add_process_info_child_collection(collection, catalog_config, collection_config)
-
-        root_collection.update_extent_from_items()
-        # Add bbox extents from children
-        for c_child in root_collection.get_children():
-            if isinstance(c_child, Collection):
-                root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+        update_extents_from_collection_children(root_collection)
     else:
         # if locations are not provided, treat the collection as a
         # general proxy to the sentinel hub layer
         datetimes = get_collection_datetimes_from_config(endpoint_config)
         bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
+        items = []
         for dt in datetimes:
             item = Item(
                 id=format_datetime_to_isostring_zulu(dt),
                 bbox=bbox,
                 properties={},
-                geometry=None,
+                geometry=create_geometry_from_bbox(bbox),
                 datetime=dt,
                 stac_extensions=[
                     "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                 ],
+                assets={"dummy_asset": Asset(href="")},
             )
             add_projection_info(endpoint_config, item)
             add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
-            item_link = root_collection.add_item(item)
-            item_link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
+            items.append(item)
+        save_items(
+            root_collection,
+            items,
+            options.outputpath,
+            catalog_config["id"],
+            coll_path_rel_to_root_catalog,
+            options.gp,
+        )
+        # set spatial extent from config
+        root_collection.extent.spatial.bboxes = [bbox]
+        # set time extent from geodb
+        time_extent = [min(datetimes), max(datetimes)]
+        root_collection.extent.temporal = TemporalExtent([time_extent])
     # eodash v4 compatibility
     add_collection_information(catalog_config, root_collection, collection_config, True)
     add_visualization_info(root_collection, collection_config, endpoint_config)
@@ -454,13 +502,20 @@ def handle_SH_WMS_endpoint(
 
 
 def handle_xcube_endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
+    options: Options,
 ) -> Collection:
     collection = process_STAC_Datacube_Endpoint(
         catalog_config=catalog_config,
         endpoint_config=endpoint_config,
         collection_config=collection_config,
         catalog=catalog,
+        options=options,
+        coll_path_rel_to_root_catalog=coll_path_rel_to_root_catalog,
     )
 
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
@@ -468,23 +523,33 @@ def handle_xcube_endpoint(
 
 
 def handle_rasdaman_endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
 ) -> Collection:
     collection = process_WCS_rasdaman_Endpoint(
-        catalog_config, endpoint_config, collection_config, catalog
+        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog
     )
     # add_example_info(collection, collection_config, endpoint_config, catalog_config)
     return collection
 
 
 def handle_GeoDB_endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
+    options: Options,
 ) -> Collection:
     # ID of collection is data["Name"] instead of CollectionId to be able to
     # create more STAC collections from one geoDB table
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     select = "?select=aoi,aoi_id,country,city,time,input_data,sub_aoi"
     url = (
         endpoint_config["EndPoint"]
@@ -538,6 +603,7 @@ def handle_GeoDB_endpoint(
             collection, key, sc_config, catalog_config, endpoint_config
         )
         if input_data:
+            items = []
             for v in values:
                 # add items based on inputData fields for each time step available in values
                 first_match = next(
@@ -548,14 +614,20 @@ def handle_GeoDB_endpoint(
                 if "sub_aoi" in v and v["sub_aoi"] != "/":
                     # create geometry from wkt
                     geometry = mapping(wkt.loads(v["sub_aoi"]))
+                    # converting multipolygon to polygon to avoid shapely throwing an exception
+                    # in collection extent from geoparquet table generation
+                    # while trying to create a multipolygon extent of all multipolygons
+                    if geometry["type"] == "MultiPolygon":
+                        geometry = {"type": "Polygon", "coordinates": geometry["coordinates"][0]}
                 else:
-                    geometry = create_geojson_from_bbox(bbox)
+                    geometry = create_geometry_from_bbox(bbox)
                 item = Item(
                     id=v["time"],
                     bbox=bbox,
                     properties={},
                     geometry=geometry,
                     datetime=time_object,
+                    assets={"dummy_asset": Asset(href="")},
                 )
                 if first_match:
                     match first_match["Type"]:
@@ -591,15 +663,15 @@ def handle_GeoDB_endpoint(
                                 extra_fields=extra_fields,
                             )
                             item.add_link(link)
-                            itemlink = locations_collection.add_item(item)
-                            itemlink.extra_fields["datetime"] = (
-                                f"{format_datetime_to_isostring_zulu(time_object)}Z"
-                            )
-
-            # add_visualization_info(
-            #     item, collection_config, endpoint_config, file_url=first_match.get("FileUrl")
-            # )
-            locations_collection.update_extent_from_items()
+                            items.append(item)
+            save_items(
+                locations_collection,
+                items,
+                options.outputpath,
+                catalog_config["id"],
+                f"{coll_path_rel_to_root_catalog}/{locations_collection.id}",
+                options.gp,
+            )
         else:
             # set spatial extent from geodb
             locations_collection.extent.spatial.bboxes = [bbox]
@@ -631,32 +703,9 @@ def handle_GeoDB_endpoint(
     add_collection_information(catalog_config, collection, collection_config)
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
     collection.extra_fields["locations"] = True
-    if not input_data:
-        # we have no items, extents of collection need to be updated manually
-        merged_bbox = merge_bboxes(
-            [
-                c_child.extent.spatial.bboxes[0]
-                for c_child in collection.get_children()
-                if isinstance(c_child, Collection)
-            ]
-        )
-        collection.extent.spatial.bboxes = [merged_bbox]
-        # Add bbox extents from children
-        for c_child in collection.get_children():
-            if isinstance(c_child, Collection) and merged_bbox != c_child.extent.spatial.bboxes[0]:
-                collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
-        # set time extent of collection
-        individual_datetimes = []
-        for c_child in collection.get_children():
-            if isinstance(c_child, Collection) and isinstance(
-                c_child.extent.temporal.intervals[0], list
-            ):
-                individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
-        time_extent = [min(individual_datetimes), max(individual_datetimes)]
-        collection.extent.temporal = TemporalExtent([time_extent])
-    else:
-        # we can update from items
-        collection.update_extent_from_items()
+
+    update_extents_from_collection_children(collection)
+
     collection.summaries = Summaries(
         {
             "cities": cities,
@@ -670,6 +719,7 @@ def handle_SH_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
 ) -> Collection:
@@ -682,7 +732,13 @@ def handle_SH_endpoint(
             endpoint_config["Type"] + "-" + endpoint_config["CollectionId"]
         )
     collection = handle_STAC_based_endpoint(
-        catalog_config, endpoint_config, collection_config, catalog, options, headers
+        catalog_config,
+        endpoint_config,
+        collection_config,
+        coll_path_rel_to_root_catalog,
+        catalog,
+        options,
+        headers,
     )
     return collection
 
@@ -691,12 +747,15 @@ def handle_WMS_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
+    options: Options,
     wmts: bool = False,
 ) -> Collection:
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     datetimes = get_collection_datetimes_from_config(endpoint_config)
     spatial_extent = collection.extent.spatial.to_dict().get("bbox", [-180, -90, 180, 90])[0]
     if endpoint_config.get("Type") != "OverwriteTimes" or not endpoint_config.get("OverwriteBBox"):
@@ -712,6 +771,10 @@ def handle_WMS_endpoint(
     # optionally filter time results
     if query := endpoint_config.get("Query"):
         datetimes = filter_time_entries(datetimes, query)
+
+    # we first collect the items and then decide if to save as geoparquet or individual items
+    items = []
+
     # Create an item per time to allow visualization in stac clients
     if len(datetimes) > 0:
         for dt in datetimes:
@@ -719,19 +782,28 @@ def handle_WMS_endpoint(
                 id=format_datetime_to_isostring_zulu(dt),
                 bbox=spatial_extent,
                 properties={},
-                geometry=None,
+                geometry=create_geometry_from_bbox(spatial_extent),
                 datetime=dt,
                 stac_extensions=[
                     "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                 ],
+                assets={"dummy_asset": Asset(href="")},
             )
             add_projection_info(endpoint_config, item)
             add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
-            link = collection.add_item(item)
-            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
-        collection.update_extent_from_items()
+            items.append(item)
     else:
         LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
+
+    # Save items either into collection as individual items or as geoparquet
+    save_items(
+        collection,
+        items,
+        options.outputpath,
+        catalog_config["id"],
+        coll_path_rel_to_root_catalog,
+        options.gp,
+    )
 
     # Check if we should overwrite bbox
     if endpoint_config.get("OverwriteBBox"):
@@ -1071,12 +1143,16 @@ def handle_raw_source(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
+    options: Options,
 ) -> Collection:
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     if len(endpoint_config.get("TimeEntries", [])) > 0:
+        items = []
         style_link = None
         for time_entry in endpoint_config["TimeEntries"]:
             assets = {}
@@ -1099,7 +1175,7 @@ def handle_raw_source(
                 id=format_datetime_to_isostring_zulu(dt),
                 bbox=bbox,
                 properties={},
-                geometry=create_geojson_from_bbox(bbox)["features"][0]["geometry"],
+                geometry=create_geometry_from_bbox(bbox),
                 datetime=dt,
                 assets=assets,
                 extra_fields={},
@@ -1125,13 +1201,19 @@ def handle_raw_source(
                     },
                 )
                 item.add_link(style_link)
-            link = collection.add_item(item)
-            link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
-            link.extra_fields["assets"] = [a["File"] for a in time_entry["Assets"]]
+            items.append(item)
+
+        save_items(
+            collection,
+            items,
+            options.outputpath,
+            catalog_config["id"],
+            coll_path_rel_to_root_catalog,
+            options.gp,
+        )
         # eodash v4 compatibility, adding last referenced style to collection
         if style_link:
             collection.add_link(style_link)
-        collection.update_extent_from_items()
     else:
         LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
 

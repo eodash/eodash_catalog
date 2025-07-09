@@ -11,14 +11,17 @@ from decimal import Decimal
 from functools import reduce, wraps
 from typing import Any
 
+import pyarrow.compute as pc
 import stac_geoparquet as stacgp
 import yaml
 from dateutil import parser
 from owslib.wcs import WebCoverageService
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
-from pystac import Asset, Catalog, Collection, Item, Link, RelType
+from pystac import Asset, Catalog, Collection, Item, Link, RelType, SpatialExtent, TemporalExtent
 from pytz import timezone as pytztimezone
+from shapely import geometry as sgeom
+from shapely import wkb
 from six import string_types
 from structlog import get_logger
 
@@ -45,7 +48,15 @@ def create_geojson_point(lon: int | float, lat: int | float) -> dict[str, Any]:
     return {"type": "Feature", "geometry": point, "properties": {}}
 
 
-def create_geojson_from_bbox(bbox: list[float | int]) -> dict:
+def create_geometry_from_bbox(bbox: list[float | int]) -> dict:
+    """
+    Create a GeoJSON geometry from a bounding box.
+    Args:
+        bbox (list[float | int]): A list containing the bounding box coordinates in the format
+        [min_lon, min_lat, max_lon, max_lat].
+    Returns:
+        dict: A GeoJSON geometry object representing the bounding box.
+    """
     coordinates = [
         [bbox[0], bbox[1]],
         [bbox[2], bbox[1]],
@@ -53,11 +64,7 @@ def create_geojson_from_bbox(bbox: list[float | int]) -> dict:
         [bbox[0], bbox[3]],
         [bbox[0], bbox[1]],
     ]
-    polygon = {"type": "Polygon", "coordinates": [coordinates]}
-
-    feature = {"type": "Feature", "geometry": polygon, "properties": {}}
-    feature_collection = {"type": "FeatureCollection", "features": [feature]}
-    return feature_collection
+    return {"type": "Polygon", "coordinates": [coordinates]}
 
 
 def retrieveExtentFromWCS(
@@ -242,43 +249,9 @@ def recursive_save(stac_object: Catalog, no_items: bool = False, geo_parquet: bo
     for child in stac_object.get_children():
         recursive_save(child, no_items, geo_parquet)
     if not no_items:
-        if geo_parquet:
-            create_geoparquet_items(stac_object)
-        else:
-            for item in stac_object.get_items():
-                item.save_object()
+        for item in stac_object.get_items():
+            item.save_object()
     stac_object.save_object()
-
-
-def create_geoparquet_items(stacObject: Catalog):
-    if iter_len_at_least(stacObject.get_items(), 1):
-        stac_dir_arr = stacObject.self_href.split("/")
-        stac_dir_arr.pop()
-        stac_dir_path = "/".join(stac_dir_arr)
-        items_stacgp_path = f"{stac_dir_path}/items.parquet"
-        to_stac_geoparquet(stacObject, items_stacgp_path)
-        gp_link = Link(
-            rel="items",
-            target=items_stacgp_path,
-            media_type="application/vnd.apache.parquet",
-            title="GeoParquet Items",
-        )
-        stacObject.clear_links(rel="item")
-        stacObject.add_links([gp_link])
-
-
-def to_stac_geoparquet(stacObject: Catalog, path: str):
-    items = []
-    for item in stacObject.get_items():
-        if not item.geometry:
-            item.geometry = create_geojson_point(0, 0)["geometry"]
-        if not item.assets:
-            item.assets = {"dummy_asset": Asset(href="")}
-        items.append(item.to_dict())
-    record_batch_reader = stacgp.arrow.parse_stac_items_to_arrow(items)
-    table = record_batch_reader.read_all()
-    os.makedirs(os.path.dirname(path), exist_ok=True)
-    stacgp.arrow.to_parquet(table, path)
 
 
 def iter_len_at_least(i, n: int) -> int:
@@ -437,6 +410,154 @@ def get_full_url(url: str, catalog_config) -> str:
         return url
     else:
         return f'{catalog_config["assets_endpoint"]}{url}'
+
+
+def update_extents_from_collection_children(collection: Collection):
+    # retrieve extents from children
+    c_bboxes = [
+        c_child.extent.spatial.bboxes[0]
+        for c_child in collection.get_children()
+        if isinstance(c_child, Collection)
+    ]
+    if len(c_bboxes) > 0:
+        merged_bbox = merge_bboxes(c_bboxes)
+    else:
+        LOGGER.warn(
+            "No bounding boxes found in children of collection, using default bbox",
+        )
+        merged_bbox = [-180.0, -90.0, 180.0, 90.0]
+
+    collection.extent.spatial.bboxes = [merged_bbox]
+    # Add bbox extents from children
+    for c_child in collection.get_children():
+        if isinstance(c_child, Collection) and merged_bbox != c_child.extent.spatial.bboxes[0]:
+            collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+    # set time extent of collection
+    individual_datetimes = []
+    for c_child in collection.get_children():
+        if isinstance(c_child, Collection) and isinstance(
+            c_child.extent.temporal.intervals[0], list
+        ):
+            individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
+    individual_datetimes = list(filter(lambda x: x is not None, individual_datetimes))
+    time_extent = [min(individual_datetimes), max(individual_datetimes)]
+    collection.extent.temporal = TemporalExtent([time_extent])
+
+
+def save_items(
+    collection: Collection,
+    items: list[Item],
+    output_path: str,
+    catalog_id: str,
+    colpath: str,
+    use_geoparquet: bool = False,
+) -> None:
+    """
+    Save a list of items for a collection either as single geoparquet or
+    by adding them to the collection in order to be saved by pystac as individual items.
+    Args:
+        collection (Collection): The collection to which the items will be added.
+        items (list[Item]): The list of items to save.
+        output_path (str): The path where the items will be saved.
+        catalog_id (str): The ID of the catalog to which the collection belongs.
+        colpath (str): The expected path where to save the files relative to the catalog root.
+        use_geoparquet (bool): If True, save items as a single GeoParquet file.
+            If False, add items to the collection and save them individually.
+    """
+    if len(items) == 0:
+        LOGGER.info(
+            "No items to save for collection, adding placeholder extents",
+            collection_id=collection.id,
+            item_count=len(items),
+        )
+        # we need to add some generic extent to the collection
+        collection.extent.spatial = SpatialExtent([[-180.0, -90.0, 180.0, 90.0]])
+        collection.extent.temporal = TemporalExtent(
+            [
+                datetime(1970, 1, 1, 0, 0, 0, tzinfo=pytztimezone("UTC")),
+                datetime.now(tz=pytztimezone("UTC")),
+            ]
+        )
+        return
+    if use_geoparquet:
+        LOGGER.info(
+            "Saving items as GeoParquet file",
+            collection_id=collection.id,
+            item_count=len(items),
+        )
+        if colpath is None:
+            colpath = f"{collection.id}/{collection.id}"
+        buildcatpath = f"{output_path}/{catalog_id}"
+        record_batch_reader = stacgp.arrow.parse_stac_items_to_arrow(items)
+        table = record_batch_reader.read_all()
+        output_path = f"{buildcatpath}/{colpath}"
+        os.makedirs(output_path, exist_ok=True)
+        stacgp.arrow.to_parquet(table, f"{output_path}/items.parquet")
+        gp_link = Link(
+            rel="items",
+            target="./items.parquet",
+            media_type="application/vnd.apache.parquet",
+            title="GeoParquet Items",
+        )
+        collection.add_link(gp_link)
+        # add extent information to the collection
+        min_datetime = pc.min(table["datetime"]).as_py()
+        max_datetime = pc.max(table["datetime"]).as_py()
+        if not min_datetime:
+            # cases when datetime was null
+            # fallback to start_datetime
+            min_datetime = pc.min(table["start_datetime"]).as_py()
+            max_datetime = pc.max(table["start_datetime"]).as_py()
+        collection.extent.temporal = TemporalExtent([min_datetime, max_datetime])
+        geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
+        bbox = sgeom.MultiPolygon(geoms).bounds
+        collection.extent.spatial = SpatialExtent([bbox])
+        # Make sure to also reference the geoparquet as asset
+        collection.add_asset(
+            "geoparquet",
+            Asset(
+                href="./items.parquet",
+                media_type="application/vnd.apache.parquet",
+                title="GeoParquet Items",
+                roles=["collection-mirror"],
+            ),
+        )
+    else:
+        # go over items and add them to the collection
+        LOGGER.info(
+            "Adding items to collection to be saved individually",
+            collection_id=collection.id,
+            item_count=len(items),
+        )
+        for item in items:
+            link = collection.add_item(item)
+            # bubble up information we want to the link
+            # it is possible for datetime to be null, if it is start and end datetime have to exist
+            item_datetime = item.get_datetime()
+            if item_datetime:
+                link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(item_datetime)
+            else:
+                link.extra_fields["start_datetime"] = format_datetime_to_isostring_zulu(
+                    parse_datestring_to_tz_aware_datetime(item.properties["start_datetime"])
+                )
+                link.extra_fields["end_datetime"] = format_datetime_to_isostring_zulu(
+                    parse_datestring_to_tz_aware_datetime(item.properties["end_datetime"])
+                )
+
+            # bubble up data assets based on role
+            collected_assets = [
+                asset.href
+                for asset in item.assets.values()
+                if asset.roles and ("data" in asset.roles or "default" in asset.roles)
+            ]
+            if collected_assets:
+                link.extra_fields["assets"] = collected_assets
+            # also bubble up item id and cog_href if available
+            # TODO: not clear when the item id is needed in the link might be some legacy reference
+            # link.extra_fields["item"] = item.id
+            if item.assets.get("cog_default"):
+                link.extra_fields["cog_href"] = item.assets["cog_default"].href
+        collection.update_extent_from_items()
 
 
 def read_config_file(path: str) -> dict:

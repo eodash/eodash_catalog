@@ -1,0 +1,101 @@
+{
+  "Name": "IDEAS1_hopi_b1",
+  "Title": "Raw COG Source",
+  "EodashIdentifier": "IND1_1_b1",
+  "Subtitle": "Indicator 1: HOUHPI",
+  "Description": "IDEAS1_hopi/IDEAS1_hopi.md",
+  "Themes": [
+    "health"
+  ],
+  "Tags": [
+    "heat",
+    "pollution"
+  ],
+  "Other": [
+    "multiple",
+    "HDX",
+    "CAMS"
+  ],
+  "Agency": [
+    "ESA"
+  ],
+  "Provider": [
+    {
+      "Name": "Murmuration",
+      "Url": "https://murmuration-sas.com/"
+    }
+  ],
+  "Resources": [
+    {
+      "Name": "COG source",
+      "Style": "https://raw.githubusercontent.com/eurodatacube/eodash-assets/refs/heads/main/collections/IDEAS1_hopi/flatstyle_b1.json",
+      "Bbox": [
+        -24,
+        33,
+        42,
+        71
+      ],
+      "TimeEntries": [
+        {
+          "Time": "20210401T0000",
+          "Assets": [
+            {
+              "Identifier": "spring",
+              "File": "https://eox-ideas.s3.eu-central-1.amazonaws.com/indicator1/indicator1_v1_houhpi_Spring_europe_3857_b1.tif"
+            }
+          ]
+        },
+        {
+          "Time": "20210402T0000",
+          "Assets": [
+            {
+              "Identifier": "summer",
+              "File": "https://eox-ideas.s3.eu-central-1.amazonaws.com/indicator1/indicator1_v1_houhpi_Summer_europe_3857_b1.tif"
+            }
+          ]
+        }, {
+          "Time": "20210403T0000",
+          "Assets": [
+            {
+              "Identifier": "autumn",
+              "File": "https://eox-ideas.s3.eu-central-1.amazonaws.com/indicator1/indicator1_v1_houhpi_Autumn_europe_3857_b1.tif"
+            }
+          ]
+        }, {
+          "Time": "20210404T0000",
+          "Assets": [
+            {
+              "Identifier": "winter",
+              "File": "https://eox-ideas.s3.eu-central-1.amazonaws.com/indicator1/indicator1_v1_houhpi_Winter_europe_3857_b1.tif"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "Image": "IDEAS1_hopi/IDEAS1_hopi.png",
+  "Colorlegend": {
+    "domain": [
+      0,
+      2
+    ],
+    "range": [
+      "#ffffff",
+      "#ffffb2",
+      "#ffff65",
+      "#ffff17",
+      "#ffdb00",
+      "#ffa800",
+      "#ff7400",
+      "#ff4100",
+      "#ff0d00",
+      "#d90000",
+      "#a50000",
+      "#720000",
+      "#3e0000",
+      "#0b0000"
+    ],
+    "scaleType": "continuous",
+    "title": "[index]"
+  }
+}

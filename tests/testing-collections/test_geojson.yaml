@@ -1,0 +1,51 @@
+Name: crop_forecast_at
+Title: Raw GeoJSON source
+EodashIdentifier: CROPOMAT1
+Subtitle: Yield forecast under "what-if" scenarios
+Description: ""
+Themes:
+  - agriculture
+  - economy
+Tags:
+  - Crop
+  - Yield
+  - Water
+  - Forecast
+DataSource:
+  Spaceborne:
+    Satellite:
+      - Sentinel-2
+      - CLMS HR-VPP Vegetation Indices
+      - CLMS HR-VPP Seasonal Trajectory 
+  InSitu:
+    - Meteorological data from local Meteorological offices (AT)
+Agency:
+  - ESA
+Provider:
+  - Name: CropOM
+    Url: https://cropom.com
+  - Name: Danube Data Cube
+    Url: https://ddc.cropom.com
+  - Name: Copernicus Land Monitoring Service
+    Url: https://land.copernicus.eu/en/dataset-catalog
+  - Name: FAO
+    Url: https://www.fao.org/home/en
+License:
+  - Name: Commercial license
+    Url: https://cropom.com/terms_and_conditions.pdf
+References:
+  - Name: Danube Data Cube documentation
+    Url: https://doc.cropom.com
+  - Name: AquaCrop
+    Url: https://www.fao.org/aquacrop/en/
+Resources:
+    - Name: GeoJSON source
+      Style: crop_forecast_CropOM/style_yield.json
+      Bbox: [9.27, 46.2, 17.3, 49.2]
+      DataProjection: 3035
+      TimeEntries:
+        - Time: "20240101"
+          Assets:
+            - Identifier: vector_data
+              File: "https://raw.githubusercontent.com/eodash/eodash_catalog/main/tests/test-data/regional_forecast.json"
+Legend: crop_forecast_CropOM/cm_legend.png

@@ -6,12 +6,11 @@ Indicator generator to harvest information from endpoints and generate catalog
 
 import os
 import time
-from datetime import datetime
 from typing import Any
 
 import click
 from dotenv import load_dotenv
-from pystac import Catalog, CatalogType, Collection, Link, Summaries, TemporalExtent
+from pystac import Catalog, CatalogType, Collection, Link, Summaries
 from pystac.layout import TemplateLayoutStrategy
 from pystac.validation import validate_all
 from structlog import get_logger
@@ -41,10 +40,10 @@ from eodash_catalog.utils import (
     RaisingThread,
     add_single_item_if_collection_empty,
     iter_len_at_least,
-    merge_bboxes,
     read_config_file,
     recursive_save,
     retry,
+    update_extents_from_collection_children,
 )
 
 # make sure we are loading the env local definition
@@ -99,10 +98,10 @@ def process_catalog_file(file_path: str, options: Options):
 
     LOGGER.info("Started creation of collection files")
     start = time.time()
-    if options.ni or options.gp:
+    if options.ni:
         catalog_self_href = f'{options.outputpath}/{catalog_config["id"]}'
         catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
-        recursive_save(catalog, options.ni, options.gp)
+        recursive_save(catalog, options.ni)
     else:
         # For full catalog save with items this still seems to be faster
         catalog_self_href = catalog_config.get(
@@ -170,6 +169,7 @@ def process_indicator_file(
         catalog, indicator_config["Name"], indicator_config, catalog_config, {}
     )
     if indicator_config.get("Collections"):
+        coll_path_rel_to_root_catalog = indicator_config["Name"]
         for collection in indicator_config["Collections"]:
             process_collection_file(
                 catalog_config,
@@ -177,6 +177,7 @@ def process_indicator_file(
                 parent_indicator,
                 options,
                 "Disable" in indicator_config and collection in indicator_config["Disable"],
+                coll_path_rel_to_root_catalog,
             )
     else:
         # we assume that collection files can also be loaded directly
@@ -186,29 +187,7 @@ def process_indicator_file(
         parent_indicator.update_extent_from_items()
     # get shared extent of all of the collections
     # they might have OverwriteBBox and that would discard it for indicator
-    merged_bbox = merge_bboxes(
-        [
-            c_child.extent.spatial.bboxes[0]
-            for c_child in parent_indicator.get_children()
-            if isinstance(c_child, Collection)
-        ]
-    )
-    parent_indicator.extent.spatial.bboxes = [merged_bbox]
-    # Add bbox extents from children
-    for c_child in parent_indicator.get_children():
-        if isinstance(c_child, Collection) and merged_bbox != c_child.extent.spatial.bboxes[0]:
-            parent_indicator.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
-    # aggregate all time extents from the child collections and make it a indicator extent
-    individual_datetimes: list[datetime] = []
-    for c_child in parent_indicator.get_children():
-        if isinstance(c_child, Collection) and isinstance(
-            c_child.extent.temporal.intervals[0], list
-        ):
-            individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
-    # filter out None
-    individual_datetimes = list(filter(lambda x: x is not None, individual_datetimes))
-    time_extent = [min(individual_datetimes), max(individual_datetimes)]
-    parent_indicator.extent.temporal = TemporalExtent([time_extent])
+    update_extents_from_collection_children(parent_indicator)
     # extract collection information and add it to summary indicator level
     extract_indicator_info(parent_indicator)
     add_process_info(parent_indicator, catalog_config, indicator_config)
@@ -224,49 +203,95 @@ def process_collection_file(
     catalog: Catalog | Collection,
     options: Options,
     disable=False,
+    coll_path_rel_to_root_catalog: str = "",
 ):
     LOGGER.info(f"Processing collection: {file_path}")
     collection_config = read_config_file(file_path)
+    if not coll_path_rel_to_root_catalog:
+        # case when a single collection made the indicator
+        coll_path_rel_to_root_catalog = collection_config["Name"]
     if collection_config.get("Resources"):
         for endpoint_config in collection_config["Resources"]:
             try:
                 collection = None
                 if endpoint_config["Name"] == "Sentinel Hub":
                     collection = handle_SH_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, options
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "Sentinel Hub WMS":
                     collection = handle_SH_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "GeoDB":
                     collection = handle_GeoDB_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "VEDA":
                     collection = handle_VEDA_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, options
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "marinedatastore":
                     collection = handle_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, wmts=True
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
+                        wmts=True,
                     )
                 elif endpoint_config["Name"] == "xcube":
                     collection = handle_xcube_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "rasdaman":
                     collection = handle_rasdaman_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config, endpoint_config, collection_config, catalog, options
                     )
                 elif endpoint_config["Name"] == "WMS":
                     collection = handle_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 elif endpoint_config["Name"] == "JAXA_WMTS_PALSAR":
                     # somewhat one off creation of individual WMTS layers as individual items
                     collection = handle_WMS_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, wmts=True
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
+                        wmts=True,
                     )
                 elif endpoint_config["Name"] == "Collection-only":
                     collection = handle_collection_only(
@@ -285,12 +310,19 @@ def process_collection_file(
                     "FlatGeobuf source",
                 ]:
                     collection = handle_raw_source(
-                        catalog_config, endpoint_config, collection_config, catalog
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
                     )
                 else:
                     raise ValueError("Type of Resource is not supported")
                 if collection:
-                    add_single_item_if_collection_empty(endpoint_config, collection)
+                    # check if geoparquet flag is used, as these collections have no items
+                    if not options.gp:
+                        add_single_item_if_collection_empty(endpoint_config, collection)
                     add_projection_info(endpoint_config, collection)
                     add_to_catalog(collection, catalog, endpoint_config, collection_config, disable)
                 else:
@@ -304,7 +336,9 @@ def process_collection_file(
         parent_collection = get_or_create_collection(
             catalog, collection_config["Name"], collection_config, catalog_config, {}
         )
-
+        coll_path_rel_to_root_catalog = (
+            f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+        )
         locations = []
         countries = []
         for sub_coll_def in collection_config["Subcollections"]:
@@ -316,11 +350,16 @@ def process_collection_file(
                     countries.extend(sub_coll_def["Country"])
                 else:
                     countries.append(sub_coll_def["Country"])
+                coll_path_rel_to_root_catalog = (
+                    f"{coll_path_rel_to_root_catalog}/{sub_coll_def['Collection']}"
+                )
                 process_collection_file(
                     catalog_config,
                     "{}/{}".format(options.collectionspath, sub_coll_def["Collection"]),
                     parent_collection,
                     options,
+                    False,
+                    coll_path_rel_to_root_catalog,
                 )
                 # find link in parent collection to update metadata
                 for link in parent_collection.links:
@@ -345,11 +384,16 @@ def process_collection_file(
             else:
                 # create temp catalog to save collection
                 tmp_catalog = Catalog(id="tmp_catalog", description="temp catalog placeholder")
+                coll_path_rel_to_root_catalog = (
+                    f"{coll_path_rel_to_root_catalog}/{sub_coll_def['Collection']}"
+                )
                 process_collection_file(
                     catalog_config,
                     "{}/{}".format(options.collectionspath, sub_coll_def["Collection"]),
                     tmp_catalog,
                     options,
+                    None,
+                    coll_path_rel_to_root_catalog,
                 )
                 links = tmp_catalog.get_child(sub_coll_def["Identifier"]).get_links()  # type: ignore
                 for link in links:
@@ -366,11 +410,7 @@ def process_collection_file(
 
         add_collection_information(catalog_config, parent_collection, collection_config, True)
         add_process_info(parent_collection, catalog_config, collection_config)
-        parent_collection.update_extent_from_items()
-        # Add bbox extents from children
-        for c_child in parent_collection.get_children():
-            if isinstance(c_child, Collection):
-                parent_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+        update_extents_from_collection_children(parent_collection)
         # Fill summaries for locations
         parent_collection.summaries = Summaries(
             {
