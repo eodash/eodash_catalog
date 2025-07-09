@@ -621,6 +621,11 @@ def handle_GeoDB_endpoint(
                 if "sub_aoi" in v and v["sub_aoi"] != "/":
                     # create geometry from wkt
                     geometry = mapping(wkt.loads(v["sub_aoi"]))
+                    # converting multipolygon to polygon to avoid shapely throwing an exception
+                    # in collection extent from geoparquet table generation
+                    # while trying to create a multipolygon extent of all multipolygons
+                    if geometry["type"] == "MultiPolygon":
+                        geometry = {"type": "Polygon", "coordinates": geometry["coordinates"][0]}
                 else:
                     geometry = create_geometry_from_bbox(bbox)
                 item = Item(

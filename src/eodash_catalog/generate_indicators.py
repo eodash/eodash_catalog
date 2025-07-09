@@ -45,6 +45,7 @@ from eodash_catalog.utils import (
     read_config_file,
     recursive_save,
     retry,
+    update_extents_from_collection_children,
 )
 
 # make sure we are loading the env local definition
@@ -209,6 +210,7 @@ def process_indicator_file(
             individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
     # filter out None
     individual_datetimes = list(filter(lambda x: x is not None, individual_datetimes))
+
     time_extent = [min(individual_datetimes), max(individual_datetimes)]
     parent_indicator.extent.temporal = TemporalExtent([time_extent])
     # extract collection information and add it to summary indicator level
@@ -433,11 +435,7 @@ def process_collection_file(
 
         add_collection_information(catalog_config, parent_collection, collection_config, True)
         add_process_info(parent_collection, catalog_config, collection_config)
-        parent_collection.update_extent_from_items()
-        # Add bbox extents from children
-        for c_child in parent_collection.get_children():
-            if isinstance(c_child, Collection):
-                parent_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+        update_extents_from_collection_children(parent_collection)
         # Fill summaries for locations
         parent_collection.summaries = Summaries(
             {
