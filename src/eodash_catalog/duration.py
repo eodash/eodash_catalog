@@ -34,7 +34,7 @@ def max_days_in_month(year, month):
         return 31
     if month in (4, 6, 9, 11):
         return 30
-    if ((year % 400) == 0) or ((year % 100) != 0) and ((year % 4) == 0):
+    if ((year % 400) == 0) or (((year % 100) != 0) and ((year % 4) == 0)):
         return 29
     return 28
 
@@ -260,11 +260,10 @@ class Duration:
         the two Durations are considered equal.
         """
         if isinstance(other, Duration):
-            if (self.years * 12 + self.months) == (
-                other.years * 12 + other.months
-            ) and self.tdelta == other.tdelta:
-                return True
-            return False
+            return bool(
+                self.years * 12 + self.months == other.years * 12 + other.months
+                and self.tdelta == other.tdelta
+            )
         # check if other con be compared against timedelta object
         # will raise an AssertionError when optimisation is off
         if self.years == 0 and self.months == 0:
@@ -277,11 +276,10 @@ class Duration:
         the two Durations are considered not equal.
         """
         if isinstance(other, Duration):
-            if (self.years * 12 + self.months) != (
-                other.years * 12 + other.months
-            ) or self.tdelta != other.tdelta:
-                return True
-            return False
+            return bool(
+                self.years * 12 + self.months != other.years * 12 + other.months
+                or self.tdelta != other.tdelta
+            )
         # check if other can be compared against timedelta object
         # will raise an AssertionError when optimisation is off
         if self.years == 0 and self.months == 0:

@@ -79,6 +79,7 @@ def process_STAC_Datacube_Endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
 ) -> Collection:
@@ -86,7 +87,7 @@ def process_STAC_Datacube_Endpoint(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
     add_visualization_info(collection, collection_config, endpoint_config)
-
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     stac_endpoint_url = endpoint_config["EndPoint"]
     if endpoint_config.get("Name") == "xcube":
         stac_endpoint_url = stac_endpoint_url + endpoint_config.get("StacEndpoint", "")
@@ -137,7 +138,7 @@ def process_STAC_Datacube_Endpoint(
         items,
         options.outputpath,
         catalog_config["id"],
-        f"{collection_config['Name']}/{collection_config['Name']}",
+        coll_path_rel_to_root_catalog,
         options.gp,
     )
     unit = variables.get(endpoint_config.get("Variable")).get("unit")
@@ -145,7 +146,7 @@ def process_STAC_Datacube_Endpoint(
         collection_config["yAxis"] = unit
     if datetimes and not options.gp:
         collection.update_extent_from_items()
-    else:
+    elif not datetimes:
         LOGGER.warn(f"NO datetimes returned for collection: {collection_id}!")
 
     add_collection_information(catalog_config, collection, collection_config)
@@ -157,19 +158,23 @@ def handle_STAC_based_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
     headers=None,
 ) -> Collection:
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     if collection_config.get("Locations"):
         root_collection = get_or_create_collection(
             catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
         )
         for location in collection_config["Locations"]:
+            identifier = location.get("Identifier", uuid.uuid4())
             collection = process_STACAPI_Endpoint(
                 catalog_config=catalog_config,
                 endpoint_config=endpoint_config,
                 collection_config=collection_config,
+                coll_path_rel_to_root_catalog=f"{coll_path_rel_to_root_catalog}/{identifier}",
                 catalog=catalog,
                 options=options,
                 headers=headers,
@@ -180,7 +185,7 @@ def handle_STAC_based_endpoint(
             # Update identifier to use location as well as title
             # TODO: should we use the name as id? it provides much more
             # information in the clients
-            collection.id = location.get("Identifier", uuid.uuid4())
+            collection.id = identifier
             collection.title = location.get("Name")
             # See if description should be overwritten
             if location.get("Description"):
@@ -204,11 +209,7 @@ def handle_STAC_based_endpoint(
                         location["OverwriteBBox"],
                     ]
                 )
-        root_collection.update_extent_from_items()
-        # Add bbox extents from children
-        for c_child in root_collection.get_children():
-            if isinstance(c_child, Collection):
-                root_collection.extent.spatial.bboxes.append(c_child.extent.spatial.bboxes[0])
+        update_extents_from_collection_children(root_collection)
     else:
         bbox = None
         if endpoint_config.get("Bbox"):
@@ -217,6 +218,7 @@ def handle_STAC_based_endpoint(
             catalog_config=catalog_config,
             endpoint_config=endpoint_config,
             collection_config=collection_config,
+            coll_path_rel_to_root_catalog=coll_path_rel_to_root_catalog,
             catalog=catalog,
             options=options,
             headers=headers,
@@ -233,6 +235,7 @@ def process_STACAPI_Endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
     headers: dict[str, str] | None = None,
@@ -313,6 +316,13 @@ def process_STACAPI_Endpoint(
         # we check if the item has any assets, if not we create a dummy asset
         if not item.assets:
             item.assets["dummy_asset"] = Asset(href="")
+        if "cog_default" in item.assets and item.assets["cog_default"].extra_fields.get(
+            "raster:bands"
+        ):
+            # saving via pyarrow does not work well with statistics ranges
+            # Integer value -10183824872833024 is outside of the range exactly
+            # representable by a IEEE 754 double precision value
+            item.assets["cog_default"].extra_fields.pop("raster:bands")
         items.append(item)
 
     if len(items) > 0:
@@ -321,7 +331,7 @@ def process_STACAPI_Endpoint(
             items,
             options.outputpath,
             catalog_config["id"],
-            f"{collection_config['Name']}/{collection_config['Name']}",
+            coll_path_rel_to_root_catalog,
             options.gp,
         )
     else:
@@ -348,11 +358,17 @@ def handle_VEDA_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
 ) -> Collection:
     collection = handle_STAC_based_endpoint(
-        catalog_config, endpoint_config, collection_config, catalog, options
+        catalog_config,
+        endpoint_config,
+        collection_config,
+        coll_path_rel_to_root_catalog,
+        catalog,
+        options,
     )
     return collection
 
@@ -385,6 +401,7 @@ def handle_SH_WMS_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
 ) -> Collection:
@@ -392,6 +409,7 @@ def handle_SH_WMS_endpoint(
     root_collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     if collection_config.get("Locations"):
         for location in collection_config["Locations"]:
             # create  and populate location collections based on times
@@ -421,13 +439,12 @@ def handle_SH_WMS_endpoint(
                 add_projection_info(endpoint_config, item)
                 add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
                 items.append(item)
-
             save_items(
                 collection,
                 items,
                 options.outputpath,
                 catalog_config["id"],
-                f"{collection_config['Name']}/{collection_config['Name']}/{collection.id}",
+                f"{coll_path_rel_to_root_catalog}/{collection.id}",
                 options.gp,
             )
             link = root_collection.add_child(collection)
@@ -439,14 +456,11 @@ def handle_SH_WMS_endpoint(
             link.extra_fields["city"] = location["Name"]
             if location["Times"] and not options.gp:
                 collection.update_extent_from_items()
-            else:
+            elif not location["Times"]:
                 LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
             add_visualization_info(collection, collection_config, endpoint_config)
             add_process_info_child_collection(collection, catalog_config, collection_config)
-            if options.gp:
-                update_extents_from_collection_children(root_collection)
-            else:
-                root_collection.update_extent_from_items()
+        update_extents_from_collection_children(root_collection)
     else:
         # if locations are not provided, treat the collection as a
         # general proxy to the sentinel hub layer
@@ -473,7 +487,7 @@ def handle_SH_WMS_endpoint(
             items,
             options.outputpath,
             catalog_config["id"],
-            f"{collection_config['Name']}/{collection_config['Name']}",
+            coll_path_rel_to_root_catalog,
             options.gp,
         )
         # set spatial extent from config
@@ -491,6 +505,7 @@ def handle_xcube_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
 ) -> Collection:
@@ -500,6 +515,7 @@ def handle_xcube_endpoint(
         collection_config=collection_config,
         catalog=catalog,
         options=options,
+        coll_path_rel_to_root_catalog=coll_path_rel_to_root_catalog,
     )
 
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
@@ -507,10 +523,14 @@ def handle_xcube_endpoint(
 
 
 def handle_rasdaman_endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
 ) -> Collection:
     collection = process_WCS_rasdaman_Endpoint(
-        catalog_config, endpoint_config, collection_config, catalog
+        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog
     )
     # add_example_info(collection, collection_config, endpoint_config, catalog_config)
     return collection
@@ -520,6 +540,7 @@ def handle_GeoDB_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
 ) -> Collection:
@@ -528,6 +549,7 @@ def handle_GeoDB_endpoint(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     select = "?select=aoi,aoi_id,country,city,time,input_data,sub_aoi"
     url = (
         endpoint_config["EndPoint"]
@@ -592,6 +614,11 @@ def handle_GeoDB_endpoint(
                 if "sub_aoi" in v and v["sub_aoi"] != "/":
                     # create geometry from wkt
                     geometry = mapping(wkt.loads(v["sub_aoi"]))
+                    # converting multipolygon to polygon to avoid shapely throwing an exception
+                    # in collection extent from geoparquet table generation
+                    # while trying to create a multipolygon extent of all multipolygons
+                    if geometry["type"] == "MultiPolygon":
+                        geometry = {"type": "Polygon", "coordinates": geometry["coordinates"][0]}
                 else:
                     geometry = create_geometry_from_bbox(bbox)
                 item = Item(
@@ -642,7 +669,7 @@ def handle_GeoDB_endpoint(
                 items,
                 options.outputpath,
                 catalog_config["id"],
-                f"{collection_config['Name']}/{collection_config['Name']}/{locations_collection.id}",
+                f"{coll_path_rel_to_root_catalog}/{locations_collection.id}",
                 options.gp,
             )
         else:
@@ -692,6 +719,7 @@ def handle_SH_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
 ) -> Collection:
@@ -704,7 +732,13 @@ def handle_SH_endpoint(
             endpoint_config["Type"] + "-" + endpoint_config["CollectionId"]
         )
     collection = handle_STAC_based_endpoint(
-        catalog_config, endpoint_config, collection_config, catalog, options, headers
+        catalog_config,
+        endpoint_config,
+        collection_config,
+        coll_path_rel_to_root_catalog,
+        catalog,
+        options,
+        headers,
     )
     return collection
 
@@ -713,6 +747,7 @@ def handle_WMS_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
     wmts: bool = False,
@@ -720,6 +755,7 @@ def handle_WMS_endpoint(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     datetimes = get_collection_datetimes_from_config(endpoint_config)
     spatial_extent = collection.extent.spatial.to_dict().get("bbox", [-180, -90, 180, 90])[0]
     if endpoint_config.get("Type") != "OverwriteTimes" or not endpoint_config.get("OverwriteBBox"):
@@ -765,7 +801,7 @@ def handle_WMS_endpoint(
         items,
         options.outputpath,
         catalog_config["id"],
-        f"{collection_config['Name']}/{collection_config['Name']}",
+        coll_path_rel_to_root_catalog,
         options.gp,
     )
 
@@ -1107,12 +1143,14 @@ def handle_raw_source(
     catalog_config: dict,
     endpoint_config: dict,
     collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
 ) -> Collection:
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     if len(endpoint_config.get("TimeEntries", [])) > 0:
         items = []
         style_link = None
@@ -1170,7 +1208,7 @@ def handle_raw_source(
             items,
             options.outputpath,
             catalog_config["id"],
-            f"{collection_config['Name']}/{collection_config['Name']}",
+            coll_path_rel_to_root_catalog,
             options.gp,
         )
         # eodash v4 compatibility, adding last referenced style to collection
