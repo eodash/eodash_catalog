@@ -1,4 +1,5 @@
 import importlib
+import io
 import json
 import os
 import sys
@@ -8,36 +9,33 @@ from datetime import datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
 
+import pyarrow.parquet as pq
 import requests
-from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries, TemporalExtent
+from pystac import (Asset, Catalog, Collection, Item, Link, SpatialExtent,
+                    Summaries, TemporalExtent)
 from pystac_client import Client
 from shapely import wkt
 from shapely.geometry import mapping
 from structlog import get_logger
 
 from eodash_catalog.sh_endpoint import get_SH_token
-from eodash_catalog.stac_handling import (
-    add_collection_information,
-    add_example_info,
-    add_process_info_child_collection,
-    add_projection_info,
-    get_collection_datetimes_from_config,
-    get_or_create_collection,
-)
+from eodash_catalog.stac_handling import (add_collection_information,
+                                          add_example_info,
+                                          add_process_info_child_collection,
+                                          add_projection_info,
+                                          get_collection_datetimes_from_config,
+                                          get_or_create_collection)
 from eodash_catalog.thumbnails import generate_thumbnail
-from eodash_catalog.utils import (
-    Options,
-    create_geometry_from_bbox,
-    filter_time_entries,
-    format_datetime_to_isostring_zulu,
-    generate_veda_cog_link,
-    parse_datestring_to_tz_aware_datetime,
-    replace_with_env_variables,
-    retrieveExtentFromWCS,
-    retrieveExtentFromWMSWMTS,
-    save_items,
-    update_extents_from_collection_children,
-)
+from eodash_catalog.utils import (Options, create_geometry_from_bbox,
+                                  extract_extent_from_geoparquet,
+                                  filter_time_entries,
+                                  format_datetime_to_isostring_zulu,
+                                  generate_veda_cog_link,
+                                  parse_datestring_to_tz_aware_datetime,
+                                  replace_with_env_variables,
+                                  retrieveExtentFromWCS,
+                                  retrieveExtentFromWMSWMTS, save_items,
+                                  update_extents_from_collection_children)
 
 LOGGER = get_logger(__name__)
 
@@ -1214,6 +1212,40 @@ def handle_raw_source(
         # eodash v4 compatibility, adding last referenced style to collection
         if style_link:
             collection.add_link(style_link)
+    elif endpoint_config.get("ParquetSource"):
+        # if parquet source is provided, download it and create items from it
+        parquet_source = endpoint_config["ParquetSource"]
+        if parquet_source.startswith("http"):
+            # download parquet file
+            parquet_file = requests.get(parquet_source)
+            if parquet_file.status_code != 200:
+                LOGGER.error(f"Failed to download parquet file from {parquet_source}")
+                return collection
+            try:
+                table = pq.read_table(io.BytesIO(parquet_file.content))
+            except Exception as e:
+                LOGGER.error(f"Failed to read parquet file: {e}")
+                return collection
+            extents = extract_extent_from_geoparquet(table)
+            collection.extent.temporal = extents[0]
+            collection.extent.spatial = extents[1]
+            gp_link = Link(
+                rel="items",
+                target=parquet_source,
+                media_type="application/vnd.apache.parquet",
+                title="GeoParquet Items",
+            )
+            collection.add_link(gp_link)
+            collection.add_asset(
+                "geoparquet",
+                Asset(
+                    href=parquet_source,
+                    media_type="application/vnd.apache.parquet",
+                    title="GeoParquet Items",
+                    roles=["collection-mirror"],
+                ),
+            )
+
     else:
         LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
 

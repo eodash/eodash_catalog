@@ -18,7 +18,8 @@ from dateutil import parser
 from owslib.wcs import WebCoverageService
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
-from pystac import Asset, Catalog, Collection, Item, Link, RelType, SpatialExtent, TemporalExtent
+from pystac import (Asset, Catalog, Collection, Item, Link, RelType,
+                    SpatialExtent, TemporalExtent)
 from pytz import timezone as pytztimezone
 from shapely import geometry as sgeom
 from shapely import wkb
@@ -443,6 +444,27 @@ def update_extents_from_collection_children(collection: Collection):
     time_extent = [min(individual_datetimes), max(individual_datetimes)]
     collection.extent.temporal = TemporalExtent([time_extent])
 
+def extract_extent_from_geoparquet(table) -> tuple[TemporalExtent, SpatialExtent]:
+    """
+    Extract spatial and temporal extents from a GeoParquet file.
+    Args:
+        table (pyarrow.Table): The table containing the GeoParquet data.
+    Returns:
+        tuple: A tuple containing spatial and temporal extents.
+    """
+    # add extent information to the collection
+    min_datetime = pc.min(table["datetime"]).as_py()
+    max_datetime = pc.max(table["datetime"]).as_py()
+    if not min_datetime:
+        # cases when datetime was null
+        # fallback to start_datetime
+        min_datetime = pc.min(table["start_datetime"]).as_py()
+        max_datetime = pc.max(table["start_datetime"]).as_py()
+    temporal = TemporalExtent([min_datetime, max_datetime])
+    geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
+    bbox = sgeom.MultiPolygon(geoms).bounds
+    spatial = SpatialExtent([bbox])
+    return [temporal, spatial]
 
 def save_items(
     collection: Collection,
@@ -500,18 +522,9 @@ def save_items(
             title="GeoParquet Items",
         )
         collection.add_link(gp_link)
-        # add extent information to the collection
-        min_datetime = pc.min(table["datetime"]).as_py()
-        max_datetime = pc.max(table["datetime"]).as_py()
-        if not min_datetime:
-            # cases when datetime was null
-            # fallback to start_datetime
-            min_datetime = pc.min(table["start_datetime"]).as_py()
-            max_datetime = pc.max(table["start_datetime"]).as_py()
-        collection.extent.temporal = TemporalExtent([min_datetime, max_datetime])
-        geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
-        bbox = sgeom.MultiPolygon(geoms).bounds
-        collection.extent.spatial = SpatialExtent([bbox])
+        extents = extract_extent_from_geoparquet(table)
+        collection.extent.temporal = extents[0]
+        collection.extent.spatial = extents[1]
         # Make sure to also reference the geoparquet as asset
         collection.add_asset(
             "geoparquet",
