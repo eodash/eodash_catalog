@@ -18,8 +18,7 @@ from dateutil import parser
 from owslib.wcs import WebCoverageService
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
-from pystac import (Asset, Catalog, Collection, Item, Link, RelType,
-                    SpatialExtent, TemporalExtent)
+from pystac import Asset, Catalog, Collection, Item, RelType, SpatialExtent, TemporalExtent
 from pytz import timezone as pytztimezone
 from shapely import geometry as sgeom
 from shapely import wkb
@@ -444,6 +443,7 @@ def update_extents_from_collection_children(collection: Collection):
     time_extent = [min(individual_datetimes), max(individual_datetimes)]
     collection.extent.temporal = TemporalExtent([time_extent])
 
+
 def extract_extent_from_geoparquet(table) -> tuple[TemporalExtent, SpatialExtent]:
     """
     Extract spatial and temporal extents from a GeoParquet file.
@@ -465,6 +465,7 @@ def extract_extent_from_geoparquet(table) -> tuple[TemporalExtent, SpatialExtent
     bbox = sgeom.MultiPolygon(geoms).bounds
     spatial = SpatialExtent([bbox])
     return [temporal, spatial]
+
 
 def save_items(
     collection: Collection,
@@ -515,13 +516,6 @@ def save_items(
         output_path = f"{buildcatpath}/{colpath}"
         os.makedirs(output_path, exist_ok=True)
         stacgp.arrow.to_parquet(table, f"{output_path}/items.parquet")
-        gp_link = Link(
-            rel="items",
-            target="./items.parquet",
-            media_type="application/vnd.apache.parquet",
-            title="GeoParquet Items",
-        )
-        collection.add_link(gp_link)
         extents = extract_extent_from_geoparquet(table)
         collection.extent.temporal = extents[0]
         collection.extent.spatial = extents[1]
