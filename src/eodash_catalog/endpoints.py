@@ -830,7 +830,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     if endpoint_config.get("NoData"):
         no_data = "&no_data={}".format(endpoint_config["NoData"])
     item = item if item else "{item}"
-    target_url = f"https://openveda.cloud/api/raster/collections/{collection}/items/{item}/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{color_formula}{no_data}"
+    target_url = f'https://{endpoint_config["EndPoint"]}/raster/collections/{collection}/items/{item}/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{color_formula}{no_data}'
     return target_url
 
 
