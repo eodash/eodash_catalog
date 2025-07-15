@@ -831,7 +831,10 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
         no_data = "&no_data={}".format(endpoint_config["NoData"])
     item = item if item else "{item}"
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
-    target_url = f"{target_url_base}/raster/collections/{collection}/items/{item}/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{color_formula}{no_data}"
+    target_url = (
+        f"{target_url_base}/raster/collections/{collection}/items/{item}"
+        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{color_formula}{no_data}"
+    )
     return target_url
 
 
