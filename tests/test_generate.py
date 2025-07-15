@@ -5,7 +5,6 @@ from datetime import datetime
 
 import pytest
 from dateutil import parser
-
 from eodash_catalog.generate_indicators import process_catalog_file
 from eodash_catalog.utils import (
     Options,

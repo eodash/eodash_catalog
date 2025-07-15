@@ -5,7 +5,6 @@ import shutil
 import pyarrow as pa
 import pytest
 import stac_geoparquet as stac_gp
-
 from eodash_catalog.utils import (
     Options,
 )
