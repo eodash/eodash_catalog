@@ -45,11 +45,11 @@ def test_geoparquet_geojson_items(catalog_output_folder):
 
     with open(os.path.join(child_collection_path, "collection.json")) as fp:
         collection_json = json.load(fp)
-        items_links = [link for link in collection_json["links"] if link["rel"] == "items"]
-        assert len(items_links) == 1
-        gp_link = items_links[0]
-        assert gp_link["type"] == "application/vnd.apache.parquet"
-        items_path = os.path.join(child_collection_path, gp_link["href"].split("/")[-1])
+        # check if parquet source is present in assets
+        assert "geoparquet" in collection_json["assets"]
+        parquet_asset = collection_json["assets"]["geoparquet"]
+        assert parquet_asset["type"] == "application/vnd.apache.parquet"
+        items_path = os.path.join(child_collection_path, parquet_asset["href"].split("/")[-1])
         assert os.path.exists(items_path)
 
     with open(items_path, "rb") as fp:

@@ -1,4 +1,5 @@
 import importlib
+import io
 import json
 import os
 import sys
@@ -8,6 +9,7 @@ from datetime import datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
 
+import pyarrow.parquet as pq
 import requests
 from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries, TemporalExtent
 from pystac_client import Client
@@ -28,6 +30,7 @@ from eodash_catalog.thumbnails import generate_thumbnail
 from eodash_catalog.utils import (
     Options,
     create_geometry_from_bbox,
+    extract_extent_from_geoparquet,
     filter_time_entries,
     format_datetime_to_isostring_zulu,
     generate_veda_cog_link,
@@ -1218,6 +1221,33 @@ def handle_raw_source(
         # eodash v4 compatibility, adding last referenced style to collection
         if style_link:
             collection.add_link(style_link)
+    elif endpoint_config.get("ParquetSource"):
+        # if parquet source is provided, download it and create items from it
+        parquet_source = endpoint_config["ParquetSource"]
+        if parquet_source.startswith("http"):
+            # download parquet file
+            parquet_file = requests.get(parquet_source)
+            if parquet_file.status_code != 200:
+                LOGGER.error(f"Failed to download parquet file from {parquet_source}")
+                return collection
+            try:
+                table = pq.read_table(io.BytesIO(parquet_file.content))
+            except Exception as e:
+                LOGGER.error(f"Failed to read parquet file: {e}")
+                return collection
+            extents = extract_extent_from_geoparquet(table)
+            collection.extent.temporal = extents[0]
+            collection.extent.spatial = extents[1]
+            collection.add_asset(
+                "geoparquet",
+                Asset(
+                    href=parquet_source,
+                    media_type="application/vnd.apache.parquet",
+                    title="GeoParquet Items",
+                    roles=["collection-mirror"],
+                ),
+            )
+
     else:
         LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
 
