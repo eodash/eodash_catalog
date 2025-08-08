@@ -444,8 +444,9 @@ def update_extents_from_collection_children(collection: Collection):
         ):
             individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
     individual_datetimes = list(filter(lambda x: x is not None, individual_datetimes))
-    time_extent = [min(individual_datetimes), max(individual_datetimes)]
-    collection.extent.temporal = TemporalExtent([time_extent])
+    if individual_datetimes:
+        time_extent = [min(individual_datetimes), max(individual_datetimes)]
+        collection.extent.temporal = TemporalExtent([time_extent])
 
 
 def extract_extent_from_geoparquet(table) -> tuple[TemporalExtent, SpatialExtent]:
