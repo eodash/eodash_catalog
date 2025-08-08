@@ -214,7 +214,7 @@ def parse_duration(datestring):
 
 
 def generateDatetimesFromInterval(
-    start: str, end: str, timedelta_config: dict | None = None
+    start: str, end: str, timedelta_config: dict | None = None, interval_between_dates: bool = False
 ) -> list[datetime]:
     if timedelta_config is None:
         timedelta_config = {}
@@ -226,7 +226,10 @@ def generateDatetimesFromInterval(
     delta = timedelta(**timedelta_config)
     dates = []
     while start_dt <= end_dt:
-        dates.append(start_dt)
+        if interval_between_dates:
+            dates.append([start_dt, start_dt + delta])
+        else:
+            dates.append(start_dt)
         start_dt += delta
     return dates
 

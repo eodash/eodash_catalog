@@ -544,7 +544,12 @@ def get_collection_datetimes_from_config(endpoint_config: dict) -> list[datetime
             start = endpoint_config["DateTimeInterval"].get("Start", "2020-09-01T00:00:00Z")
             end = endpoint_config["DateTimeInterval"].get("End", "2020-10-01T00:00:00Z")
             timedelta_config = endpoint_config["DateTimeInterval"].get("Timedelta", {"days": 1})
-            times_datetimes = generateDatetimesFromInterval(start, end, timedelta_config)
+            interval_between_dates = endpoint_config["DateTimeInterval"].get(
+                "WMSIntervalsBetweenDates", False
+            )
+            times_datetimes = generateDatetimesFromInterval(
+                start, end, timedelta_config, interval_between_dates
+            )
     return times_datetimes
 
 

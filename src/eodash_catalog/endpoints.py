@@ -781,19 +781,24 @@ def handle_WMS_endpoint(
     # Create an item per time to allow visualization in stac clients
     if len(datetimes) > 0:
         for dt in datetimes:
+            # case of wms interval coming from config
+            dt_item = dt[0] if isinstance(dt, list) else dt
             item = Item(
-                id=format_datetime_to_isostring_zulu(dt),
+                id=format_datetime_to_isostring_zulu(dt_item),
                 bbox=spatial_extent,
                 properties={},
                 geometry=create_geometry_from_bbox(spatial_extent),
-                datetime=dt,
+                datetime=dt_item,
                 stac_extensions=[
                     "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                 ],
                 assets={"dummy_asset": Asset(href="")},
             )
             add_projection_info(endpoint_config, item)
-            add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
+            dt_visualization = dt if isinstance(dt, list) else [dt]
+            add_visualization_info(
+                item, collection_config, endpoint_config, datetimes=dt_visualization
+            )
             items.append(item)
     else:
         LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
@@ -878,7 +883,6 @@ def add_visualization_info(
             start_isostring = format_datetime_to_isostring_zulu(dt)
             # SH WMS for public collections needs time interval, we use full day here
             end = dt + timedelta(days=1) - timedelta(milliseconds=1)
-            # we have start_datetime and end_datetime
             if len(datetimes) == 2:
                 end = datetimes[1]
             end_isostring = format_datetime_to_isostring_zulu(end)
@@ -916,7 +920,13 @@ def add_visualization_info(
                     )
                 dimensions[key] = value
         if datetimes is not None:
-            dimensions["TIME"] = format_datetime_to_isostring_zulu(datetimes[0])
+            if len(datetimes) > 1:
+                start = format_datetime_to_isostring_zulu(datetimes[0])
+                end = format_datetime_to_isostring_zulu(datetimes[1])
+                interval = f"{start}/{end}"
+                dimensions["TIME"] = interval
+            else:
+                dimensions["TIME"] = format_datetime_to_isostring_zulu(datetimes[0])
         if dimensions != {}:
             extra_fields["wms:dimensions"] = dimensions
         if endpoint_config.get("Styles"):
