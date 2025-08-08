@@ -615,7 +615,9 @@ def handle_GeoDB_endpoint(
                 time_object = datetime.fromisoformat(v["time"])
                 if endpoint_config.get("MapReplaceDates"):
                     # get mapping of AOI_ID to list of dates
-                    available_dates_for_aoi_id = endpoint_config.get("MapReplaceDates").get(key)
+                    available_dates_for_aoi_id = endpoint_config.get("MapReplaceDates").get(
+                        v["aoi_id"]
+                    )
                     if available_dates_for_aoi_id:
                         formatted_datetime = time_object.strftime("%Y-%m-%d")
                         if formatted_datetime not in available_dates_for_aoi_id:
@@ -624,12 +626,14 @@ def handle_GeoDB_endpoint(
                 # extract wkt geometry from sub_aoi
                 if "sub_aoi" in v and v["sub_aoi"] != "/":
                     # create geometry from wkt
-                    geometry = mapping(wkt.loads(v["sub_aoi"]))
+                    shapely_geometry = wkt.loads(v["sub_aoi"])
+                    geometry = mapping(shapely_geometry)
                     # converting multipolygon to polygon to avoid shapely throwing an exception
                     # in collection extent from geoparquet table generation
                     # while trying to create a multipolygon extent of all multipolygons
                     if geometry["type"] == "MultiPolygon":
                         geometry = {"type": "Polygon", "coordinates": geometry["coordinates"][0]}
+                    bbox = shapely_geometry.bounds
                 else:
                     geometry = create_geometry_from_bbox(bbox)
                 item = Item(
@@ -684,6 +688,11 @@ def handle_GeoDB_endpoint(
                                 first_match.get("DateFormat", "%Y_%m_%d")
                             )
                             target_url = url.replace("{time}", date_formatted)
+                            if SiteMapping := first_match.get("SiteMapping"):
+                                # match with aoi_id
+                                site = SiteMapping.get(v["aoi_id"])
+                                # replace in URL
+                                target_url = target_url.replace("{site}", site)
                             link = Link(
                                 rel="xyz",
                                 target=target_url,
@@ -716,6 +725,7 @@ def handle_GeoDB_endpoint(
         link.extra_fields["latlng"] = latlon
         link.extra_fields["country"] = country
         link.extra_fields["name"] = city
+        add_collection_information(catalog_config, locations_collection, collection_config)
 
     if "yAxis" not in collection_config:
         # fetch yAxis and store it to data, preventing need to save it per dataset in yml
