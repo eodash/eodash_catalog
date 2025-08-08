@@ -227,7 +227,7 @@ def generateDatetimesFromInterval(
     dates = []
     while start_dt <= end_dt:
         if interval_between_dates:
-            dates.append([start_dt, start_dt + delta])
+            dates.append([start_dt, start_dt + delta - timedelta(seconds=1)])
         else:
             dates.append(start_dt)
         start_dt += delta
@@ -619,3 +619,26 @@ def merge_bboxes(bboxes: list[list[float]]) -> list[float]:
     max_lat = max(b[3] for b in bboxes)
 
     return [min_lon, min_lat, max_lon, max_lat]
+
+
+def make_intervals(datetimes: list[datetime]) -> list[list[datetime]]:
+    """
+    Converts a list of datetimes into list of lists of datetimes in format of [start,end]
+    where end is next element in original list minus 1 second
+    """
+    intervals = []
+    n = len(datetimes)
+    for i in range(n):
+        start = datetimes[i]
+        if i < n - 1:
+            # end is next datetime minus one second
+            end = datetimes[i + 1] - timedelta(seconds=1)
+        else:
+            prev_interval = timedelta(seconds=0)
+            # last item: use previous interval length added to last start
+            if n > 1:
+                prev_interval = datetimes[-1] - datetimes[-2]
+            end = start + prev_interval
+        intervals.append([start, end])
+    LOGGER.info(intervals)
+    return intervals
