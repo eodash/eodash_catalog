@@ -609,10 +609,18 @@ def handle_GeoDB_endpoint(
             items = []
             for v in values:
                 # add items based on inputData fields for each time step available in values
-                first_match = next(
+                first_match: dict = next(
                     (item for item in input_data if item.get("Identifier") == v["input_data"]), None
                 )
                 time_object = datetime.fromisoformat(v["time"])
+                if endpoint_config.get("MapReplaceDates"):
+                    # get mapping of AOI_ID to list of dates
+                    available_dates_for_aoi_id = endpoint_config.get("MapReplaceDates").get(key)
+                    if available_dates_for_aoi_id:
+                        formatted_datetime = time_object.strftime("%Y-%m-%d")
+                        if formatted_datetime not in available_dates_for_aoi_id:
+                            # discard this date because not in available map dates
+                            continue
                 # extract wkt geometry from sub_aoi
                 if "sub_aoi" in v and v["sub_aoi"] != "/":
                     # create geometry from wkt
@@ -640,7 +648,7 @@ def handle_GeoDB_endpoint(
                                 "wms:layers": [first_match["Layers"]],
                                 "role": ["data"],
                             }
-                            if url.startswith("https://services.sentinel-hub.com/ogc/wms/"):
+                            if "sentinel-hub.com" in url:
                                 instanceId = os.getenv("SH_INSTANCE_ID")
                                 if "InstanceId" in endpoint_config:
                                     instanceId = endpoint_config["InstanceId"]
@@ -655,13 +663,31 @@ def handle_GeoDB_endpoint(
                                     {"wms:dimensions": {"TIME": f"{start_date}/{end_date}"}}
                                 )
                                 # we add the instance id to the url
-                                url = f"https://services.sentinel-hub.com/ogc/wms/{instanceId}"
+                                url = f"{url}{instanceId}"
                             else:
                                 extra_fields.update({"wms:dimensions": {"TIME": v["time"]}})
                             link = Link(
                                 rel="wms",
                                 target=url,
                                 media_type=(endpoint_config.get("MimeType", "image/png")),
+                                title=collection_config["Name"],
+                                extra_fields=extra_fields,
+                            )
+                            item.add_link(link)
+                            items.append(item)
+                        case "XYZ":
+                            # handler for NASA apis
+                            url = first_match["Url"]
+                            extra_fields = {}
+                            # replace time to a formatted version
+                            date_formatted = time_object.strftime(
+                                first_match.get("DateFormat", "%Y_%m_%d")
+                            )
+                            target_url = url.replace("{time}", date_formatted)
+                            link = Link(
+                                rel="xyz",
+                                target=target_url,
+                                media_type="image/png",
                                 title=collection_config["Name"],
                                 extra_fields=extra_fields,
                             )
