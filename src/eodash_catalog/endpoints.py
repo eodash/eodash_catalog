@@ -692,7 +692,12 @@ def handle_GeoDB_endpoint(
                                 # match with aoi_id
                                 site = SiteMapping.get(v["aoi_id"])
                                 # replace in URL
-                                target_url = target_url.replace("{site}", site)
+                                if site:
+                                    target_url = target_url.replace("{site}", site)
+                                else:
+                                    LOGGER.info(
+                                        f"Warning: no match for SiteMapping in config for {site}"
+                                    )
                             link = Link(
                                 rel="xyz",
                                 target=target_url,
