@@ -18,6 +18,7 @@ from structlog import get_logger
 from eodash_catalog.utils import (
     generateDatetimesFromInterval,
     get_full_url,
+    make_intervals,
     parse_datestring_to_tz_aware_datetime,
     read_config_file,
 )
@@ -535,16 +536,22 @@ def add_extra_fields(
 def get_collection_datetimes_from_config(endpoint_config: dict) -> list[datetime]:
     times_datetimes: list[datetime] = []
     if endpoint_config:
+        interval_between_dates = endpoint_config.get("WMSIntervalsBetweenDates")
         if endpoint_config.get("Times"):
             times = list(endpoint_config.get("Times", []))
             times_datetimes = sorted(
                 [parse_datestring_to_tz_aware_datetime(time) for time in times]
             )
+            if interval_between_dates:
+                # convert to list of datetime_start and datetime_end
+                times_datetimes = make_intervals(times_datetimes)
         elif endpoint_config.get("DateTimeInterval"):
             start = endpoint_config["DateTimeInterval"].get("Start", "2020-09-01T00:00:00Z")
             end = endpoint_config["DateTimeInterval"].get("End", "2020-10-01T00:00:00Z")
             timedelta_config = endpoint_config["DateTimeInterval"].get("Timedelta", {"days": 1})
-            times_datetimes = generateDatetimesFromInterval(start, end, timedelta_config)
+            times_datetimes = generateDatetimesFromInterval(
+                start, end, timedelta_config, interval_between_dates
+            )
     return times_datetimes
 
 

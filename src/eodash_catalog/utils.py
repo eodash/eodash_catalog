@@ -214,7 +214,7 @@ def parse_duration(datestring):
 
 
 def generateDatetimesFromInterval(
-    start: str, end: str, timedelta_config: dict | None = None
+    start: str, end: str, timedelta_config: dict | None = None, interval_between_dates: bool = False
 ) -> list[datetime]:
     if timedelta_config is None:
         timedelta_config = {}
@@ -226,7 +226,10 @@ def generateDatetimesFromInterval(
     delta = timedelta(**timedelta_config)
     dates = []
     while start_dt <= end_dt:
-        dates.append(start_dt)
+        if interval_between_dates:
+            dates.append([start_dt, start_dt + delta - timedelta(seconds=1)])
+        else:
+            dates.append(start_dt)
         start_dt += delta
     return dates
 
@@ -444,8 +447,9 @@ def update_extents_from_collection_children(collection: Collection):
         ):
             individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
     individual_datetimes = list(filter(lambda x: x is not None, individual_datetimes))
-    time_extent = [min(individual_datetimes), max(individual_datetimes)]
-    collection.extent.temporal = TemporalExtent([time_extent])
+    if individual_datetimes:
+        time_extent = [min(individual_datetimes), max(individual_datetimes)]
+        collection.extent.temporal = TemporalExtent([time_extent])
 
 
 def extract_extent_from_geoparquet(table) -> tuple[TemporalExtent, SpatialExtent]:
@@ -615,3 +619,26 @@ def merge_bboxes(bboxes: list[list[float]]) -> list[float]:
     max_lat = max(b[3] for b in bboxes)
 
     return [min_lon, min_lat, max_lon, max_lat]
+
+
+def make_intervals(datetimes: list[datetime]) -> list[list[datetime]]:
+    """
+    Converts a list of datetimes into list of lists of datetimes in format of [start,end]
+    where end is next element in original list minus 1 second
+    """
+    intervals = []
+    n = len(datetimes)
+    for i in range(n):
+        start = datetimes[i]
+        if i < n - 1:
+            # end is next datetime minus one second
+            end = datetimes[i + 1] - timedelta(seconds=1)
+        else:
+            prev_interval = timedelta(seconds=0)
+            # last item: use previous interval length added to last start
+            if n > 1:
+                prev_interval = datetimes[-1] - datetimes[-2]
+            end = start + prev_interval
+        intervals.append([start, end])
+    LOGGER.info(intervals)
+    return intervals

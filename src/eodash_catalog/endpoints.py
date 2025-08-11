@@ -609,19 +609,31 @@ def handle_GeoDB_endpoint(
             items = []
             for v in values:
                 # add items based on inputData fields for each time step available in values
-                first_match = next(
+                first_match: dict = next(
                     (item for item in input_data if item.get("Identifier") == v["input_data"]), None
                 )
                 time_object = datetime.fromisoformat(v["time"])
+                if endpoint_config.get("MapReplaceDates"):
+                    # get mapping of AOI_ID to list of dates
+                    available_dates_for_aoi_id = endpoint_config.get("MapReplaceDates").get(
+                        v["aoi_id"]
+                    )
+                    if available_dates_for_aoi_id:
+                        formatted_datetime = time_object.strftime("%Y-%m-%d")
+                        if formatted_datetime not in available_dates_for_aoi_id:
+                            # discard this date because not in available map dates
+                            continue
                 # extract wkt geometry from sub_aoi
                 if "sub_aoi" in v and v["sub_aoi"] != "/":
                     # create geometry from wkt
-                    geometry = mapping(wkt.loads(v["sub_aoi"]))
+                    shapely_geometry = wkt.loads(v["sub_aoi"])
+                    geometry = mapping(shapely_geometry)
                     # converting multipolygon to polygon to avoid shapely throwing an exception
                     # in collection extent from geoparquet table generation
                     # while trying to create a multipolygon extent of all multipolygons
                     if geometry["type"] == "MultiPolygon":
                         geometry = {"type": "Polygon", "coordinates": geometry["coordinates"][0]}
+                    bbox = shapely_geometry.bounds
                 else:
                     geometry = create_geometry_from_bbox(bbox)
                 item = Item(
@@ -640,7 +652,7 @@ def handle_GeoDB_endpoint(
                                 "wms:layers": [first_match["Layers"]],
                                 "role": ["data"],
                             }
-                            if url.startswith("https://services.sentinel-hub.com/ogc/wms/"):
+                            if "sentinel-hub.com" in url:
                                 instanceId = os.getenv("SH_INSTANCE_ID")
                                 if "InstanceId" in endpoint_config:
                                     instanceId = endpoint_config["InstanceId"]
@@ -655,13 +667,41 @@ def handle_GeoDB_endpoint(
                                     {"wms:dimensions": {"TIME": f"{start_date}/{end_date}"}}
                                 )
                                 # we add the instance id to the url
-                                url = f"https://services.sentinel-hub.com/ogc/wms/{instanceId}"
+                                url = f"{url}{instanceId}"
                             else:
                                 extra_fields.update({"wms:dimensions": {"TIME": v["time"]}})
                             link = Link(
                                 rel="wms",
                                 target=url,
                                 media_type=(endpoint_config.get("MimeType", "image/png")),
+                                title=collection_config["Name"],
+                                extra_fields=extra_fields,
+                            )
+                            item.add_link(link)
+                            items.append(item)
+                        case "XYZ":
+                            # handler for NASA apis
+                            url = first_match["Url"]
+                            extra_fields = {}
+                            # replace time to a formatted version
+                            date_formatted = time_object.strftime(
+                                first_match.get("DateFormat", "%Y_%m_%d")
+                            )
+                            target_url = url.replace("{time}", date_formatted)
+                            if SiteMapping := first_match.get("SiteMapping"):
+                                # match with aoi_id
+                                site = SiteMapping.get(v["aoi_id"])
+                                # replace in URL
+                                if site:
+                                    target_url = target_url.replace("{site}", site)
+                                else:
+                                    LOGGER.info(
+                                        f"Warning: no match for SiteMapping in config for {site}"
+                                    )
+                            link = Link(
+                                rel="xyz",
+                                target=target_url,
+                                media_type="image/png",
                                 title=collection_config["Name"],
                                 extra_fields=extra_fields,
                             )
@@ -690,6 +730,7 @@ def handle_GeoDB_endpoint(
         link.extra_fields["latlng"] = latlon
         link.extra_fields["country"] = country
         link.extra_fields["name"] = city
+        add_collection_information(catalog_config, locations_collection, collection_config)
 
     if "yAxis" not in collection_config:
         # fetch yAxis and store it to data, preventing need to save it per dataset in yml
@@ -781,19 +822,24 @@ def handle_WMS_endpoint(
     # Create an item per time to allow visualization in stac clients
     if len(datetimes) > 0:
         for dt in datetimes:
+            # case of wms interval coming from config
+            dt_item = dt[0] if isinstance(dt, list) else dt
             item = Item(
-                id=format_datetime_to_isostring_zulu(dt),
+                id=format_datetime_to_isostring_zulu(dt_item),
                 bbox=spatial_extent,
                 properties={},
                 geometry=create_geometry_from_bbox(spatial_extent),
-                datetime=dt,
+                datetime=dt_item,
                 stac_extensions=[
                     "https://stac-extensions.github.io/web-map-links/v1.1.0/schema.json",
                 ],
                 assets={"dummy_asset": Asset(href="")},
             )
             add_projection_info(endpoint_config, item)
-            add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
+            dt_visualization = dt if isinstance(dt, list) else [dt]
+            add_visualization_info(
+                item, collection_config, endpoint_config, datetimes=dt_visualization
+            )
             items.append(item)
     else:
         LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
@@ -878,7 +924,6 @@ def add_visualization_info(
             start_isostring = format_datetime_to_isostring_zulu(dt)
             # SH WMS for public collections needs time interval, we use full day here
             end = dt + timedelta(days=1) - timedelta(milliseconds=1)
-            # we have start_datetime and end_datetime
             if len(datetimes) == 2:
                 end = datetimes[1]
             end_isostring = format_datetime_to_isostring_zulu(end)
@@ -916,7 +961,13 @@ def add_visualization_info(
                     )
                 dimensions[key] = value
         if datetimes is not None:
-            dimensions["TIME"] = format_datetime_to_isostring_zulu(datetimes[0])
+            if len(datetimes) > 1:
+                start = format_datetime_to_isostring_zulu(datetimes[0])
+                end = format_datetime_to_isostring_zulu(datetimes[1])
+                interval = f"{start}/{end}"
+                dimensions["TIME"] = interval
+            else:
+                dimensions["TIME"] = format_datetime_to_isostring_zulu(datetimes[0])
         if dimensions != {}:
             extra_fields["wms:dimensions"] = dimensions
         if endpoint_config.get("Styles"):
