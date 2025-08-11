@@ -640,5 +640,4 @@ def make_intervals(datetimes: list[datetime]) -> list[list[datetime]]:
                 prev_interval = datetimes[-1] - datetimes[-2]
             end = start + prev_interval
         intervals.append([start, end])
-    LOGGER.info(intervals)
     return intervals
