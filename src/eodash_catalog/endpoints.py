@@ -538,6 +538,100 @@ def handle_rasdaman_endpoint(
     # add_example_info(collection, collection_config, endpoint_config, catalog_config)
     return collection
 
+def handle_GeoDB_Features_endpoint(
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
+    options: Options,
+) -> Collection:
+    
+    # ID of collection is data["Name"] instead of CollectionId to be able to
+    # create more STAC collections from one geoDB table
+    collection = get_or_create_collection(
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
+    )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+    select = f'?select={endpoint_config["TimeParameter"]}'
+    url = (
+        endpoint_config["EndPoint"]
+        + endpoint_config["Database"]
+        + "_{}".format(endpoint_config["CollectionId"])
+        + select
+    )
+    response = json.loads(requests.get(url).text)
+    # Use aggregation value to group datetime results
+    aggregation = endpoint_config.get("Aggregation", "day")
+    unique_datetimes = set()
+    for value in response:
+        time_object = datetime.fromisoformat(value[endpoint_config["TimeParameter"]])
+        match aggregation:
+            case "hour":
+                unique_datetimes.add(
+                    datetime(
+                        time_object.year,
+                        time_object.month,
+                        time_object.day,
+                        time_object.hour,
+                    )
+                )
+            case "day":
+                unique_datetimes.add(datetime(time_object.year, time_object.month, time_object.day).date())
+            case "month":
+                unique_datetimes.add(datetime(time_object.year, time_object.month, 1).date())
+            case "year":
+                unique_datetimes.add(datetime(time_object.year, 1, 1).date())
+            case _:
+                # default to day
+                unique_datetimes.add(datetime(time_object.year, time_object.month, time_object.day).date())
+    # go over unique datetimes and create items
+    items = []
+    for dt in sorted(unique_datetimes):
+        if isinstance(dt, datetime):
+            item_datetime = dt
+        else:
+            item_datetime = datetime(dt.year, dt.month, dt.day)
+        matching_string = ""
+        match aggregation:
+            case "hour":
+                matching_string = item_datetime.strftime("%Y-%m-%dT%H:00:00Z")
+            case "day":
+                matching_string = item_datetime.strftime("%Y-%m-%d")
+            case "month":
+                matching_string = item_datetime.strftime("%Y-%m")
+            case "year":
+                matching_string = item_datetime.strftime("%Y")
+        updated_query = endpoint_config["Query"].replace("{{date_time}}", matching_string)
+        item = Item(
+            id=format_datetime_to_isostring_zulu(item_datetime),
+            bbox=endpoint_config.get("OverwriteBBox", [-180, -90, 180, 90]),
+            properties={},
+            geometry=create_geometry_from_bbox(
+                endpoint_config.get("OverwriteBBox", [-180, -90, 180, 90])
+            ),
+            datetime=item_datetime,
+            stac_extensions=[],
+            assets={
+                "geodbfeatures": Asset(
+                href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['CollectionId']}?{updated_query}",
+                media_type="application/geodb+json",
+                roles=["data"],
+            )},
+        )
+        add_projection_info(endpoint_config, item)
+        items.append(item)
+    
+    save_items(
+        collection,
+        items,
+        options.outputpath,
+        catalog_config["id"],
+        f"{coll_path_rel_to_root_catalog}/{collection.id}",
+        options.gp,
+    )
+    return collection
+    
 
 def handle_GeoDB_endpoint(
     catalog_config: dict,

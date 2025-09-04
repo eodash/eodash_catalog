@@ -19,6 +19,7 @@ from eodash_catalog.endpoints import (
     handle_collection_only,
     handle_custom_endpoint,
     handle_GeoDB_endpoint,
+    handle_GeoDB_Features_endpoint,
     handle_rasdaman_endpoint,
     handle_raw_source,
     handle_SH_endpoint,
@@ -234,6 +235,15 @@ def process_collection_file(
                     )
                 elif endpoint_config["Name"] == "GeoDB":
                     collection = handle_GeoDB_endpoint(
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
+                    )
+                elif endpoint_config["Name"] == "GeoDB Features":
+                    collection = handle_GeoDB_Features_endpoint(
                         catalog_config,
                         endpoint_config,
                         collection_config,
