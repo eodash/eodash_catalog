@@ -538,6 +538,120 @@ def handle_rasdaman_endpoint(
     # add_example_info(collection, collection_config, endpoint_config, catalog_config)
     return collection
 
+def handle_GeoDB_Features_endpoint(
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
+    options: Options,
+) -> Collection:
+
+    # ID of collection is data["Name"] instead of CollectionId to be able to
+    # create more STAC collections from one geoDB table
+    collection = get_or_create_collection(
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
+    )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+    select = f'?select={endpoint_config["TimeParameter"]}'
+    url = (
+        endpoint_config["EndPoint"]
+        + endpoint_config["Database"]
+        + "_{}".format(endpoint_config["CollectionId"])
+        + select
+    )
+    response = json.loads(requests.get(url).text)
+    # Use aggregation value to group datetime results
+    aggregation = endpoint_config.get("Aggregation", "day")
+    unique_datetimes = set()
+    for value in response:
+        time_object = datetime.fromisoformat(value[endpoint_config["TimeParameter"]])
+        match aggregation:
+            case "hour":
+                unique_datetimes.add(
+                    datetime(
+                        time_object.year,
+                        time_object.month,
+                        time_object.day,
+                        time_object.hour,
+                    )
+                )
+            case "day":
+                unique_datetimes.add(
+                    datetime(time_object.year, time_object.month, time_object.day).date()
+                )
+            case "month":
+                unique_datetimes.add(
+                    datetime(time_object.year, time_object.month, 1).date()
+                )
+            case "year":
+                unique_datetimes.add(
+                    datetime(time_object.year, 1, 1).date()
+                )
+            case _:
+                # default to day
+                unique_datetimes.add(
+                    datetime(time_object.year, time_object.month, time_object.day).date()
+                )
+    # go over unique datetimes and create items
+    items = []
+    for dt in sorted(unique_datetimes):
+        item_datetime = dt if isinstance(dt, datetime) else datetime(dt.year, dt.month, dt.day)
+        matching_string = ""
+        match aggregation:
+            case "hour":
+                matching_string = item_datetime.strftime("%Y-%m-%dT%H:00:00Z")
+            case "day":
+                matching_string = item_datetime.strftime("%Y-%m-%d")
+            case "month":
+                matching_string = item_datetime.strftime("%Y-%m")
+            case "year":
+                matching_string = item_datetime.strftime("%Y")
+        updated_query = endpoint_config["Query"].replace("{{date_time}}", matching_string)
+        assets = {
+            "geodbfeatures": Asset(
+            href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['CollectionId']}?{updated_query}",
+            media_type="application/geodb+json",
+            roles=["data"],
+        )}
+        item = Item(
+            id=format_datetime_to_isostring_zulu(item_datetime),
+            bbox=endpoint_config.get("OverwriteBBox", [-180, -90, 180, 90]),
+            properties={},
+            geometry=create_geometry_from_bbox(
+                endpoint_config.get("OverwriteBBox", [-180, -90, 180, 90])
+            ),
+            datetime=item_datetime,
+            stac_extensions=[],
+            assets=assets,
+        )
+        # add eodash style visualization info if Style has been provided
+        if endpoint_config.get("Style"):
+            ep_st = endpoint_config.get("Style")
+            style_link = Link(
+                rel="style",
+                target=ep_st
+                if ep_st.startswith("http")
+                else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                media_type="text/vector-styles",
+                extra_fields={
+                    "asset:keys": list(assets),
+                },
+            )
+            item.add_link(style_link)
+        add_projection_info(endpoint_config, item)
+        items.append(item)
+
+    save_items(
+        collection,
+        items,
+        options.outputpath,
+        catalog_config["id"],
+        f"{coll_path_rel_to_root_catalog}/{collection.id}",
+        options.gp,
+    )
+    return collection
+
 
 def handle_GeoDB_endpoint(
     catalog_config: dict,
@@ -605,7 +719,10 @@ def handle_GeoDB_endpoint(
         locations_collection = get_or_create_collection(
             collection, key, sc_config, catalog_config, endpoint_config
         )
-        if input_data:
+        # check if input data is none
+        if input_data is None:
+            input_data = []
+        if len(input_data) > 0 or endpoint_config.get("FeatureCollection"):
             items = []
             for v in values:
                 # add items based on inputData fields for each time step available in values
@@ -636,14 +753,36 @@ def handle_GeoDB_endpoint(
                     bbox = shapely_geometry.bounds
                 else:
                     geometry = create_geometry_from_bbox(bbox)
+
+                assets = {"dummy_asset": Asset(href="")}
+                if endpoint_config.get("FeatureCollection"):
+                    assets["geodbfeatures"] = Asset(
+                        href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['FeatureCollection']}?aoi_id=eq.{v['aoi_id']}&time=eq.{v['time']}",
+                        media_type="application/geodb+json",
+                        roles=["data"],
+                    )
                 item = Item(
                     id=v["time"],
                     bbox=bbox,
                     properties={},
                     geometry=geometry,
                     datetime=time_object,
-                    assets={"dummy_asset": Asset(href="")},
+                    assets=assets,
                 )
+                # make sure to also add Style link if FeatureCollection and Style has been provided
+                if endpoint_config.get("FeatureCollection") and endpoint_config.get("Style"):
+                    ep_st = endpoint_config.get("Style")
+                    style_link = Link(
+                        rel="style",
+                        target=ep_st
+                        if ep_st.startswith("http")
+                        else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                        media_type="text/vector-styles",
+                        extra_fields={
+                            "asset:keys": list(assets),
+                        },
+                    )
+                    item.add_link(style_link)
                 if first_match:
                     match first_match["Type"]:
                         case "WMS":
@@ -707,6 +846,22 @@ def handle_GeoDB_endpoint(
                             )
                             item.add_link(link)
                             items.append(item)
+                elif endpoint_config.get("FeatureCollection"):
+                    # no input data match found, just add the item with asset only
+                    assets["geodbfeatures"] = Asset(
+                        href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['FeatureCollection']}?aoi_id=eq.{v['aoi_id']}&time=eq.{v['time']}",
+                        media_type="application/geodb+json",
+                        roles=["data"],
+                    )
+                    item = Item(
+                        id=v["time"],
+                        bbox=bbox,
+                        properties={},
+                        geometry=geometry,
+                        datetime=time_object,
+                        assets=assets,
+                    )
+                    items.append(item)
             save_items(
                 locations_collection,
                 items,
