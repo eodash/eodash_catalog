@@ -546,7 +546,7 @@ def handle_GeoDB_Features_endpoint(
     catalog: Catalog,
     options: Options,
 ) -> Collection:
-    
+
     # ID of collection is data["Name"] instead of CollectionId to be able to
     # create more STAC collections from one geoDB table
     collection = get_or_create_collection(
@@ -577,21 +577,26 @@ def handle_GeoDB_Features_endpoint(
                     )
                 )
             case "day":
-                unique_datetimes.add(datetime(time_object.year, time_object.month, time_object.day).date())
+                unique_datetimes.add(
+                    datetime(time_object.year, time_object.month, time_object.day).date()
+                )
             case "month":
-                unique_datetimes.add(datetime(time_object.year, time_object.month, 1).date())
+                unique_datetimes.add(
+                    datetime(time_object.year, time_object.month, 1).date()
+                )
             case "year":
-                unique_datetimes.add(datetime(time_object.year, 1, 1).date())
+                unique_datetimes.add(
+                    datetime(time_object.year, 1, 1).date()
+                )
             case _:
                 # default to day
-                unique_datetimes.add(datetime(time_object.year, time_object.month, time_object.day).date())
+                unique_datetimes.add(
+                    datetime(time_object.year, time_object.month, time_object.day).date()
+                )
     # go over unique datetimes and create items
     items = []
     for dt in sorted(unique_datetimes):
-        if isinstance(dt, datetime):
-            item_datetime = dt
-        else:
-            item_datetime = datetime(dt.year, dt.month, dt.day)
+        item_datetime = dt if isinstance(dt, datetime) else datetime(dt.year, dt.month, dt.day)
         matching_string = ""
         match aggregation:
             case "hour":
@@ -621,7 +626,7 @@ def handle_GeoDB_Features_endpoint(
         )
         add_projection_info(endpoint_config, item)
         items.append(item)
-    
+
     save_items(
         collection,
         items,
@@ -631,7 +636,7 @@ def handle_GeoDB_Features_endpoint(
         options.gp,
     )
     return collection
-    
+
 
 def handle_GeoDB_endpoint(
     catalog_config: dict,
@@ -701,7 +706,7 @@ def handle_GeoDB_endpoint(
         )
         # check if input data is none
         if input_data is None:
-            input_data = [] 
+            input_data = []
         if len(input_data) > 0 or endpoint_config.get("FeatureCollection"):
             items = []
             for v in values:
@@ -733,7 +738,7 @@ def handle_GeoDB_endpoint(
                     bbox = shapely_geometry.bounds
                 else:
                     geometry = create_geometry_from_bbox(bbox)
-                
+
                 assets = {"dummy_asset": Asset(href="")}
                 if endpoint_config.get("FeatureCollection"):
                     assets["geodbfeatures"] = Asset(
