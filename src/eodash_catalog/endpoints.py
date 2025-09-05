@@ -699,7 +699,10 @@ def handle_GeoDB_endpoint(
         locations_collection = get_or_create_collection(
             collection, key, sc_config, catalog_config, endpoint_config
         )
-        if input_data:
+        # check if input data is none
+        if input_data is None:
+            input_data = [] 
+        if len(input_data) > 0 or endpoint_config.get("FeatureCollection"):
             items = []
             for v in values:
                 # add items based on inputData fields for each time step available in values
@@ -730,13 +733,21 @@ def handle_GeoDB_endpoint(
                     bbox = shapely_geometry.bounds
                 else:
                     geometry = create_geometry_from_bbox(bbox)
+                
+                assets = {"dummy_asset": Asset(href="")}
+                if endpoint_config.get("FeatureCollection"):
+                    assets["geodbfeatures"] = Asset(
+                        href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['FeatureCollection']}?aoi_id=eq.{v['aoi_id']}&time=eq.{v['time']}",
+                        media_type="application/geodb+json",
+                        roles=["data"],
+                    )
                 item = Item(
                     id=v["time"],
                     bbox=bbox,
                     properties={},
                     geometry=geometry,
                     datetime=time_object,
-                    assets={"dummy_asset": Asset(href="")},
+                    assets=assets,
                 )
                 if first_match:
                     match first_match["Type"]:
@@ -801,6 +812,22 @@ def handle_GeoDB_endpoint(
                             )
                             item.add_link(link)
                             items.append(item)
+                elif endpoint_config.get("FeatureCollection"):
+                    # no input data match found, just add the item with asset only
+                    assets["geodbfeatures"] = Asset(
+                        href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['FeatureCollection']}?aoi_id=eq.{v['aoi_id']}&time=eq.{v['time']}",
+                        media_type="application/geodb+json",
+                        roles=["data"],
+                    )
+                    item = Item(
+                        id=v["time"],
+                        bbox=bbox,
+                        properties={},
+                        geometry=geometry,
+                        datetime=time_object,
+                        assets=assets,
+                    )
+                    items.append(item)
             save_items(
                 locations_collection,
                 items,
