@@ -608,6 +608,12 @@ def handle_GeoDB_Features_endpoint(
             case "year":
                 matching_string = item_datetime.strftime("%Y")
         updated_query = endpoint_config["Query"].replace("{{date_time}}", matching_string)
+        assets = {
+            "geodbfeatures": Asset(
+            href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['CollectionId']}?{updated_query}",
+            media_type="application/geodb+json",
+            roles=["data"],
+        )}
         item = Item(
             id=format_datetime_to_isostring_zulu(item_datetime),
             bbox=endpoint_config.get("OverwriteBBox", [-180, -90, 180, 90]),
@@ -617,13 +623,22 @@ def handle_GeoDB_Features_endpoint(
             ),
             datetime=item_datetime,
             stac_extensions=[],
-            assets={
-                "geodbfeatures": Asset(
-                href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['CollectionId']}?{updated_query}",
-                media_type="application/geodb+json",
-                roles=["data"],
-            )},
+            assets=assets,
         )
+        # add eodash style visualization info if Style has been provided
+        if endpoint_config.get("Style"):
+            ep_st = endpoint_config.get("Style")
+            style_link = Link(
+                rel="style",
+                target=ep_st
+                if ep_st.startswith("http")
+                else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                media_type="text/vector-styles",
+                extra_fields={
+                    "asset:keys": list(assets),
+                },
+            )
+            item.add_link(style_link)
         add_projection_info(endpoint_config, item)
         items.append(item)
 
@@ -754,6 +769,20 @@ def handle_GeoDB_endpoint(
                     datetime=time_object,
                     assets=assets,
                 )
+                # make sure to also add Style link if FeatureCollection and Style has been provided
+                if endpoint_config.get("FeatureCollection") and endpoint_config.get("Style"):
+                    ep_st = endpoint_config.get("Style")
+                    style_link = Link(
+                        rel="style",
+                        target=ep_st
+                        if ep_st.startswith("http")
+                        else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                        media_type="text/vector-styles",
+                        extra_fields={
+                            "asset:keys": list(assets),
+                        },
+                    )
+                    item.add_link(style_link)
                 if first_match:
                     match first_match["Type"]:
                         case "WMS":
