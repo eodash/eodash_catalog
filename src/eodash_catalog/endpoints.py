@@ -650,6 +650,7 @@ def handle_GeoDB_Features_endpoint(
         f"{coll_path_rel_to_root_catalog}/{collection.id}",
         options.gp,
     )
+    add_collection_information(catalog_config, collection, collection_config)
     return collection
 
 
