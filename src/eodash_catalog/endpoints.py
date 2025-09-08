@@ -641,13 +641,12 @@ def handle_GeoDB_Features_endpoint(
             item.add_link(style_link)
         add_projection_info(endpoint_config, item)
         items.append(item)
-
     save_items(
         collection,
         items,
         options.outputpath,
         catalog_config["id"],
-        f"{coll_path_rel_to_root_catalog}/{collection.id}",
+        coll_path_rel_to_root_catalog,
         options.gp,
     )
     add_collection_information(catalog_config, collection, collection_config)
