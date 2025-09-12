@@ -307,18 +307,21 @@ def add_collection_information(
             ),
         )
     if collection_config.get("Image"):
+        # Check if absolute URL or relative path
+        if collection_config["Image"].startswith("http"):
+            image_url = collection_config["Image"]
+        else:
+            image_url = f'{catalog_config["assets_endpoint"]}/{collection_config["Image"]}'
         collection.add_asset(
             "thumbnail",
             Asset(
-                href=f'{catalog_config["assets_endpoint"]}/{collection_config["Image"]}',
+                href=image_url,
                 media_type="image/png",
                 roles=["thumbnail"],
             ),
         )
         # Bubble up thumbnail to extra fields
-        collection.extra_fields["thumbnail"] = (
-            f'{catalog_config["assets_endpoint"]}/' f'{collection_config["Image"]}'
-        )
+        collection.extra_fields["thumbnail"] = (image_url)
     # Add extra fields to collection if available
     add_extra_fields(collection, collection_config, is_root_collection)
 
