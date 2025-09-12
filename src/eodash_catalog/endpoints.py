@@ -748,9 +748,6 @@ def handle_GeoDB_endpoint(
                     # overwrite time with one from another collection and save
                     insert_row["time"] = response_obj["time"]
                     content_for_individual_datetimes.append(insert_row)
-                    # get closest row from original table and merge
-                # content_for_individual_datetimes = values
-                pass
             for v in content_for_individual_datetimes:
                 # add items based on inputData fields for each time step available in values
                 first_match: dict = next(
