@@ -1,3 +1,4 @@
+import copy
 import importlib
 import io
 import json
@@ -538,6 +539,7 @@ def handle_rasdaman_endpoint(
     # add_example_info(collection, collection_config, endpoint_config, catalog_config)
     return collection
 
+
 def handle_GeoDB_Features_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
@@ -546,7 +548,6 @@ def handle_GeoDB_Features_endpoint(
     catalog: Catalog,
     options: Options,
 ) -> Collection:
-
     # ID of collection is data["Name"] instead of CollectionId to be able to
     # create more STAC collections from one geoDB table
     collection = get_or_create_collection(
@@ -581,13 +582,9 @@ def handle_GeoDB_Features_endpoint(
                     datetime(time_object.year, time_object.month, time_object.day).date()
                 )
             case "month":
-                unique_datetimes.add(
-                    datetime(time_object.year, time_object.month, 1).date()
-                )
+                unique_datetimes.add(datetime(time_object.year, time_object.month, 1).date())
             case "year":
-                unique_datetimes.add(
-                    datetime(time_object.year, 1, 1).date()
-                )
+                unique_datetimes.add(datetime(time_object.year, 1, 1).date())
             case _:
                 # default to day
                 unique_datetimes.add(
@@ -610,10 +607,11 @@ def handle_GeoDB_Features_endpoint(
         updated_query = endpoint_config["Query"].replace("{{date_time}}", matching_string)
         assets = {
             "geodbfeatures": Asset(
-            href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['CollectionId']}?{updated_query}",
-            media_type="application/geodb+json",
-            roles=["data"],
-        )}
+                href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['CollectionId']}?{updated_query}",
+                media_type="application/geodb+json",
+                roles=["data"],
+            )
+        }
         item = Item(
             id=format_datetime_to_isostring_zulu(item_datetime),
             bbox=endpoint_config.get("OverwriteBBox", [-180, -90, 180, 90]),
@@ -724,7 +722,36 @@ def handle_GeoDB_endpoint(
             input_data = []
         if len(input_data) > 0 or endpoint_config.get("FeatureCollection"):
             items = []
-            for v in values:
+            content_for_individual_datetimes = values
+            if endpoint_config.get("MapTimesCollection"):
+                # extract datetimes from another table if configured so and match it based on aoi_id
+                # special for E13d
+                select = f"?select=time&aoi_id=eq.{key}"
+                url = (
+                    endpoint_config["EndPoint"]
+                    + endpoint_config["Database"]
+                    + "_{}".format(endpoint_config["MapTimesCollection"])
+                    + select
+                )
+                response = json.loads(requests.get(url).text)
+                content_for_individual_datetimes = []
+                for response_obj in response:
+                    time_object = datetime.fromisoformat(response_obj["time"])
+                    for searched_row in values:
+                        search_datetime = datetime.fromisoformat(searched_row["time"])
+                        if (
+                            search_datetime.month == time_object.month
+                            and search_datetime.year == time_object.year
+                        ):
+                            break
+                    insert_row = copy.deepcopy(searched_row)
+                    # overwrite time with one from another collection and save
+                    insert_row["time"] = response_obj["time"]
+                    content_for_individual_datetimes.append(insert_row)
+                    # get closest row from original table and merge
+                # content_for_individual_datetimes = values
+                pass
+            for v in content_for_individual_datetimes:
                 # add items based on inputData fields for each time step available in values
                 first_match: dict = next(
                     (item for item in input_data if item.get("Identifier") == v["input_data"]), None
