@@ -421,6 +421,7 @@ def process_collection_file(
         add_collection_information(catalog_config, parent_collection, collection_config, True)
         add_process_info(parent_collection, catalog_config, collection_config)
         update_extents_from_collection_children(parent_collection)
+        add_base_overlay_info(parent_collection, catalog_config, collection_config)
         # Fill summaries for locations
         parent_collection.summaries = Summaries(
             {

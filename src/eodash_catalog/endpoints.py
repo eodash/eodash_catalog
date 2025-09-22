@@ -20,6 +20,7 @@ from structlog import get_logger
 
 from eodash_catalog.sh_endpoint import get_SH_token
 from eodash_catalog.stac_handling import (
+    add_base_overlay_info,
     add_collection_information,
     add_example_info,
     add_process_info_child_collection,
@@ -213,6 +214,8 @@ def handle_STAC_based_endpoint(
                         location["OverwriteBBox"],
                     ]
                 )
+            add_collection_information(catalog_config, collection, collection_config)
+            add_base_overlay_info(collection, catalog_config, collection_config)
         update_extents_from_collection_children(root_collection)
     else:
         bbox = None
@@ -464,6 +467,8 @@ def handle_SH_WMS_endpoint(
                 LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
             add_visualization_info(collection, collection_config, endpoint_config)
             add_process_info_child_collection(collection, catalog_config, collection_config)
+            add_collection_information(catalog_config, collection, collection_config)
+            add_base_overlay_info(collection, catalog_config, collection_config)
         update_extents_from_collection_children(root_collection)
     else:
         # if locations are not provided, treat the collection as a
@@ -910,6 +915,7 @@ def handle_GeoDB_endpoint(
         link.extra_fields["country"] = country
         link.extra_fields["name"] = city
         add_collection_information(catalog_config, locations_collection, collection_config)
+        add_base_overlay_info(locations_collection, catalog_config, collection_config)
 
     if "yAxis" not in collection_config:
         # fetch yAxis and store it to data, preventing need to save it per dataset in yml
