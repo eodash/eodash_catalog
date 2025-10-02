@@ -468,6 +468,11 @@ def extract_extent_from_geoparquet(table) -> tuple[TemporalExtent, SpatialExtent
         # fallback to start_datetime
         min_datetime = pc.min(table["start_datetime"]).as_py()
         max_datetime = pc.max(table["start_datetime"]).as_py()
+    # Making sure time extent is timezone aware
+    if min_datetime and min_datetime.tzinfo is None:
+        min_datetime = min_datetime.replace(tzinfo=timezone.utc)
+    if max_datetime and max_datetime.tzinfo is None:
+        max_datetime = max_datetime.replace(tzinfo=timezone.utc)
     temporal = TemporalExtent([min_datetime, max_datetime])
     geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
     bbox = sgeom.MultiPolygon(geoms).bounds
