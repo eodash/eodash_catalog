@@ -1060,6 +1060,10 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     color_formula = ""
     if endpoint_config.get("ColorFormula"):
         color_formula = "&color_formula={}".format(endpoint_config["ColorFormula"])
+    rescale = ""
+    if endpoint_config.get("Rescale"):
+        for rescale in endpoint_config["Rescale"]:
+            rescale += f"&rescale={rescale}"
     no_data = ""
     if endpoint_config.get("NoData"):
         no_data = "&no_data={}".format(endpoint_config["NoData"])
@@ -1067,7 +1071,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
     target_url = (
         f"{target_url_base}/raster/collections/{collection}/items/{item}"
-        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{color_formula}{no_data}"
+        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{color_formula}{no_data}{rescale}"
     )
     return target_url
 
@@ -1119,7 +1123,9 @@ def add_visualization_info(
             extra_fields["wms:dimensions"] = dimensions
         link = Link(
             rel="wms",
-            target=f"https://services.sentinel-hub.com/ogc/wms/{instanceId}",
+            target=endpoint_config.get(
+                "EndPoint", "https://services.sentinel-hub.com/ogc/wms/{SH_INSTANCE_ID}"
+            ).replace("{SH_INSTANCE_ID}", instanceId),
             media_type=(endpoint_config.get("MimeType", "image/png")),
             title=collection_config["Name"],
             extra_fields=extra_fields,

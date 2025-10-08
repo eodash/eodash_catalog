@@ -476,7 +476,7 @@ def add_base_overlay_info(
     collection: Collection, catalog_config: dict, collection_config: dict
 ) -> None:
     # add custom baselayers specially for this indicator
-    if collection_config.get("BaseLayers"):
+    if "BaseLayers" in collection_config:
         for layer in collection_config["BaseLayers"]:
             collection.add_link(create_web_map_link(layer, role="baselayer"))
     # alternatively use default base layers defined
@@ -485,7 +485,7 @@ def add_base_overlay_info(
         for layer in base_layers:
             collection.add_link(create_web_map_link(layer, role="baselayer"))
     # add custom overlays just for this indicator
-    if collection_config.get("OverlayLayers"):
+    if "OverlayLayers" in collection_config:
         for layer in collection_config["OverlayLayers"]:
             collection.add_link(create_web_map_link(layer, role="overlay"))
     # check if default overlay layers defined
