@@ -1,10 +1,10 @@
 import os
 import time
+from urllib.parse import urlparse
 
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
-SH_TOKEN_URL = "https://services.sentinel-hub.com/oauth/token"
 _token_cache: dict[str, dict] = {}
 
 
@@ -24,6 +24,8 @@ def get_SH_token(endpoint_config: dict) -> str:
     client = BackendApplicationClient(client_id=client_id)
     oauth = OAuth2Session(client=client)
     # Get token for the session
+    endpoint_url_parts = urlparse(endpoint_config["EndPoint"])
+    SH_TOKEN_URL = f"https://{endpoint_url_parts.netloc}/oauth/token"
     token = oauth.fetch_token(
         token_url=SH_TOKEN_URL,
         client_secret=client_secret,

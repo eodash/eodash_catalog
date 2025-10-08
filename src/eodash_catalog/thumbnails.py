@@ -1,6 +1,7 @@
 import os
 import re
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 from pystac import (
@@ -46,7 +47,9 @@ def generate_thumbnail(
         # if it is start and end datetime have to exist
         if item_datetime:
             time = format_datetime_to_isostring_zulu(item_datetime)
-        url = "https://services.sentinel-hub.com/ogc/wms/{}?{}&layers={}&time={}&{}".format(
+        endpoint_url_parts = urlparse(endpoint_config["EndPoint"])
+        url = "https://{}/ogc/wms/{}?{}&layers={}&time={}&{}".format(
+            endpoint_url_parts,
             instanceId,
             wms_config,
             endpoint_config["LayerId"],

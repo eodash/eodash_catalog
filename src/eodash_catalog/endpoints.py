@@ -9,6 +9,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta
 from itertools import groupby
 from operator import itemgetter
+from urllib.parse import urlparse
 
 import pyarrow.parquet as pq
 import requests
@@ -954,7 +955,8 @@ def handle_SH_endpoint(
 ) -> Collection:
     token = get_SH_token(endpoint_config)
     headers = {"Authorization": f"Bearer {token}"}
-    endpoint_config["EndPoint"] = "https://services.sentinel-hub.com/api/v1/catalog/1.0.0/"
+    endpoint_url_parts = urlparse(endpoint_config["EndPoint"])
+    endpoint_config["EndPoint"] = f"https://{endpoint_url_parts.netloc}/api/v1/catalog/1.0.0/"
     # Overwrite collection id with type, such as ZARR or BYOC
     if endpoint_config.get("Type"):
         endpoint_config["CollectionId"] = (
@@ -1121,9 +1123,10 @@ def add_visualization_info(
 
         if dimensions != {}:
             extra_fields["wms:dimensions"] = dimensions
+        endpoint_url_parts = urlparse(endpoint_config["EndPoint"])
         link = Link(
             rel="wms",
-            target=f"https://services.sentinel-hub.com/ogc/wms/{instanceId}",
+            target=f"https://{endpoint_url_parts.netloc}/ogc/wms/{instanceId}",
             media_type=(endpoint_config.get("MimeType", "image/png")),
             title=collection_config["Name"],
             extra_fields=extra_fields,
