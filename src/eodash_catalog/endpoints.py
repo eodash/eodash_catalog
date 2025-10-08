@@ -1123,9 +1123,7 @@ def add_visualization_info(
             extra_fields["wms:dimensions"] = dimensions
         link = Link(
             rel="wms",
-            target=endpoint_config.get(
-                "EndPoint", "https://services.sentinel-hub.com/ogc/wms/{SH_INSTANCE_ID}"
-            ).replace("{SH_INSTANCE_ID}", instanceId),
+            target=f"https://services.sentinel-hub.com/ogc/wms/{instanceId}",
             media_type=(endpoint_config.get("MimeType", "image/png")),
             title=collection_config["Name"],
             extra_fields=extra_fields,
