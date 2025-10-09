@@ -360,9 +360,11 @@ def process_collection_file(
                     countries.extend(sub_coll_def["Country"])
                 else:
                     countries.append(sub_coll_def["Country"])
-                coll_path_rel_to_root_catalog = (
-                    f"{coll_path_rel_to_root_catalog}/{sub_coll_def['Collection']}"
-                )
+                # commented out intentionally, because otherwise paths further down did
+                # not match, parquet file was one level deeper
+                # coll_path_rel_to_root_catalog = (
+                #     f"{coll_path_rel_to_root_catalog}/{sub_coll_def['Collection']}"
+                # )
                 process_collection_file(
                     catalog_config,
                     "{}/{}".format(options.collectionspath, sub_coll_def["Collection"]),
