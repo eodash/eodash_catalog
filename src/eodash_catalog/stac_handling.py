@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 
 import requests
@@ -122,11 +123,14 @@ def create_service_link(endpoint_config: dict, catalog_config: dict) -> Link:
     return sl
 
 
-def create_web_map_link(layer_config: dict, role: str) -> Link:
+def create_web_map_link(
+    collection: Collection, catalog_config: dict, layer_config: dict, role: str
+) -> Link:
     extra_fields = {
         "roles": [role],
         "id": layer_config["id"],
     }
+    media_type = (layer_config.get("media_type", "image/png"),)
     if layer_config.get("default"):
         extra_fields["roles"].append("default")
     if layer_config.get("visible"):
@@ -146,12 +150,30 @@ def create_web_map_link(layer_config: dict, role: str) -> Link:
             extra_fields["wmts:layer"] = layer_config["layer"]
             if layer_config.get("dimensions"):
                 extra_fields["wmts:dimensions"] = layer_config["dimensions"]
+        case "vector-tile":
+            identifier = uuid.uuid4()
+            extra_fields["key"] = identifier
+            media_type = "application/vnd.mapbox-vector-tile"
+            if ep_st := layer_config.get("Style"):
+                style_link = Link(
+                    rel="style",
+                    target=ep_st
+                    if ep_st.startswith("http")
+                    else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                    media_type="text/vector-styles",
+                    extra_fields={"links:keys": [identifier]},
+                )
+                collection.add_link(style_link)
+            add_authentication(collection, layer_config["url"], extra_fields)
+
     if layer_config.get("Attribution"):
         extra_fields["attribution"] = layer_config["Attribution"]
+    if layer_config.get("Colorlegend"):
+        extra_fields["eox:colorlegend"] = layer_config["Colorlegend"]
     wml = Link(
         rel=layer_config["protocol"],
         target=layer_config["url"],
-        media_type=layer_config.get("media_type", "image/png"),
+        media_type=media_type,
         title=layer_config["name"],
         extra_fields=extra_fields,
     )
@@ -321,7 +343,7 @@ def add_collection_information(
             ),
         )
         # Bubble up thumbnail to extra fields
-        collection.extra_fields["thumbnail"] = (image_url)
+        collection.extra_fields["thumbnail"] = image_url
     # Add extra fields to collection if available
     add_extra_fields(collection, collection_config, is_root_collection)
 
@@ -478,21 +500,29 @@ def add_base_overlay_info(
     # add custom baselayers specially for this indicator
     if "BaseLayers" in collection_config:
         for layer in collection_config["BaseLayers"]:
-            collection.add_link(create_web_map_link(layer, role="baselayer"))
+            collection.add_link(
+                create_web_map_link(collection, catalog_config, layer, role="baselayer")
+            )
     # alternatively use default base layers defined
     elif catalog_config.get("default_base_layers"):
         base_layers = read_config_file(catalog_config["default_base_layers"])
         for layer in base_layers:
-            collection.add_link(create_web_map_link(layer, role="baselayer"))
+            collection.add_link(
+                create_web_map_link(collection, catalog_config, layer, role="baselayer")
+            )
     # add custom overlays just for this indicator
     if "OverlayLayers" in collection_config:
         for layer in collection_config["OverlayLayers"]:
-            collection.add_link(create_web_map_link(layer, role="overlay"))
+            collection.add_link(
+                create_web_map_link(collection, catalog_config, layer, role="overlay")
+            )
     # check if default overlay layers defined
     elif catalog_config.get("default_overlay_layers"):
         overlay_layers = read_config_file(catalog_config["default_overlay_layers"])
         for layer in overlay_layers:
-            collection.add_link(create_web_map_link(layer, role="overlay"))
+            collection.add_link(
+                create_web_map_link(collection, catalog_config, layer, role="overlay")
+            )
 
 
 def add_extra_fields(
@@ -582,3 +612,20 @@ def add_projection_info(
             stac_object.extra_fields["eodash:proj4_def"] = proj
         else:
             raise Exception(f"Incorrect type of proj definition {proj}")
+
+
+def add_authentication(stac_object: Item | Collection | Catalog, url: str, extra_fields_link: dict):
+    if "api.mapbox" in url:
+        # add authentication info
+        auth_extension = "https://stac-extensions.github.io/authentication/v1.1.0/schema.json"
+        if auth_extension not in stac_object.stac_extensions:
+            stac_object.stac_extensions.append(auth_extension)
+        stac_object.extra_fields["auth:schemes"] = {
+            "mapboxauth": {
+                "type": "apiKey",
+                "name": "access_token",
+                "in": "query",
+            }
+        }
+        extra_fields_link["auth:refs"] = ["mapboxauth"]
+    pass
