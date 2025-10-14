@@ -1496,3 +1496,103 @@ def handle_raw_source(
 
     add_collection_information(catalog_config, collection, collection_config)
     return collection
+
+
+def handle_vector_tile_source(
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
+    options: Options,
+) -> Collection:
+    collection = get_or_create_collection(
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
+    )
+    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+    if len(endpoint_config.get("TimeEntries", [])) > 0:
+        items = []
+        style_link = None
+        for time_entry in endpoint_config["TimeEntries"]:
+            # create Item for each time entry
+            media_type = "application/vnd.mapbox-vector-tile"
+            style_type = "text/vector-styles"
+            bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
+            dt = parse_datestring_to_tz_aware_datetime(time_entry["Time"])
+
+            item = Item(
+                id=format_datetime_to_isostring_zulu(dt),
+                bbox=bbox,
+                properties={},
+                geometry=create_geometry_from_bbox(bbox),
+                datetime=dt,
+                extra_fields={},
+            )
+            extra_fields_link = {}
+            if "api.mapbox" in time_entry["Url"]:
+                # add authentication info
+                item.stac_extensions.append(
+                    "https://stac-extensions.github.io/authentication/v1.1.0/schema.json"
+                )
+                item.extra_fields["auth:schemes"] = {
+                    "mapboxauth": {
+                        "type": "apiKey",
+                        "name": "access_token",
+                        "in": "query",
+                    }
+                }
+                extra_fields_link["auth:refs"] = ["mapboxauth"]
+            # add mapbox vector tile link
+            identifier = uuid.uuid4()
+            extra_fields_link["key"] = identifier
+            link = Link(
+                rel="vector-tile",
+                target=time_entry["Url"],
+                media_type=media_type,
+                title=collection_config["Name"],
+                extra_fields=extra_fields_link,
+            )
+            add_projection_info(
+                endpoint_config,
+                link,
+            )
+            item.add_link(link)
+            add_projection_info(
+                endpoint_config,
+                item,
+            )
+            if endpoint_config.get("Attribution"):
+                item.stac_extensions.append(
+                    "https://stac-extensions.github.io/attribution/v0.1.0/schema.json"
+                )
+                item.extra_fields["attribution"] = endpoint_config["Attribution"]
+            # add style
+            if ep_st := endpoint_config.get("Style"):
+                style_link = Link(
+                    rel="style",
+                    target=ep_st
+                    if ep_st.startswith("http")
+                    else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                    media_type=style_type,
+                    extra_fields={"links:keys": [identifier]},
+                )
+                item.add_link(style_link)
+            items.append(item)
+
+        save_items(
+            collection,
+            items,
+            options.outputpath,
+            catalog_config["id"],
+            coll_path_rel_to_root_catalog,
+            options.gp,
+        )
+        # eodash v4 compatibility, adding last referenced style to collection
+        if style_link:
+            collection.add_link(style_link)
+
+    else:
+        LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
+
+    add_collection_information(catalog_config, collection, collection_config)
+    return collection
