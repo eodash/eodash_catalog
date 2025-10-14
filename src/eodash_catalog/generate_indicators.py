@@ -293,7 +293,7 @@ def process_collection_file(
                         catalog,
                         options,
                     )
-                elif endpoint_config["Name"] == "vectortile":
+                elif endpoint_config["Name"] == "VectorTile source":
                     collection = handle_vector_tile_source(
                         catalog_config,
                         endpoint_config,

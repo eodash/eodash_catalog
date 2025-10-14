@@ -21,6 +21,7 @@ from structlog import get_logger
 
 from eodash_catalog.sh_endpoint import get_SH_token
 from eodash_catalog.stac_handling import (
+    add_authentication,
     add_base_overlay_info,
     add_collection_information,
     add_example_info,
@@ -1529,19 +1530,7 @@ def handle_vector_tile_source(
                 extra_fields={},
             )
             extra_fields_link = {}
-            if "api.mapbox" in time_entry["Url"]:
-                # add authentication info
-                item.stac_extensions.append(
-                    "https://stac-extensions.github.io/authentication/v1.1.0/schema.json"
-                )
-                item.extra_fields["auth:schemes"] = {
-                    "mapboxauth": {
-                        "type": "apiKey",
-                        "name": "access_token",
-                        "in": "query",
-                    }
-                }
-                extra_fields_link["auth:refs"] = ["mapboxauth"]
+            add_authentication(item, time_entry["Url"], extra_fields_link)
             # add mapbox vector tile link
             identifier = uuid.uuid4()
             extra_fields_link["key"] = identifier
@@ -1587,9 +1576,6 @@ def handle_vector_tile_source(
             coll_path_rel_to_root_catalog,
             options.gp,
         )
-        # eodash v4 compatibility, adding last referenced style to collection
-        if style_link:
-            collection.add_link(style_link)
 
     else:
         LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
