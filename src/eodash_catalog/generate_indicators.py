@@ -24,6 +24,7 @@ from eodash_catalog.endpoints import (
     handle_raw_source,
     handle_SH_endpoint,
     handle_SH_WMS_endpoint,
+    handle_vector_tile_source,
     handle_VEDA_endpoint,
     handle_WMS_endpoint,
     handle_xcube_endpoint,
@@ -285,6 +286,15 @@ def process_collection_file(
                     )
                 elif endpoint_config["Name"] == "WMS":
                     collection = handle_WMS_endpoint(
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
+                    )
+                elif endpoint_config["Name"] == "VectorTile source":
+                    collection = handle_vector_tile_source(
                         catalog_config,
                         endpoint_config,
                         collection_config,
