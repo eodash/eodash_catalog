@@ -29,4 +29,4 @@ RUN eodash_catalog --help
 
 CMD ["eodash_catalog"]
 
-LABEL version="0.3.13"
+LABEL version="0.3.14"
