@@ -328,6 +328,7 @@ def add_single_item_if_collection_empty(endpoint_config: dict, collection: Colle
             datetime=datetime(1970, 1, 1, 0, 0, 0, tzinfo=pytztimezone("UTC")),
             start_datetime=datetime(1970, 1, 1, 0, 0, 0, tzinfo=pytztimezone("UTC")),
             end_datetime=datetime.now(tz=pytztimezone("UTC")),
+            assets={"dummy_asset": Asset(href="")},
         )
         collection.add_item(item)
         if not endpoint_config.get("OverwriteBBox"):

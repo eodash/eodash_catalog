@@ -397,6 +397,7 @@ def handle_collection_only(
                 properties={},
                 geometry=None,
                 datetime=dt,
+                assets={"dummy_asset": Asset(href="")},
             )
             link = collection.add_item(item)
             link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
@@ -1528,6 +1529,7 @@ def handle_vector_tile_source(
                 geometry=create_geometry_from_bbox(bbox),
                 datetime=dt,
                 extra_fields={},
+                assets={"dummy_asset": Asset(href="")},
             )
             extra_fields_link = {}
             add_authentication(item, time_entry["Url"], extra_fields_link)
