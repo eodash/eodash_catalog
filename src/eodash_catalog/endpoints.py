@@ -221,8 +221,8 @@ def handle_STAC_based_endpoint(
         update_extents_from_collection_children(root_collection)
     else:
         bbox = None
-        if endpoint_config.get("Bbox"):
-            bbox = ",".join(map(str, endpoint_config["Bbox"]))
+        if endpoint_config.get("OverwriteBBox"):
+            bbox = ",".join(map(str, endpoint_config["OverwriteBBox"]))
         root_collection = process_STACAPI_Endpoint(
             catalog_config=catalog_config,
             endpoint_config=endpoint_config,
@@ -476,7 +476,7 @@ def handle_SH_WMS_endpoint(
         # if locations are not provided, treat the collection as a
         # general proxy to the sentinel hub layer
         datetimes = get_collection_datetimes_from_config(endpoint_config)
-        bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
+        bbox = endpoint_config.get("OverwriteBBox", [-180, -85, 180, 85])
         items = []
         for dt in datetimes:
             item = Item(

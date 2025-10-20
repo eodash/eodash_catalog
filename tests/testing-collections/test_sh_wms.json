@@ -33,7 +33,7 @@
       "Name": "Sentinel Hub WMS",
       "CollectionId": "sentinel-1-grd",
       "LayerId": "SENTINEL_1_IW_VV",
-      "Bbox": [
+      "OverwriteBBox": [
         101.938,
         11.945,
         106.37,
