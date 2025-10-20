@@ -176,7 +176,7 @@ def handle_STAC_based_endpoint(
             catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
         )
         for location in collection_config["Locations"]:
-            identifier = location.get("Identifier", uuid.uuid4())
+            identifier = location.get("Identifier", str(uuid.uuid4()))
             collection = process_STACAPI_Endpoint(
                 catalog_config=catalog_config,
                 endpoint_config=endpoint_config,
@@ -1532,7 +1532,7 @@ def handle_vector_tile_source(
             extra_fields_link = {}
             add_authentication(item, time_entry["Url"], extra_fields_link)
             # add mapbox vector tile link
-            identifier = uuid.uuid4()
+            identifier = str(uuid.uuid4())
             extra_fields_link["key"] = identifier
             link = Link(
                 rel="vector-tile",

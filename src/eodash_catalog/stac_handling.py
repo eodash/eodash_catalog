@@ -151,7 +151,7 @@ def create_web_map_link(
             if layer_config.get("dimensions"):
                 extra_fields["wmts:dimensions"] = layer_config["dimensions"]
         case "vector-tile":
-            identifier = uuid.uuid4()
+            identifier = str(uuid.uuid4())
             extra_fields["key"] = identifier
             media_type = "application/vnd.mapbox-vector-tile"
             if ep_st := layer_config.get("Style"):
