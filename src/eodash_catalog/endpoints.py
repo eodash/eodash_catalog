@@ -1145,6 +1145,14 @@ def add_visualization_info(
                 "role": ["data"],
             }
         )
+        if collection_config.get("EodashIdentifier") == "FNF":
+            extra_fields.update(
+                {
+                    "wms:layers": endpoint_config.get("LayerId", "").replace(
+                        "{time}", (datetimes is not None and str(datetimes[0].year)) or "2020"
+                    ),
+                }
+            )
         dimensions = {}
         if dimensions_config := endpoint_config.get("Dimensions", {}):
             for key, value in dimensions_config.items():
@@ -1218,28 +1226,6 @@ def add_visualization_info(
             link,
         )
         stac_object.add_link(link)
-    elif endpoint_config["Name"] == "JAXA_WMTS_PALSAR":
-        target_url = "{}".format(endpoint_config.get("EndPoint"))
-        # custom time just for this special case as a default for collection wmts
-        time = None
-        if datetimes is not None:
-            time = datetimes[0]
-        extra_fields.update(
-            {
-                "wmts:layer": endpoint_config.get("LayerId", "").replace(
-                    "{time}", (time and str(time.year)) or "2017"
-                )
-            }
-        )
-        stac_object.add_link(
-            Link(
-                rel="wmts",
-                target=target_url,
-                media_type="image/png",
-                title="wmts capabilities",
-                extra_fields=extra_fields,
-            )
-        )
     elif endpoint_config["Name"] == "xcube":
         if endpoint_config["Type"] == "zarr":
             # either preset ColormapName of left as a template

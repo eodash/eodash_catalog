@@ -302,17 +302,6 @@ def process_collection_file(
                         catalog,
                         options,
                     )
-                elif endpoint_config["Name"] == "JAXA_WMTS_PALSAR":
-                    # somewhat one off creation of individual WMTS layers as individual items
-                    collection = handle_WMS_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                        wmts=True,
-                    )
                 elif endpoint_config["Name"] == "Collection-only":
                     collection = handle_collection_only(
                         catalog_config, endpoint_config, collection_config, catalog
