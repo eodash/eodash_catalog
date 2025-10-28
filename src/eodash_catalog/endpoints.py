@@ -995,12 +995,14 @@ def handle_WMS_endpoint(
         # some endpoints allow "narrowed-down" capabilities per-layer, which we utilize to not
         # have to process full service capabilities XML
         capabilities_url = endpoint_config["EndPoint"]
-        spatial_extent, datetimes = retrieveExtentFromWMSWMTS(
+        spatial_extent, datetimes_retrieved = retrieveExtentFromWMSWMTS(
             capabilities_url,
             endpoint_config["LayerId"],
             version=endpoint_config.get("Version", "1.1.1"),
             wmts=wmts,
         )
+        if datetimes_retrieved:
+            datetimes = datetimes_retrieved
     # optionally filter time results
     if query := endpoint_config.get("Query"):
         datetimes = filter_time_entries(datetimes, query)
