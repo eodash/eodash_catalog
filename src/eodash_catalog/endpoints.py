@@ -1524,6 +1524,8 @@ def handle_vector_tile_source(
             # add mapbox vector tile link
             identifier = str(uuid.uuid4())
             extra_fields_link["key"] = identifier
+            if vector_tile_id_property := endpoint_config.get("idProperty"):
+                extra_fields_link["idProperty"] = vector_tile_id_property
             link = Link(
                 rel="vector-tile",
                 target=time_entry["Url"],
