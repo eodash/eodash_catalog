@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import parse_qs, urlparse
 
 import requests
 import spdx_lookup as lookup
@@ -321,15 +322,26 @@ def add_collection_information(
                 roles=["metadata"],
             ),
         )
-    if collection_config.get("Story"):
-        collection.add_asset(
-            "story",
-            Asset(
-                href=f'{catalog_config["assets_endpoint"]}/{collection_config["Story"]}',
-                media_type="text/markdown",
-                roles=["metadata"],
-            ),
-        )
+    if stories := collection_config.get("Stories"):
+        for story in stories:
+            if story.startswith("http"):
+                story_url = story
+            else:
+                story_url = f'{catalog_config.get("stories_endpoint")}/{story}'
+            parsed_url = urlparse(story_url)
+            # check if it is URL with a query parameter id=story-identifier
+            if parsed_url.query and len(parse_qs(parsed_url.query).get("id")) > 0:
+                story_id = parse_qs(parsed_url.query).get("id")[0]
+            else:
+                story_id = parsed_url.path.rsplit("/")[-1].replace(".md", "").replace(".MD", "")
+            collection.add_asset(
+                story_id,
+                Asset(
+                    href=story_url,
+                    media_type="text/markdown",
+                    roles=["metadata", "story"],
+                ),
+            )
     if collection_config.get("Image"):
         # Check if absolute URL or relative path
         if collection_config["Image"].startswith("http"):
