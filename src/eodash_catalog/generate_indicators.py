@@ -464,6 +464,12 @@ def add_to_catalog(
     link.extra_fields["id"] = collection_config["Name"]
     if collection_config.get("Themes"):
         link.extra_fields["themes"] = collection_config["Themes"]
+    if collection_config.get("Provider"):
+        # get all provider names
+        link.extra_fields["providers"] = [
+            provider.get("Name") or provider.get("Url")
+            for provider in collection_config["Provider"]
+        ]
     # Check for summaries and bubble up info
     if disable:
         link.extra_fields["roles"] = ["disable"]
