@@ -313,6 +313,10 @@ def add_collection_information(
 
     if collection_config.get("Subtitle"):
         collection.extra_fields["subtitle"] = collection_config["Subtitle"]
+
+    if collection_config.get("ShortDescription"):
+        collection.extra_fields["shortdescription"] = collection_config["ShortDescription"]
+
     if collection_config.get("Legend"):
         collection.add_asset(
             "legend",

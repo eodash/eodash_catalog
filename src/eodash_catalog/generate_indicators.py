@@ -458,6 +458,8 @@ def add_to_catalog(
         link.extra_fields["endpointtype"] = endpoint["Name"]
     if collection_config.get("Subtitle"):
         link.extra_fields["subtitle"] = collection_config["Subtitle"]
+    if collection_config.get("ShortDescription"):
+        link.extra_fields["shortdescription"] = collection_config["ShortDescription"]
     link.extra_fields["title"] = collection.title
     if collection_config.get("EodashIdentifier"):
         link.extra_fields["code"] = collection_config["EodashIdentifier"]
