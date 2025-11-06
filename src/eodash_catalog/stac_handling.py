@@ -324,10 +324,9 @@ def add_collection_information(
         )
     if stories := collection_config.get("Stories"):
         for story in stories:
-            if story.startswith("http"):
-                story_url = story
-            else:
-                story_url = f'{catalog_config.get("stories_endpoint")}/{story}'
+            story_url = story.get("Url")
+            if not story_url.startswith("http"):
+                story_url = f'{catalog_config.get("stories_endpoint")}/{story_url}'
             parsed_url = urlparse(story_url)
             # check if it is URL with a query parameter id=story-identifier
             if parsed_url.query and len(parse_qs(parsed_url.query).get("id")) > 0:
@@ -337,6 +336,7 @@ def add_collection_information(
             collection.add_asset(
                 story_id,
                 Asset(
+                    title=story.get("Name"),
                     href=story_url,
                     media_type="text/markdown",
                     roles=["metadata", "story"],
