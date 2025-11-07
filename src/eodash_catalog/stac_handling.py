@@ -633,7 +633,7 @@ def add_projection_info(
 
 
 def add_authentication(stac_object: Item | Collection | Catalog, url: str, extra_fields_link: dict):
-    if "api.mapbox" in url:
+    if "mapbox" in url:
         # add authentication info
         auth_extension = "https://stac-extensions.github.io/authentication/v1.1.0/schema.json"
         if auth_extension not in stac_object.stac_extensions:
