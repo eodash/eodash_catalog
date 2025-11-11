@@ -714,13 +714,13 @@ def handle_GeoDB_endpoint(
         latlon = unique_values["aoi"]
         [lat, lon] = [float(x) for x in latlon.split(",")]
         # create item for unique locations
-        buff = 0.01
+        buff = 0.2
         bbox = [lon - buff, lat - buff, lon + buff, lat + buff]
 
         # create collection per available inputdata information
         sc_config = {
-            "Title": city,
-            "Description": f"{city} - {country}",
+            "Title": f"{city} - {collection_config["Name"]}",
+            "Description": collection_config["Description"],
         }
         locations_collection = get_or_create_collection(
             collection, key, sc_config, catalog_config, endpoint_config
@@ -845,7 +845,7 @@ def handle_GeoDB_endpoint(
                                 rel="wms",
                                 target=url,
                                 media_type=(endpoint_config.get("MimeType", "image/png")),
-                                title=collection_config["Name"],
+                                title=first_match["Identifier"],
                                 extra_fields=extra_fields,
                             )
                             item.add_link(link)
