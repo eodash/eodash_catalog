@@ -909,6 +909,9 @@ def handle_GeoDB_endpoint(
             individual_datetimes = [datetime.fromisoformat(v["time"]) for v in values]
             time_extent = [min(individual_datetimes), max(individual_datetimes)]
             locations_collection.extent.temporal = TemporalExtent([time_extent])
+        add_process_info_child_collection(
+            locations_collection, catalog_config, collection_config, key
+        )
         locations_collection.extra_fields["subcode"] = key
         link = collection.add_child(locations_collection)
         # collection.update_extent_from_items()

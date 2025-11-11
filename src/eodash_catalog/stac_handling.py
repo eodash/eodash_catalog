@@ -88,7 +88,9 @@ def get_or_create_collection(
     return collection
 
 
-def create_service_link(endpoint_config: dict, catalog_config: dict) -> Link:
+def create_service_link(
+    endpoint_config: dict, catalog_config: dict, location_id: str | None = None
+) -> Link:
     extra_fields = {
         "id": endpoint_config["Identifier"],
         "method": endpoint_config.get("Method", "GET"),
@@ -115,9 +117,12 @@ def create_service_link(endpoint_config: dict, catalog_config: dict) -> Link:
                 extra_fields["eox:flatstyle"].append(flatstyle_obj)
         else:
             LOGGER.warn("Flatstyle is invalid type", endpoint_config["Flatstyle"])
+    url = endpoint_config["Url"]
+    if location_id:
+        url = url.replace("{{feature}}", location_id)
     sl = Link(
         rel="service",
-        target=endpoint_config["Url"],
+        target=url,
         media_type=endpoint_config["Type"],
         extra_fields=extra_fields,
     )
@@ -497,17 +502,25 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
 
 
 def add_process_info_child_collection(
-    collection: Collection, catalog_config: dict, collection_config: dict
+    collection: Collection, catalog_config: dict, collection_config: dict, location_id: str | None
 ) -> None:
     # in case of locations, we add the process itself on a child collection
     if collection_config.get("Process"):
         if collection_config["Process"].get("EndPoints"):
             for endpoint in collection_config["Process"]["EndPoints"]:
-                collection.add_link(create_service_link(endpoint, catalog_config))
+                link = create_service_link(endpoint, catalog_config, location_id)
+                collection.add_link(link)
         if collection_config["Process"].get("JsonForm"):
-            collection.extra_fields["eodash:jsonform"] = get_full_url(
-                collection_config["Process"]["JsonForm"], catalog_config
-            )
+            if location_id and catalog_config.get("geodb_empty_form"):
+                # specific handling of geodb locations to replace with an empty jsonform
+                collection.extra_fields["eodash:jsonform"] = get_full_url(
+                    catalog_config["geodb_empty_form"], catalog_config
+                )
+            else:
+                # standard json form pass through
+                collection.extra_fields["eodash:jsonform"] = get_full_url(
+                    collection_config["Process"]["JsonForm"], catalog_config
+                )
         if collection_config["Process"].get("VegaDefinition"):
             collection.extra_fields["eodash:vegadefinition"] = get_full_url(
                 collection_config["Process"]["VegaDefinition"], catalog_config
