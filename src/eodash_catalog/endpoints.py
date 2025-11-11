@@ -209,7 +209,7 @@ def handle_STAC_based_endpoint(
             add_example_info(collection, collection_config, endpoint_config, catalog_config)
             # eodash v4 compatibility
             add_visualization_info(collection, collection_config, endpoint_config)
-            add_process_info_child_collection(collection, catalog_config, collection_config)
+            add_process_info_child_collection(collection, catalog_config, collection_config, None)
             if location.get("OverwriteBBox"):
                 collection.extent.spatial = SpatialExtent(
                     [
@@ -469,7 +469,7 @@ def handle_SH_WMS_endpoint(
             elif not location["Times"]:
                 LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
             add_visualization_info(collection, collection_config, endpoint_config)
-            add_process_info_child_collection(collection, catalog_config, collection_config)
+            add_process_info_child_collection(collection, catalog_config, collection_config, None)
             add_collection_information(catalog_config, collection, collection_config)
             add_base_overlay_info(collection, catalog_config, collection_config)
         update_extents_from_collection_children(root_collection)
