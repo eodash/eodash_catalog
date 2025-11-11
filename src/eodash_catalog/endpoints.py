@@ -719,7 +719,7 @@ def handle_GeoDB_endpoint(
 
         # create collection per available inputdata information
         sc_config = {
-            "Title": f"{city} - {collection_config["Name"]}",
+            "Title": f"{city} - {collection_config['Name']}",
             "Description": collection_config["Description"],
         }
         locations_collection = get_or_create_collection(
