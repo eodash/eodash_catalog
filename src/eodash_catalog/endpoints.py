@@ -268,6 +268,7 @@ def process_STACAPI_Endpoint(
     api = Client.open(endpoint_config["EndPoint"], headers=headers)
     if bbox is None:
         bbox = [-180, -90, 180, 90]
+
     results = api.search(
         collections=[collection_id],
         bbox=bbox,
@@ -294,9 +295,13 @@ def process_STACAPI_Endpoint(
             else:
                 generate_thumbnail(item, collection_config, endpoint_config)
         # Check if we can create visualization link
-        if endpoint_config.get("Assets"):
+        if endpoint_config.get("Name") == "VEDA" and endpoint_config.get("Type") == "tiles":
             add_visualization_info(item, collection_config, endpoint_config, item.id)
-        elif item.assets.get("cog_default"):
+        elif (
+            endpoint_config.get("Name") == "VEDA"
+            and endpoint_config.get("Type") == "cog"
+            and item.assets.get("cog_default")
+        ):
             add_visualization_info(
                 item, collection_config, endpoint_config, item.assets["cog_default"].href
             )
@@ -1066,13 +1071,19 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     assets = ""
     for asset in endpoint_config["Assets"]:
         assets += f"&assets={asset}"
+
+    colormap_name = ""
+    if endpoint_config.get("ColormapName"):
+        colormap_name = "&colormap_name={}".format(endpoint_config["ColormapName"])
+
     color_formula = ""
     if endpoint_config.get("ColorFormula"):
         color_formula = "&color_formula={}".format(endpoint_config["ColorFormula"])
     rescale = ""
     if endpoint_config.get("Rescale"):
-        for rescale in endpoint_config["Rescale"]:
-            rescale += f"&rescale={rescale}"
+        rescale = "&rescale={},{}".format(
+            endpoint_config["Rescale"][0], endpoint_config["Rescale"][1]
+        )
     no_data = ""
     if endpoint_config.get("NoData"):
         no_data = "&no_data={}".format(endpoint_config["NoData"])
@@ -1080,7 +1091,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
     target_url = (
         f"{target_url_base}/raster/collections/{collection}/items/{item}"
-        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{color_formula}{no_data}{rescale}"
+        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{colormap_name}{color_formula}{no_data}{rescale}"
     )
     return target_url
 
