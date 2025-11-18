@@ -1080,10 +1080,16 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     if endpoint_config.get("ColorFormula"):
         color_formula = "&color_formula={}".format(endpoint_config["ColorFormula"])
     rescale = ""
-    if endpoint_config.get("Rescale"):
-        rescale = "&rescale={},{}".format(
-            endpoint_config["Rescale"][0], endpoint_config["Rescale"][1]
-        )
+    if rescale_configs := endpoint_config.get("Rescale", ""):
+        if isinstance(rescale_configs[0], list):
+            # one rescale definition for each band
+            for rescale_config in rescale_configs:
+                rescale += f"&rescale={rescale_config[0]},{rescale_config[1]}"
+        else:
+            # shared rescale definition for all bands
+            rescale = "&rescale={},{}".format(
+                endpoint_config["Rescale"][0], endpoint_config["Rescale"][1]
+            )
     no_data = ""
     if endpoint_config.get("NoData"):
         no_data = "&no_data={}".format(endpoint_config["NoData"])
