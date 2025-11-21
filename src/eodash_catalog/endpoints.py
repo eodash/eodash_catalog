@@ -27,6 +27,7 @@ from eodash_catalog.stac_handling import (
     add_example_info,
     add_process_info_child_collection,
     add_projection_info,
+    add_raw_assets,
     get_collection_datetimes_from_config,
     get_or_create_collection,
 )
@@ -1415,20 +1416,7 @@ def handle_raw_source(
         items = []
         style_link = None
         for time_entry in endpoint_config["TimeEntries"]:
-            assets = {}
-            media_type = "application/geo+json"
-            style_type = "text/vector-styles"
-            if endpoint_config["Name"] == "COG source":
-                style_type = "text/cog-styles"
-                media_type = "image/tiff"
-            if endpoint_config["Name"] == "FlatGeobuf source":
-                media_type = "application/vnd.flatgeobuf"
-            for a in time_entry["Assets"]:
-                asset = Asset(
-                    href=a["File"], roles=["data"], media_type=media_type, extra_fields={}
-                )
-                add_projection_info(endpoint_config, asset)
-                assets[a["Identifier"]] = asset
+            assets, style_link = add_raw_assets(time_entry, endpoint_config, catalog_config, "data")
             bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
             dt = parse_datestring_to_tz_aware_datetime(time_entry["Time"])
             item = Item(
@@ -1444,22 +1432,12 @@ def handle_raw_source(
                 item.stac_extensions.append(
                     "https://stac-extensions.github.io/attribution/v0.1.0/schema.json"
                 )
-                asset.extra_fields["attribution"] = endpoint_config["Attribution"]
+                item.extra_fields["attribution"] = endpoint_config["Attribution"]
             add_projection_info(
                 endpoint_config,
                 item,
             )
-            if ep_st := endpoint_config.get("Style"):
-                style_link = Link(
-                    rel="style",
-                    target=ep_st
-                    if ep_st.startswith("http")
-                    else f"{catalog_config['assets_endpoint']}/{ep_st}",
-                    media_type=style_type,
-                    extra_fields={
-                        "asset:keys": list(assets),
-                    },
-                )
+            if style_link:
                 item.add_link(style_link)
             items.append(item)
 
