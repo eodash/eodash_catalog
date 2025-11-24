@@ -136,7 +136,7 @@ def create_web_map_link(
         "roles": [role],
         "id": layer_config["id"],
     }
-    media_type = (layer_config.get("media_type", "image/png"),)
+    media_type = layer_config.get("media_type", "image/png")
     if layer_config.get("default"):
         extra_fields["roles"].append("default")
     if layer_config.get("visible"):
@@ -189,6 +189,52 @@ def create_web_map_link(
     )
     add_projection_info(layer_config, wml)
     return wml
+
+
+def add_raw_assets(time_entry: dict, endpoint_config: dict, catalog_config: dict, role: str):
+    assets = {}
+    style_link = None
+    media_type = "application/geo+json"
+    style_type = "text/vector-styles"
+    extra_fields_asset = {}
+    roles = [role]
+    if endpoint_config.get("visible"):
+        roles.append("visible")
+    if "visible" in endpoint_config and not endpoint_config["visible"]:
+        roles.append("invisible")
+
+    if endpoint_config.get("Attribution"):
+        extra_fields_asset["attribution"] = endpoint_config["Attribution"]
+    if endpoint_config.get("Colorlegend"):
+        extra_fields_asset["eox:colorlegend"] = endpoint_config["Colorlegend"]
+
+    if endpoint_config["Name"] == "COG source":
+        style_type = "text/cog-styles"
+        media_type = "image/tiff"
+    if endpoint_config["Name"] == "FlatGeobuf source":
+        media_type = "application/vnd.flatgeobuf"
+    for a in time_entry["Assets"]:
+        asset = Asset(
+            href=a["File"],
+            title=a.get("Title", a["Identifier"]),
+            roles=roles,
+            media_type=media_type,
+            extra_fields=extra_fields_asset,
+        )
+        add_projection_info(endpoint_config, asset)
+        assets[a["Identifier"]] = asset
+    if ep_st := endpoint_config.get("Style"):
+        style_link = Link(
+            rel="style",
+            target=ep_st
+            if ep_st.startswith("http")
+            else f"{catalog_config['assets_endpoint']}/{ep_st}",
+            media_type=style_type,
+            extra_fields={
+                "asset:keys": list(assets),
+            },
+        )
+    return assets, style_link
 
 
 def add_example_info(
@@ -531,31 +577,52 @@ def add_base_overlay_info(
     collection: Collection, catalog_config: dict, collection_config: dict
 ) -> None:
     # add custom baselayers specially for this indicator
-    if "BaseLayers" in collection_config:
-        for layer in collection_config["BaseLayers"]:
-            collection.add_link(
-                create_web_map_link(collection, catalog_config, layer, role="baselayer")
-            )
     # alternatively use default base layers defined
-    elif catalog_config.get("default_base_layers"):
-        base_layers = read_config_file(catalog_config["default_base_layers"])
-        for layer in base_layers:
-            collection.add_link(
-                create_web_map_link(collection, catalog_config, layer, role="baselayer")
-            )
+    if "BaseLayers" in collection_config or catalog_config.get("default_base_layers"):
+        layers = collection_config.get("BaseLayers") or read_config_file(
+            catalog_config["default_base_layers"]
+        )
+        for layer in layers:
+            if layer.get("Name") in [
+                "COG source",
+                "GeoJSON source",
+                "FlatGeobuf source",
+            ]:
+                time_entry_structure = {"Assets": [layer]}
+                assets, style_link = add_raw_assets(
+                    time_entry_structure, layer, catalog_config, role="baselayer"
+                )
+                for asset_key, asset in assets.items():
+                    collection.add_asset(asset_key, asset)
+                collection.add_link(style_link)
+                collection.extra_fields["merge_assets"] = False
+            else:
+                link = create_web_map_link(collection, catalog_config, layer, role="baselayer")
+                collection.add_link(link)
     # add custom overlays just for this indicator
-    if "OverlayLayers" in collection_config:
-        for layer in collection_config["OverlayLayers"]:
-            collection.add_link(
-                create_web_map_link(collection, catalog_config, layer, role="overlay")
-            )
-    # check if default overlay layers defined
-    elif catalog_config.get("default_overlay_layers"):
-        overlay_layers = read_config_file(catalog_config["default_overlay_layers"])
-        for layer in overlay_layers:
-            collection.add_link(
-                create_web_map_link(collection, catalog_config, layer, role="overlay")
-            )
+    # alternatively use default overlays defined
+    if "OverlayLayers" in collection_config or catalog_config.get("default_overlay_layers"):
+        layers = collection_config.get("OverlayLayers") or read_config_file(
+            catalog_config["default_overlay_layers"]
+        )
+
+        for layer in layers:
+            if layer.get("Name") in [
+                "COG source",
+                "GeoJSON source",
+                "FlatGeobuf source",
+            ]:
+                time_entry_structure = {"Assets": [layer]}
+                assets, style_link = add_raw_assets(
+                    time_entry_structure, layer, catalog_config, role="overlay"
+                )
+                for asset_key, asset in assets.items():
+                    collection.add_asset(asset_key, asset)
+                collection.extra_fields["merge_assets"] = False
+                collection.add_link(style_link)
+            else:
+                link = create_web_map_link(collection, catalog_config, layer, role="overlay")
+                collection.add_link(link)
 
 
 def add_extra_fields(
