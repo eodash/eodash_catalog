@@ -136,7 +136,7 @@ def create_web_map_link(
         "roles": [role],
         "id": layer_config["id"],
     }
-    media_type = (layer_config.get("media_type", "image/png"),)
+    media_type = layer_config.get("media_type", "image/png")
     if layer_config.get("default"):
         extra_fields["roles"].append("default")
     if layer_config.get("visible"):
