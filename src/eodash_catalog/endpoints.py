@@ -1419,6 +1419,7 @@ def handle_raw_source(
             assets, style_link = add_raw_assets(time_entry, endpoint_config, catalog_config, "data")
             bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
             dt = parse_datestring_to_tz_aware_datetime(time_entry["Time"])
+
             item = Item(
                 id=format_datetime_to_isostring_zulu(dt),
                 bbox=bbox,
@@ -1433,6 +1434,9 @@ def handle_raw_source(
                     "https://stac-extensions.github.io/attribution/v0.1.0/schema.json"
                 )
                 item.extra_fields["attribution"] = endpoint_config["Attribution"]
+            if "MergeAssets" in endpoint_config:
+                item.extra_fields["merge_assets"] = endpoint_config["MergeAssets"]
+
             add_projection_info(
                 endpoint_config,
                 item,

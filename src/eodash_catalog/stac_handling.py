@@ -198,9 +198,9 @@ def add_raw_assets(time_entry: dict, endpoint_config: dict, catalog_config: dict
     style_type = "text/vector-styles"
     extra_fields_asset = {}
     roles = [role]
-    if time_entry.get("visible"):
+    if endpoint_config.get("visible"):
         roles.append("visible")
-    if "visible" in time_entry and not time_entry["visible"]:
+    if "visible" in endpoint_config and not endpoint_config["visible"]:
         roles.append("invisible")
 
     if endpoint_config.get("Attribution"):
@@ -583,11 +583,19 @@ def add_base_overlay_info(
             catalog_config["default_base_layers"]
         )
         for layer in layers:
-            if "Assets" in layer:
-                assets, style_link = add_raw_assets(layer, layer, catalog_config, role="baselayer")
+            if layer.get("Name") in [
+                "COG source",
+                "GeoJSON source",
+                "FlatGeobuf source",
+            ]:
+                time_entry_structure = {"Assets": [layer]}
+                assets, style_link = add_raw_assets(
+                    time_entry_structure, layer, catalog_config, role="baselayer"
+                )
                 for asset_key, asset in assets.items():
                     collection.add_asset(asset_key, asset)
                 collection.add_link(style_link)
+                collection.extra_fields["merge_assets"] = False
             else:
                 link = create_web_map_link(collection, catalog_config, layer, role="baselayer")
                 collection.add_link(link)
@@ -599,10 +607,18 @@ def add_base_overlay_info(
         )
 
         for layer in layers:
-            if "Assets" in layer:
-                assets, style_link = add_raw_assets(layer, layer, catalog_config, role="overlay")
+            if layer.get("Name") in [
+                "COG source",
+                "GeoJSON source",
+                "FlatGeobuf source",
+            ]:
+                time_entry_structure = {"Assets": [layer]}
+                assets, style_link = add_raw_assets(
+                    time_entry_structure, layer, catalog_config, role="overlay"
+                )
                 for asset_key, asset in assets.items():
                     collection.add_asset(asset_key, asset)
+                collection.extra_fields["merge_assets"] = False
                 collection.add_link(style_link)
             else:
                 link = create_web_map_link(collection, catalog_config, layer, role="overlay")
