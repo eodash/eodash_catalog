@@ -794,8 +794,17 @@ def handle_GeoDB_endpoint(
 
                 assets = {"dummy_asset": Asset(href="")}
                 if endpoint_config.get("FeatureCollection"):
+                    url = f"{endpoint_config['EndPoint']}{endpoint_config[
+                        'Database']}_{endpoint_config['FeatureCollection']}?aoi_id=eq.{v['aoi_id']}"
+                    if collection_config.get("EodashIdentifier") == "E13d":
+                        # custom override of E13d to be +- 60 minutes around observation datetime
+                        time_start_features = (time_object - timedelta(minutes=60)).isoformat()
+                        time_end_features = (time_object + timedelta(minutes=60)).isoformat()
+                        url += f"&time=gte.{time_start_features}&time=lte.{time_end_features}"
+                    else:
+                        url += f"&time=eq.{v['time']}"
                     assets["geodbfeatures"] = Asset(
-                        href=f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['FeatureCollection']}?aoi_id=eq.{v['aoi_id']}&time=eq.{v['time']}",
+                        href=url,
                         media_type="application/geodb+json",
                         roles=["data"],
                     )
