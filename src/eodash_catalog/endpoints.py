@@ -794,8 +794,7 @@ def handle_GeoDB_endpoint(
 
                 assets = {"dummy_asset": Asset(href="")}
                 if endpoint_config.get("FeatureCollection"):
-                    url = f"{endpoint_config['EndPoint']}{endpoint_config[
-                        'Database']}_{endpoint_config['FeatureCollection']}?aoi_id=eq.{v['aoi_id']}"
+                    url = f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['FeatureCollection']}?aoi_id=eq.{v['aoi_id']}"  # noqa: E501
                     if collection_config.get("EodashIdentifier") == "E13d":
                         # custom override of E13d to be +- 60 minutes around observation datetime
                         time_start_features = (time_object - timedelta(minutes=60)).isoformat()
