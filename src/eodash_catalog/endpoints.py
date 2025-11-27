@@ -1542,7 +1542,7 @@ def handle_vector_tile_source(
                 rel="vector-tile",
                 target=time_entry["Url"],
                 media_type=media_type,
-                title=collection_config["Name"],
+                title=collection_config["Title"],
                 extra_fields=extra_fields_link,
             )
             add_projection_info(
