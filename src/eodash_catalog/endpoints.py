@@ -1443,7 +1443,7 @@ def handle_raw_source(
                 )
                 item.extra_fields["attribution"] = endpoint_config["Attribution"]
             if "MergeAssets" in endpoint_config:
-                item.extra_fields["merge_assets"] = endpoint_config["MergeAssets"]
+                item.extra_fields["eodash:merge_assets"] = endpoint_config["MergeAssets"]
 
             add_projection_info(
                 endpoint_config,
