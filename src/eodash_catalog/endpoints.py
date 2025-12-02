@@ -282,12 +282,14 @@ def process_STACAPI_Endpoint(
         item_datetime = item.get_datetime()
         if item_datetime is not None:
             iso_date = item_datetime.isoformat()[:10]
+            iso_datetime = item_datetime.isoformat()[:16]
             # if filterdates has been specified skip dates not listed in config
             if filter_dates and iso_date not in filter_dates:
                 continue
-            if iso_date in added_times:
+            # eodash client can not work with equal datetimes of items yet
+            if iso_datetime in added_times:
                 continue
-            added_times[iso_date] = True
+            added_times[iso_datetime] = True
         if options.tn:
             if item.assets.get("cog_default"):
                 generate_thumbnail(
@@ -887,7 +889,7 @@ def handle_GeoDB_endpoint(
                                 rel="xyz",
                                 target=target_url,
                                 media_type="image/png",
-                                title=collection_config["Name"],
+                                title=collection_config["Title"],
                                 extra_fields=extra_fields,
                             )
                             item.add_link(link)
@@ -1099,6 +1101,8 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
             rescale = "&rescale={},{}".format(
                 endpoint_config["Rescale"][0], endpoint_config["Rescale"][1]
             )
+    if expression := endpoint_config.get("Expression", ""):
+        expression = f"&expression={expression}"
     no_data = ""
     if endpoint_config.get("NoData"):
         no_data = "&no_data={}".format(endpoint_config["NoData"])
@@ -1106,7 +1110,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
     target_url = (
         f"{target_url_base}/raster/collections/{collection}/items/{item}"
-        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{colormap_name}{color_formula}{no_data}{rescale}"
+        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{colormap_name}{color_formula}{no_data}{rescale}{expression}"
     )
     return target_url
 
@@ -1161,7 +1165,7 @@ def add_visualization_info(
             rel="wms",
             target=f"https://{endpoint_url_parts.netloc}/ogc/wms/{instanceId}",
             media_type=(endpoint_config.get("MimeType", "image/png")),
-            title=collection_config["Name"],
+            title=collection_config["Title"],
             extra_fields=extra_fields,
         )
         add_projection_info(
@@ -1217,7 +1221,7 @@ def add_visualization_info(
             rel="wms",
             target=endpoint_url,
             media_type=media_type,
-            title=collection_config["Name"],
+            title=collection_config["Title"],
             extra_fields=extra_fields,
         )
         add_projection_info(
@@ -1249,7 +1253,7 @@ def add_visualization_info(
             rel="wms",
             target=endpoint_url,
             media_type=media_type,
-            title=collection_config["Name"],
+            title=collection_config["Title"],
             extra_fields=extra_fields,
         )
         add_projection_info(
@@ -1332,7 +1336,7 @@ def add_visualization_info(
                 rel="xyz",
                 target=target_url,
                 media_type="image/png",
-                title=collection_config["Name"],
+                title=collection_config["Title"],
                 extra_fields=extra_fields,
             )
             add_projection_info(
@@ -1364,7 +1368,7 @@ def add_visualization_info(
                 rel="xyz",
                 target=target_url,
                 media_type="application/pbf",
-                title=collection_config["Name"],
+                title=collection_config["Title"],
                 extra_fields=extra_fields,
             )
         )
