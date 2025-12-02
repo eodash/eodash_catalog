@@ -278,11 +278,13 @@ def process_STACAPI_Endpoint(
     # We keep track of potential duplicate times in this list
     added_times = {}
     items = []
+
     for item in results.items():
         item_datetime = item.get_datetime()
+
         if item_datetime is not None:
             iso_date = item_datetime.isoformat()[:10]
-            iso_datetime = item_datetime.isoformat()[:16]
+            iso_datetime = item_datetime.isoformat()[:19]
             # if filterdates has been specified skip dates not listed in config
             if filter_dates and iso_date not in filter_dates:
                 continue
