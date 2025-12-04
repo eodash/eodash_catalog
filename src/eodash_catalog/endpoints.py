@@ -69,7 +69,9 @@ def process_WCS_rasdaman_Endpoint(
             geometry=None,
             datetime=dt,
         )
-        add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
+        add_visualization_info(
+            item, collection_config, endpoint_config, catalog_config, datetimes=[dt]
+        )
         link = collection.add_item(item)
         # bubble up information we want to the link
         link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
@@ -94,7 +96,12 @@ def process_STAC_Datacube_Endpoint(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    add_visualization_info(collection, collection_config, endpoint_config)
+    add_visualization_info(
+        collection,
+        collection_config,
+        endpoint_config,
+        catalog_config,
+    )
     coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     stac_endpoint_url = endpoint_config["EndPoint"]
     if endpoint_config.get("Name") == "xcube":
@@ -138,7 +145,26 @@ def process_STAC_Datacube_Endpoint(
             datetime=dt,
             assets={"dummy_asset": Asset(href="")},
         )
-        add_visualization_info(new_item, collection_config, endpoint_config)
+        add_visualization_info(
+            new_item,
+            collection_config,
+            endpoint_config,
+            catalog_config,
+        )
+        # add eodash style visualization info if Style has been provided
+        if endpoint_config.get("Style"):
+            ep_st = endpoint_config.get("Style")
+            style_link = Link(
+                rel="style",
+                target=ep_st
+                if ep_st.startswith("http")
+                else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                media_type="text/tileUrl-styles",
+                extra_fields={
+                    "asset:keys": list(new_item.assets.keys()),
+                },
+            )
+            new_item.add_link(style_link)
         items.append(new_item)
 
     save_items(
@@ -209,8 +235,15 @@ def handle_STAC_based_endpoint(
             link.extra_fields["name"] = location["Name"]
             add_example_info(collection, collection_config, endpoint_config, catalog_config)
             # eodash v4 compatibility
-            add_visualization_info(collection, collection_config, endpoint_config)
-            add_process_info_child_collection(collection, catalog_config, collection_config, None)
+            add_visualization_info(
+                collection,
+                collection_config,
+                endpoint_config,
+                catalog_config,
+            )
+            add_process_info_child_collection(
+                collection, catalog_config, collection_config, catalog_config, None
+            )
             if location.get("OverwriteBBox"):
                 collection.extent.spatial = SpatialExtent(
                     [
@@ -235,7 +268,12 @@ def handle_STAC_based_endpoint(
             bbox=bbox,
         )
     # eodash v4 compatibility
-    add_visualization_info(root_collection, collection_config, endpoint_config)
+    add_visualization_info(
+        root_collection,
+        collection_config,
+        endpoint_config,
+        catalog_config,
+    )
     add_collection_information(catalog_config, root_collection, collection_config, True)
     add_example_info(root_collection, collection_config, endpoint_config, catalog_config)
     return root_collection
@@ -301,24 +339,35 @@ def process_STACAPI_Endpoint(
                 generate_thumbnail(item, collection_config, endpoint_config)
         # Check if we can create visualization link
         if endpoint_config.get("Name") == "VEDA" and endpoint_config.get("Type") == "tiles":
-            add_visualization_info(item, collection_config, endpoint_config, item.id)
+            add_visualization_info(
+                item,
+                collection_config,
+                endpoint_config,
+                catalog_config,
+                item.id,
+            )
         elif (
             endpoint_config.get("Name") == "VEDA"
             and endpoint_config.get("Type") == "cog"
             and item.assets.get("cog_default")
         ):
             add_visualization_info(
-                item, collection_config, endpoint_config, item.assets["cog_default"].href
+                item,
+                collection_config,
+                endpoint_config,
+                catalog_config,
+                item.assets["cog_default"].href,
             )
         elif item_datetime:
             add_visualization_info(
-                item, collection_config, endpoint_config, datetimes=[item_datetime]
+                item, collection_config, endpoint_config, catalog_config, datetimes=[item_datetime]
             )
         elif item.properties.get("start_datetime") and item.properties.get("end_datetime"):
             add_visualization_info(
                 item,
                 collection_config,
                 endpoint_config,
+                catalog_config,
                 datetimes=[
                     parse_datestring_to_tz_aware_datetime(item.properties["start_datetime"]),
                     parse_datestring_to_tz_aware_datetime(item.properties["end_datetime"]),
@@ -413,7 +462,12 @@ def handle_collection_only(
             link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
     add_collection_information(catalog_config, collection, collection_config)
     # eodash v4 compatibility
-    add_visualization_info(collection, collection_config, endpoint_config)
+    add_visualization_info(
+        collection,
+        collection_config,
+        endpoint_config,
+        catalog_config,
+    )
     return collection
 
 
@@ -457,7 +511,9 @@ def handle_SH_WMS_endpoint(
                     assets={"dummy_asset": Asset(href="")},
                 )
                 add_projection_info(endpoint_config, item)
-                add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
+                add_visualization_info(
+                    item, collection_config, endpoint_config, catalog_config, datetimes=[dt]
+                )
                 items.append(item)
             save_items(
                 collection,
@@ -478,7 +534,12 @@ def handle_SH_WMS_endpoint(
                 collection.update_extent_from_items()
             elif not location["Times"]:
                 LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
-            add_visualization_info(collection, collection_config, endpoint_config)
+            add_visualization_info(
+                collection,
+                collection_config,
+                endpoint_config,
+                catalog_config,
+            )
             add_process_info_child_collection(collection, catalog_config, collection_config, None)
             add_collection_information(catalog_config, collection, collection_config)
             add_base_overlay_info(collection, catalog_config, collection_config)
@@ -502,7 +563,9 @@ def handle_SH_WMS_endpoint(
                 assets={"dummy_asset": Asset(href="")},
             )
             add_projection_info(endpoint_config, item)
-            add_visualization_info(item, collection_config, endpoint_config, datetimes=[dt])
+            add_visualization_info(
+                item, collection_config, endpoint_config, catalog_config, datetimes=[dt]
+            )
             items.append(item)
         save_items(
             root_collection,
@@ -519,7 +582,12 @@ def handle_SH_WMS_endpoint(
         root_collection.extent.temporal = TemporalExtent([time_extent])
     # eodash v4 compatibility
     add_collection_information(catalog_config, root_collection, collection_config, True)
-    add_visualization_info(root_collection, collection_config, endpoint_config)
+    add_visualization_info(
+        root_collection,
+        collection_config,
+        endpoint_config,
+        catalog_config,
+    )
     return root_collection
 
 
@@ -1050,7 +1118,7 @@ def handle_WMS_endpoint(
             add_projection_info(endpoint_config, item)
             dt_visualization = dt if isinstance(dt, list) else [dt]
             add_visualization_info(
-                item, collection_config, endpoint_config, datetimes=dt_visualization
+                item, collection_config, endpoint_config, catalog_config, datetimes=dt_visualization
             )
             items.append(item)
     else:
@@ -1074,7 +1142,12 @@ def handle_WMS_endpoint(
             ]
         )
     # eodash v4 compatibility
-    add_visualization_info(collection, collection_config, endpoint_config)
+    add_visualization_info(
+        collection,
+        collection_config,
+        endpoint_config,
+        catalog_config,
+    )
     add_collection_information(catalog_config, collection, collection_config)
     return collection
 
@@ -1121,6 +1194,7 @@ def add_visualization_info(
     stac_object: Collection | Item,
     collection_config: dict,
     endpoint_config: dict,
+    catalog_config: dict,
     file_url: str | None = None,
     datetimes: list[datetime] | None = None,
 ) -> None:
@@ -1219,6 +1293,8 @@ def add_visualization_info(
         endpoint_url = endpoint_config["EndPoint"]
         # custom replacing of all ENV VARS present as template in URL as {VAR}
         endpoint_url = replace_with_env_variables(endpoint_url)
+        identifier = str(uuid.uuid4())
+        extra_fields["key"] = identifier
         link = Link(
             rel="wms",
             target=endpoint_url,
@@ -1231,6 +1307,20 @@ def add_visualization_info(
             link,
         )
         stac_object.add_link(link)
+        # add eodash style visualization info if Style has been provided
+        if endpoint_config.get("Style"):
+            ep_st = endpoint_config.get("Style")
+            style_link = Link(
+                rel="style",
+                target=ep_st
+                if ep_st.startswith("http")
+                else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                media_type="text/tileUrl-styles",
+                extra_fields={
+                    "links:keys": [identifier],
+                },
+            )
+            stac_object.add_link(style_link)
     elif endpoint_config["Name"] == "rasdaman":
         extra_fields.update(
             {
@@ -1319,6 +1409,8 @@ def add_visualization_info(
                 dimensions[key] = value
         if dimensions != {}:
             extra_fields["wmts:dimensions"] = dimensions
+        identifier = str(uuid.uuid4())
+        extra_fields["key"] = identifier
         stac_object.add_link(
             Link(
                 rel="wmts",
@@ -1328,12 +1420,28 @@ def add_visualization_info(
                 extra_fields=extra_fields,
             )
         )
+        # add eodash style visualization info if Style has been provided
+        if endpoint_config.get("Style"):
+            ep_st = endpoint_config.get("Style")
+            style_link = Link(
+                rel="style",
+                target=ep_st
+                if ep_st.startswith("http")
+                else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                media_type="text/tileUrl-styles",
+                extra_fields={
+                    "links:keys": [identifier],
+                },
+            )
+            stac_object.add_link(style_link)
     elif endpoint_config["Name"] == "VEDA":
         if endpoint_config["Type"] == "cog":
             target_url = generate_veda_cog_link(endpoint_config, file_url)
         elif endpoint_config["Type"] == "tiles":
             target_url = generate_veda_tiles_link(endpoint_config, file_url)
         if target_url:
+            identifier = str(uuid.uuid4())
+            extra_fields["key"] = identifier
             link = Link(
                 rel="xyz",
                 target=target_url,
@@ -1346,6 +1454,20 @@ def add_visualization_info(
                 link,
             )
             stac_object.add_link(link)
+            # add eodash style visualization info if Style has been provided
+            if endpoint_config.get("Style"):
+                ep_st = endpoint_config.get("Style")
+                style_link = Link(
+                    rel="style",
+                    target=ep_st
+                    if ep_st.startswith("http")
+                    else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                    media_type="text/tileUrl-styles",
+                    extra_fields={
+                        "links:keys": [identifier],
+                    },
+                )
+                stac_object.add_link(style_link)
     elif endpoint_config["Name"] == "GeoDB Vector Tiles":
         # `${geoserverUrl}${config.layerName}@EPSG%3A${projString}@pbf/{z}/{x}/{-y}.pbf`,
         # 'geodb_debd884d-92f9-4979-87b6-eadef1139394:GTIF_AT_Gemeinden_3857'
