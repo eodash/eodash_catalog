@@ -259,18 +259,6 @@ def add_example_info(
                         },
                     )
                 )
-            if service["Name"] == "VEDA Statistics":
-                stac_object.add_link(
-                    Link(
-                        rel="example",
-                        target=service["Endpoint"],
-                        title=service["Name"],
-                        media_type="application/json",
-                        extra_fields={
-                            "example:language": "JSON",
-                        },
-                    )
-                )
             if service["Name"] == "EOxHub Notebook":
                 # TODO: we need to consider if we can improve information added
                 stac_object.add_link(

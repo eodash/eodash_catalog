@@ -573,9 +573,7 @@ def save_items(
             ]
             if collected_assets:
                 link.extra_fields["assets"] = collected_assets
-            # also bubble up item id and cog_href if available
-            # TODO: not clear when the item id is needed in the link might be some legacy reference
-            # link.extra_fields["item"] = item.id
+            # also bubble up cog_href if available
             if item.assets.get("cog_default"):
                 link.extra_fields["cog_href"] = item.assets["cog_default"].href
         collection.update_extent_from_items()
