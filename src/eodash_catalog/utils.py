@@ -279,7 +279,7 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
         # colormap = "&colormap=%s"%(urllib.parse.quote(str(endpoint_config["Colormap"])))
 
     Nodata = ""
-    if endpoint_config.get("Nodata"):
+    if endpoint_config.get("Nodata") is not None:
         Nodata = "&nodata={}".format(endpoint_config["Nodata"])
 
     colormap_name = ""
