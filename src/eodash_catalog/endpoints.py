@@ -1468,34 +1468,6 @@ def add_visualization_info(
                     },
                 )
                 stac_object.add_link(style_link)
-    elif endpoint_config["Name"] == "GeoDB Vector Tiles":
-        # `${geoserverUrl}${config.layerName}@EPSG%3A${projString}@pbf/{z}/{x}/{-y}.pbf`,
-        # 'geodb_debd884d-92f9-4979-87b6-eadef1139394:GTIF_AT_Gemeinden_3857'
-        target_url = "{}{}:{}_{}@EPSG:3857@pbf/{{z}}/{{x}}/{{-y}}.pbf".format(
-            endpoint_config["EndPoint"],
-            endpoint_config["Instance"],
-            endpoint_config["Database"],
-            endpoint_config["CollectionId"],
-        )
-        extra_fields.update(
-            {
-                "description": collection_config["Title"],
-                "parameters": endpoint_config["Parameters"],
-                "matchKey": endpoint_config["MatchKey"],
-                "timeKey": endpoint_config["TimeKey"],
-                "source": endpoint_config["Source"],
-                "role": ["data"],
-            }
-        )
-        stac_object.add_link(
-            Link(
-                rel="xyz",
-                target=target_url,
-                media_type="application/pbf",
-                title=collection_config["Title"],
-                extra_fields=extra_fields,
-            )
-        )
     else:
         LOGGER.info(f"Visualization endpoint not supported {endpoint_config['Name']}")
 
