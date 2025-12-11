@@ -1180,7 +1180,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
         expression = f"&expression={expression}"
     no_data = ""
     if endpoint_config.get("NoData") is not None:
-        no_data = "&no_data={}".format(endpoint_config["NoData"])
+        no_data = "&nodata={}".format(endpoint_config["NoData"])
     item = item if item else "{item}"
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
     target_url = (
