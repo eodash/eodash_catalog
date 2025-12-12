@@ -646,3 +646,22 @@ def make_intervals(datetimes: list[datetime]) -> list[list[datetime]]:
             end = start + prev_interval
         intervals.append([start, end])
     return intervals
+
+
+def convert_layers_config_to_assets_configs(layer_config: dict):
+    """
+    Converts a config of baselayers/overlays to what function add_raw_assets
+    expects for raw data
+    """
+    new_layer_config = {
+        **layer_config,
+        "Identifier": layer_config["id"],
+        "Name": layer_config["protocol"],
+        "File": layer_config["url"],
+    }
+    if title := layer_config.get("name"):
+        new_layer_config["Title"] = title
+
+    time_entry_structure = {"Assets": [new_layer_config]}
+
+    return time_entry_structure, new_layer_config

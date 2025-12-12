@@ -18,6 +18,7 @@ from pystac import (
 from structlog import get_logger
 
 from eodash_catalog.utils import (
+    convert_layers_config_to_assets_configs,
     generateDatetimesFromInterval,
     get_full_url,
     make_intervals,
@@ -184,7 +185,7 @@ def create_web_map_link(
         rel=layer_config["protocol"],
         target=layer_config["url"],
         media_type=media_type,
-        title=layer_config["name"],
+        title=layer_config.get("name", layer_config["id"]),
         extra_fields=extra_fields,
     )
     add_projection_info(layer_config, wml)
@@ -571,14 +572,14 @@ def add_base_overlay_info(
             catalog_config["default_base_layers"]
         )
         for layer in layers:
-            if layer.get("Name") in [
+            if layer.get("protocol") in [
                 "COG source",
                 "GeoJSON source",
                 "FlatGeobuf source",
             ]:
-                time_entry_structure = {"Assets": [layer]}
+                time_entry_structure, layer_config = convert_layers_config_to_assets_configs(layer)
                 assets, style_link = add_raw_assets(
-                    time_entry_structure, layer, catalog_config, role="baselayer"
+                    time_entry_structure, layer_config, catalog_config, role="baselayer"
                 )
                 for asset_key, asset in assets.items():
                     collection.add_asset(asset_key, asset)
@@ -595,14 +596,14 @@ def add_base_overlay_info(
         )
 
         for layer in layers:
-            if layer.get("Name") in [
+            if layer.get("protocol") in [
                 "COG source",
                 "GeoJSON source",
                 "FlatGeobuf source",
             ]:
-                time_entry_structure = {"Assets": [layer]}
+                time_entry_structure, layer_config = convert_layers_config_to_assets_configs(layer)
                 assets, style_link = add_raw_assets(
-                    time_entry_structure, layer, catalog_config, role="overlay"
+                    time_entry_structure, layer_config, catalog_config, role="overlay"
                 )
                 for asset_key, asset in assets.items():
                     collection.add_asset(asset_key, asset)
