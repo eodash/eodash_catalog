@@ -335,7 +335,9 @@ def process_collection_file(
                     if not options.gp:
                         add_single_item_if_collection_empty(endpoint_config, collection)
                     add_projection_info(endpoint_config, collection)
-                    add_to_catalog(collection, catalog, endpoint_config, collection_config, disable, hidden)
+                    add_to_catalog(
+                        collection, catalog, endpoint_config, collection_config, disable, hidden
+                    )
                 else:
                     raise Exception(f"No collection was generated for resource {endpoint_config}")
             except Exception as e:
@@ -437,7 +439,8 @@ def process_collection_file(
 
 
 def add_to_catalog(
-    collection: Collection, catalog: Catalog, endpoint: dict, collection_config: dict, disable=False, hidden=False
+    collection: Collection, catalog: Catalog, endpoint: dict,
+    collection_config: dict, disable=False, hidden=False
 ):
     # check if already in catalog, if it is do not re-add it
     # TODO: probably we should add to the catalog only when creating
