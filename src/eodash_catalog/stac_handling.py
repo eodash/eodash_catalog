@@ -153,6 +153,10 @@ def create_web_map_link(
                 extra_fields["wms:styles"] = layer_config["styles"]
             if layer_config.get("dimensions"):
                 extra_fields["wms:dimensions"] = layer_config["dimensions"]
+            if layer_config.get("version"):
+                extra_fields["wms:version"] = layer_config["version"]
+            if layer_config.get("tilesize"):
+                extra_fields["wms:tilesize"] = layer_config["tilesize"]
         case "wmts":
             extra_fields["wmts:layer"] = layer_config["layer"]
             if layer_config.get("dimensions"):
