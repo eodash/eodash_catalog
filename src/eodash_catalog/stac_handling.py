@@ -572,11 +572,12 @@ def add_base_overlay_info(
     # add custom baselayers specially for this indicator
     # alternatively use default base layers defined
     if "BaseLayers" in collection_config or catalog_config.get("default_base_layers"):
-        layers = (
-            collection_config.get("BaseLayers")
-            or read_config_file(catalog_config["default_overlay_layers"]).get("layers")
-            or read_config_file(catalog_config["default_overlay_layers"])
-        )
+        layers = collection_config.get("BaseLayers")
+        if not layers:
+            layers = read_config_file(catalog_config["default_base_layers"])
+            if isinstance(layers, dict):
+                layers = layers.get("layers")
+
         for layer in layers:
             if layer.get("protocol") in [
                 "COG source",
@@ -597,11 +598,11 @@ def add_base_overlay_info(
     # add custom overlays just for this indicator
     # alternatively use default overlays defined
     if "OverlayLayers" in collection_config or catalog_config.get("default_overlay_layers"):
-        layers = (
-            collection_config.get("OverlayLayers")
-            or read_config_file(catalog_config["default_overlay_layers"]).get("layers")
-            or read_config_file(catalog_config["default_overlay_layers"])
-        )
+        layers = collection_config.get("OverlayLayers")
+        if not layers:
+            layers = read_config_file(catalog_config["default_overlay_layers"])
+            if isinstance(layers, dict):
+                layers = layers.get("layers")
 
         for layer in layers:
             if layer.get("protocol") in [
@@ -692,7 +693,7 @@ def add_projection_info(
         if isinstance(proj, str):
             if proj.lower().startswith("epsg"):
                 # consider input such as "EPSG:4326"
-                proj = proj.lower().split("EPSG:")[1]
+                proj = proj.lower().split("epsg:")[1]
             # consider a number only
             proj = int(proj)
         if isinstance(proj, int):

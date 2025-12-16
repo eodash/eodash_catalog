@@ -452,7 +452,7 @@ def handle_collection_only(
         for dt in datetimes:
             item = Item(
                 id=format_datetime_to_isostring_zulu(dt),
-                bbox=endpoint_config.get("OverwriteBBox"),
+                bbox=endpoint_config.get("OverwriteBBox", [-180.0, -90.0, 180.0, 90.0]),
                 properties={},
                 geometry=None,
                 datetime=dt,
