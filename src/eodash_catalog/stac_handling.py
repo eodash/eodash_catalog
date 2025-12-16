@@ -572,8 +572,10 @@ def add_base_overlay_info(
     # add custom baselayers specially for this indicator
     # alternatively use default base layers defined
     if "BaseLayers" in collection_config or catalog_config.get("default_base_layers"):
-        layers = collection_config.get("BaseLayers") or read_config_file(
-            catalog_config["default_base_layers"]
+        layers = (
+            collection_config.get("BaseLayers")
+            or read_config_file(catalog_config["default_overlay_layers"]).get("layers")
+            or read_config_file(catalog_config["default_overlay_layers"])
         )
         for layer in layers:
             if layer.get("protocol") in [
@@ -595,8 +597,10 @@ def add_base_overlay_info(
     # add custom overlays just for this indicator
     # alternatively use default overlays defined
     if "OverlayLayers" in collection_config or catalog_config.get("default_overlay_layers"):
-        layers = collection_config.get("OverlayLayers") or read_config_file(
-            catalog_config["default_overlay_layers"]
+        layers = (
+            collection_config.get("OverlayLayers")
+            or read_config_file(catalog_config["default_overlay_layers"]).get("layers")
+            or read_config_file(catalog_config["default_overlay_layers"])
         )
 
         for layer in layers:
