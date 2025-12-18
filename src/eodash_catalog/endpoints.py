@@ -241,9 +241,7 @@ def handle_STAC_based_endpoint(
                 endpoint_config,
                 catalog_config,
             )
-            add_process_info_child_collection(
-                collection, catalog_config, collection_config, catalog_config, None
-            )
+            add_process_info_child_collection(collection, catalog_config, collection_config, None)
             if location.get("OverwriteBBox"):
                 collection.extent.spatial = SpatialExtent(
                     [
