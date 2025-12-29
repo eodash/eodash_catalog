@@ -1163,6 +1163,10 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     color_formula = ""
     if endpoint_config.get("ColorFormula"):
         color_formula = "&color_formula={}".format(endpoint_config["ColorFormula"])
+
+    colormap = ""
+    if endpoint_config.get("Colormap"):
+        colormap = "&colormap={}".format(endpoint_config["Colormap"])
     rescale = ""
     if rescale_configs := endpoint_config.get("Rescale", ""):
         if isinstance(rescale_configs[0], list):
@@ -1183,7 +1187,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
     target_url = (
         f"{target_url_base}/raster/collections/{collection}/items/{item}"
-        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{colormap_name}{color_formula}{no_data}{rescale}{expression}"
+        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{colormap_name}{color_formula}{no_data}{rescale}{expression}{colormap}"
     )
     return target_url
 
