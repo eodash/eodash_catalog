@@ -1391,7 +1391,7 @@ def add_visualization_info(
                     rel="xyz",
                     target=target_url,
                     media_type="image/png",
-                    title="xcube tiles",
+                    title=collection_config["Title"],
                     extra_fields=extra_fields,
                 )
             )
@@ -1418,7 +1418,7 @@ def add_visualization_info(
                 rel="wmts",
                 target=target_url,
                 media_type="image/png",
-                title="wmts capabilities",
+                title=collection_config["Title"],
                 extra_fields=extra_fields,
             )
         )
