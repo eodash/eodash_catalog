@@ -167,8 +167,8 @@ def create_web_map_link(
             media_type = "application/vnd.mapbox-vector-tile"
             if vector_tile_id_property := layer_config.get("idProperty"):
                 extra_fields["idProperty"] = vector_tile_id_property
-            if vector_tile_id_property := layer_config.get("layers"):
-                layer_config["layers"] = vector_tile_id_property
+            if vector_tile_layers := layer_config.get("layers"):
+                extra_fields["layers"] = vector_tile_layers
             if ep_st := layer_config.get("Style"):
                 style_link = Link(
                     rel="style",

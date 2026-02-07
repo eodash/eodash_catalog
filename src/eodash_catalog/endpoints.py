@@ -1638,8 +1638,8 @@ def handle_vector_tile_source(
             extra_fields_link["key"] = identifier
             if vector_tile_id_property := endpoint_config.get("idProperty"):
                 extra_fields_link["idProperty"] = vector_tile_id_property
-            if vector_tile_id_property := endpoint_config.get("layers"):
-                extra_fields_link["layers"] = vector_tile_id_property
+            if vector_tile_layers := endpoint_config.get("layers"):
+                extra_fields_link["layers"] = vector_tile_layers
             link = Link(
                 rel="vector-tile",
                 target=time_entry["Url"],
