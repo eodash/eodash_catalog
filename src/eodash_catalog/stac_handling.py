@@ -180,7 +180,11 @@ def create_web_map_link(
                 )
                 collection.add_link(style_link)
             add_authentication(collection, layer_config["url"], extra_fields)
-
+        case "mapbox-style-document":
+            media_type = "application/json"
+            if vector_tile_apply_options := layer_config.get("applyOptions"):
+                extra_fields["applyOptions"] = vector_tile_apply_options
+            add_authentication(collection, layer_config["url"], extra_fields)
     if layer_config.get("Attribution"):
         extra_fields["attribution"] = layer_config["Attribution"]
     if layer_config.get("Colorlegend"):

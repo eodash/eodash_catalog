@@ -304,6 +304,16 @@ def process_collection_file(
                         catalog,
                         options,
                     )
+                elif endpoint_config["Name"] == "MapboxStyle source":
+                    collection = handle_vector_tile_source(
+                        catalog_config,
+                        endpoint_config,
+                        collection_config,
+                        coll_path_rel_to_root_catalog,
+                        catalog,
+                        options,
+                        mapbox_style=True,
+                    )
                 elif endpoint_config["Name"] == "Collection-only":
                     collection = handle_collection_only(
                         catalog_config, endpoint_config, collection_config, catalog
@@ -439,8 +449,12 @@ def process_collection_file(
 
 
 def add_to_catalog(
-    collection: Collection, catalog: Catalog, endpoint: dict,
-    collection_config: dict, disable=False, hidden=False
+    collection: Collection,
+    catalog: Catalog,
+    endpoint: dict,
+    collection_config: dict,
+    disable=False,
+    hidden=False,
 ):
     # check if already in catalog, if it is do not re-add it
     # TODO: probably we should add to the catalog only when creating

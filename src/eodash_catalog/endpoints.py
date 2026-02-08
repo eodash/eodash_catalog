@@ -1607,6 +1607,7 @@ def handle_vector_tile_source(
     coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
+    mapbox_style: bool = False,
 ) -> Collection:
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
@@ -1617,7 +1618,9 @@ def handle_vector_tile_source(
         style_link = None
         for time_entry in endpoint_config["TimeEntries"]:
             # create Item for each time entry
-            media_type = "application/vnd.mapbox-vector-tile"
+            media_type = (
+                "application/json" if mapbox_style else "application/vnd.mapbox-vector-tile"
+            )
             style_type = "text/vector-styles"
             bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
             dt = parse_datestring_to_tz_aware_datetime(time_entry["Time"])
@@ -1640,8 +1643,11 @@ def handle_vector_tile_source(
                 extra_fields_link["idProperty"] = vector_tile_id_property
             if vector_tile_layers := endpoint_config.get("layers"):
                 extra_fields_link["layers"] = vector_tile_layers
+            if vector_tile_apply_options := endpoint_config.get("applyOptions"):
+                extra_fields_link["applyOptions"] = vector_tile_apply_options
+            rel = "mapbox-style-document" if mapbox_style else "vector-tile"
             link = Link(
-                rel="vector-tile",
+                rel,
                 target=time_entry["Url"],
                 media_type=media_type,
                 title=collection_config["Title"],
