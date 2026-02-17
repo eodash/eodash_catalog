@@ -595,7 +595,7 @@ def add_base_overlay_info(
                 for asset_key, asset in assets.items():
                     collection.add_asset(asset_key, asset)
                 collection.add_link(style_link)
-                collection.extra_fields["merge_assets"] = False
+                collection.extra_fields["eodash:merge_assets"] = False
             else:
                 link = create_web_map_link(collection, catalog_config, layer, role="baselayer")
                 collection.add_link(link)
@@ -620,7 +620,7 @@ def add_base_overlay_info(
                 )
                 for asset_key, asset in assets.items():
                     collection.add_asset(asset_key, asset)
-                collection.extra_fields["merge_assets"] = False
+                collection.extra_fields["eodash:merge_assets"] = False
                 collection.add_link(style_link)
             else:
                 link = create_web_map_link(collection, catalog_config, layer, role="overlay")
