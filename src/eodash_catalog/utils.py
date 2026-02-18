@@ -417,7 +417,7 @@ def get_full_url(url: str, catalog_config) -> str:
     if url.startswith("http"):
         return url
     else:
-        return f'{catalog_config["assets_endpoint"]}{url}'
+        return f'{catalog_config["assets_endpoint"]}/{url}'
 
 
 def update_extents_from_collection_children(collection: Collection):
