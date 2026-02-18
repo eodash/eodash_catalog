@@ -378,24 +378,42 @@ def add_collection_information(
         )
     if stories := collection_config.get("Stories"):
         for story in stories:
-            story_url = story.get("Url")
-            if not story_url.startswith("http"):
-                story_url = f'{catalog_config.get("stories_endpoint")}/{story_url}'
-            parsed_url = urlparse(story_url)
-            # check if it is URL with a query parameter id=story-identifier
-            if parsed_url.query and len(parse_qs(parsed_url.query).get("id")) > 0:
-                story_id = parse_qs(parsed_url.query).get("id")[0]
+            stories_endpoint_config = catalog_config.get("stories_endpoint")
+            if story_id := story.get("Id"):
+                # only story ID defined, then use it to create raw link and rendered link
+                story_url = (stories_endpoint_config["rendered_url"]).replace("{id}", story_id)
+                suffix = "" if story_id.endswith(".md") or story_id.endswith(".MD") else ".md"
+                story_raw_url = f"{stories_endpoint_config['raw_url']}/{story_id}{suffix}"
             else:
-                story_id = parsed_url.path.rsplit("/")[-1].replace(".md", "").replace(".MD", "")
-            collection.add_asset(
-                story_id,
-                Asset(
-                    title=story.get("Name"),
-                    href=story_url,
-                    media_type="text/markdown",
-                    roles=["metadata", "story"],
-                ),
+                # Url was inserted, treat it as rendered URL
+                # try to extract story ID from it to create raw markdown URL
+                story_url = story.get("Url")
+                parsed_url = urlparse(story_url)
+                # check if it is URL with a query parameter id=story-identifier
+                if parsed_url.query and len(parse_qs(parsed_url.query).get("id")) > 0:
+                    story_id = parse_qs(parsed_url.query).get("id")[0]
+                else:
+                    story_id = parsed_url.path.rsplit("/")[-1].replace(".md", "").replace(".MD", "")
+                story_raw_url = f"{stories_endpoint_config['raw_url']}/{story_id}.md"
+            # store alternate URL so that both rendered story URL and raw markdown url can be linked
+            extra_fields = {
+                "alternate": {
+                    "raw": {
+                        "href": story_raw_url,
+                        "description": "Raw markdown content of the story",
+                    }
+                },
+                "alternate:name": "rendered",
+            }
+            asset = Asset(
+                title=story.get("Name"),
+                href=story_url,
+                media_type="text/markdown",
+                roles=["metadata", "story"],
+                extra_fields=extra_fields,
             )
+
+            collection.add_asset(story_id, asset)
     if collection_config.get("Image"):
         # Check if absolute URL or relative path
         if collection_config["Image"].startswith("http"):
