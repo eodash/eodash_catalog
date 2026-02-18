@@ -414,6 +414,11 @@ def add_collection_information(
             )
 
             collection.add_asset(story_id, asset)
+            alternate_extension = (
+                "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json"
+            )
+            if alternate_extension not in collection.stac_extensions:
+                collection.stac_extensions.append(alternate_extension)
     if collection_config.get("Image"):
         # Check if absolute URL or relative path
         if collection_config["Image"].startswith("http"):
