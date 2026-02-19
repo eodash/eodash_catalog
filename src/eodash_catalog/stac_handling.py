@@ -401,15 +401,17 @@ def add_collection_information(
                     "raw": {
                         "href": story_raw_url,
                         "description": "Raw markdown content of the story",
+                        "alternate:name": "raw story markdown",
                     }
                 },
-                "alternate:name": "rendered",
+                "alternate:name": "rendered story page",
             }
             asset = Asset(
                 title=story.get("Name"),
                 href=story_url,
                 media_type="text/markdown",
                 roles=["metadata", "story"],
+                description="Rendered page of the story",
                 extra_fields=extra_fields,
             )
 
