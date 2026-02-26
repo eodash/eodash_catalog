@@ -1403,9 +1403,24 @@ def add_visualization_info(
                 "role": ["data"],
             }
         )
+        # Pass through optional MatrixSet for TileMatrixSet selection
+        if matrix_set := endpoint_config.get("MatrixSet"):
+            extra_fields["wmts:matrixSet"] = matrix_set
         dimensions = {}
         if datetimes is not None:
-            dimensions["time"] = format_datetime_to_isostring_zulu(datetimes[0])
+            dt = datetimes[0]
+            # Date-only format for midnight timestamps;
+            # marine.copernicus requires full ISO.
+            if (
+                dt.hour == 0
+                and dt.minute == 0
+                and dt.second == 0
+                and dt.microsecond == 0
+                and "marine.copernicus" not in endpoint_config.get("EndPoint", "")
+            ):
+                dimensions["time"] = dt.strftime("%Y-%m-%d")
+            else:
+                dimensions["time"] = format_datetime_to_isostring_zulu(dt)
         if dimensions_config := endpoint_config.get("Dimensions", {}):
             for key, value in dimensions_config.items():
                 dimensions[key] = value
