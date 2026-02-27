@@ -62,3 +62,17 @@ Pushing a tag in the repository automatically creates:
 ## License
 
 `eodash_catalog` is distributed under the terms of the [MIT](https://spdx.org/licenses/MIT.html) license.
+
+## Wiki
+
+eodash_catalog wiki contains meaning of most of configurable parameters of the collections, indicators and catalogs.
+
+For one-time export of the wiki as single PDF, do following:
+
+```bash
+git clone https://github.com/eodash/eodash_catalog.wiki.git
+cd eodash_catalog.wiki
+for f in *.md; do pandoc -V geometry:margin=1in "$f" -o "$f".pdf; done
+now=`date +'%Y%m%d'` && pdftk Home.md.pdf Data-integration-steps.md.pdf "Data-definition-‐-first-steps.md.pdf" Auxiliary-layers.md.pdf Colorlegend.md.pdf DataSource.md.pdf Locations.md.pdf Process.md.pdf Projection.md.pdf Provider.md.pdf Reference.md.pdf Resource.md.pdf Service.md.pdf Story.md.pdf output eodash-catalog-wiki-snapshot-$now.pdf
+```
+Add missing files if new wiki pages have been added in the meantime.
