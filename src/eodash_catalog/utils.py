@@ -128,8 +128,9 @@ def retrieveExtentFromWMSWMTS(
             if not wmts and service[layer].timepositions is not None:
                 tps = service[layer].timepositions
             elif wmts:
-                time_dimension = service[layer].dimensions.get("time")
-                # specifically taking 'time' dimension
+                # Case-insensitive TIME dimension lookup
+                dims = service[layer].dimensions
+                time_dimension = dims.get("time") or dims.get("TIME")
                 if time_dimension:
                     tps = time_dimension["values"]
             for tp in tps:
