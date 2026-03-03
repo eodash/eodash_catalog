@@ -378,7 +378,7 @@ def add_collection_information(
         )
     if stories := collection_config.get("Stories"):
         for story in stories:
-            stories_endpoint_config = catalog_config.get("stories_endpoint")
+            stories_endpoint_config = catalog_config.get("stories_endpoint", {})
             if story_id := story.get("Id"):
                 # only story ID defined, then use it to create raw link and rendered link
                 story_url = (stories_endpoint_config["rendered_url"]).replace("{id}", story_id)
@@ -414,6 +414,17 @@ def add_collection_information(
                 description="Rendered page of the story",
                 extra_fields=extra_fields,
             )
+            if stories_additional_stac_property := stories_endpoint_config.get(
+                "additional_stac_property", "eodash:narratives"
+            ):
+                # copy assets to root level to be in a special category in eodash stacinfo
+                if stories_additional_stac_property not in collection.extra_fields:
+                    collection.extra_fields[stories_additional_stac_property] = {}
+                root_level_asset = asset.to_dict()
+                del root_level_asset["description"]
+                collection.extra_fields[stories_additional_stac_property][story_id] = (
+                    root_level_asset
+                )
 
             collection.add_asset(story_id, asset)
             alternate_extension = (
