@@ -25,7 +25,12 @@ def get_SH_token(endpoint_config: dict) -> str:
     oauth = OAuth2Session(client=client)
     # Get token for the session
     endpoint_url_parts = urlparse(endpoint_config["EndPoint"])
-    SH_TOKEN_URL = f"https://{endpoint_url_parts.netloc}/oauth/token"
+    if "dataspace.copernicus" in endpoint_config["EndPoint"]:
+        # cdse auth handler
+        SH_TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
+    else:
+        # old sentinel hub auth handler
+        SH_TOKEN_URL = f"https://{endpoint_url_parts.netloc}/auth/realms/main/protocol/openid-connect/token"
     token = oauth.fetch_token(
         token_url=SH_TOKEN_URL,
         client_secret=client_secret,
