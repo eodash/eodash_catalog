@@ -30,11 +30,10 @@ def get_SH_token(endpoint_config: dict) -> str:
         SH_TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
     else:
         # old sentinel hub auth handler
-        SH_TOKEN_URL = f"https://{endpoint_url_parts.netloc}/oauth/token"
+        SH_TOKEN_URL = f"https://{endpoint_url_parts.netloc}/auth/realms/main/protocol/openid-connect/token"
     token = oauth.fetch_token(
         token_url=SH_TOKEN_URL,
         client_secret=client_secret,
-        include_client_id=True,
     )
     access_token = token["access_token"]
     _token_cache[client_id] = {"access_token": access_token, "expires_at": token["expires_at"]}
