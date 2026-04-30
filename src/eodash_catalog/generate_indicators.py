@@ -501,6 +501,16 @@ def add_to_catalog(
         for summary in collection.summaries.lists:
             link.extra_fields[summary] = collection.summaries.lists[summary]
 
+    # Prioritize explicit parent thumbnail (must be a list of 1)
+    if collection.extra_fields.get("thumbnail"):
+        link.extra_fields["thumbnail"] = [collection.extra_fields["thumbnail"]]
+    # If no explicit thumbnail, but summarized thumbnails exist, pick first one only
+    elif "thumbnail" in link.extra_fields and isinstance(link.extra_fields["thumbnail"], list):
+        if len(link.extra_fields["thumbnail"]) > 0:
+            link.extra_fields["thumbnail"] = [link.extra_fields["thumbnail"][0]]
+        else:
+            del link.extra_fields["thumbnail"]
+
     add_extra_fields(link, collection_config)
     return link
 
