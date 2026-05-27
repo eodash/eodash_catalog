@@ -225,7 +225,7 @@ def handle_STAC_based_endpoint(
             if location.get("Description"):
                 collection.description = location["Description"]
             else:
-                collection.description = location["Name"]
+                collection.description = root_collection.description
             # TODO: should we remove all assets from sub collections?
             link = root_collection.add_child(collection)
             latlng = f'{location["Point"][1]},{location["Point"][0]}'.strip()
@@ -484,15 +484,17 @@ def handle_SH_WMS_endpoint(
     coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
     if collection_config.get("Locations"):
         for location in collection_config["Locations"]:
-            # create  and populate location collections based on times
-            # TODO: Should we add some new description per location?
+            # create and populate location collections based on times
             location_config = {
                 "Title": location["Name"],
-                "Description": "",
             }
             collection = get_or_create_collection(
                 catalog, location["Identifier"], location_config, catalog_config, endpoint_config
             )
+            if location.get("Description"):
+                collection.description = location["Description"]
+            else:
+                collection.description = root_collection.description
             collection.extra_fields["endpointtype"] = endpoint_config["Name"]
             items = []
             for time_string in location["Times"]:
@@ -996,6 +998,7 @@ def handle_GeoDB_endpoint(
         add_process_info_child_collection(
             locations_collection, catalog_config, collection_config, key
         )
+        locations_collection.description = collection.description
         locations_collection.extra_fields["subcode"] = key
         link = collection.add_child(locations_collection)
         # collection.update_extent_from_items()
