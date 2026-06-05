@@ -270,7 +270,9 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
     bidx = ""
     if endpoint_config.get("Bidx"):
         # Check if an array was provided
-        if hasattr(endpoint_config["Bidx"], "__len__"):
+        if hasattr(endpoint_config["Bidx"], "__len__") and not isinstance(
+            endpoint_config["Bidx"], str
+        ):
             for band in endpoint_config["Bidx"]:
                 bidx = bidx + f"&bidx={band}"
         else:
@@ -279,30 +281,44 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
     colormap = ""
     if endpoint_config.get("Colormap"):
         colormap = "&colormap={}".format(endpoint_config["Colormap"])
-        # TODO: For now we assume a already urlparsed colormap definition
-        # it could be nice to allow a json and better convert it on the fly
-        # colormap = "&colormap=%s"%(urllib.parse.quote(str(endpoint_config["Colormap"])))
 
-    Nodata = ""
+    no_data = ""
     if endpoint_config.get("Nodata") is not None:
-        Nodata = "&nodata={}".format(endpoint_config["Nodata"])
+        no_data = "&nodata={}".format(endpoint_config["Nodata"])
 
     colormap_name = ""
     if endpoint_config.get("ColormapName"):
         colormap_name = "&colormap_name={}".format(endpoint_config["ColormapName"])
 
     rescale = ""
-    if endpoint_config.get("Rescale"):
-        rescale = "&rescale={},{}".format(
-            endpoint_config["Rescale"][0], endpoint_config["Rescale"][1]
-        )
+    if rescale_configs := endpoint_config.get("Rescale"):
+        if isinstance(rescale_configs[0], list):
+            # one rescale definition for each band
+            for rescale_config in rescale_configs:
+                rescale += f"&rescale={rescale_config[0]},{rescale_config[1]}"
+        else:
+            # shared rescale definition for all bands
+            rescale = "&rescale={},{}".format(rescale_configs[0], rescale_configs[1])
 
-    file_url = f"url={file_url}&" if file_url else ""
+    expression = ""
+    if expr := endpoint_config.get("Expression"):
+        expression = f"&expression={expr}"
+    resampling_method = "&resampling_method=nearest"
+
+    algorithm = ""
+    if algo := endpoint_config.get("Algorithm"):
+        algorithm = f"&algorithm={algo}"
+
+    algorithm_params = ""
+    if algo_p := endpoint_config.get("AlgorithmParams"):
+        algorithm_params = f"&algorithm_params={algo_p}"
+    file_url = f"&url={file_url}" if file_url else ""
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
     target_url = (
         f"{target_url_base}/raster/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?"
-        f"{file_url}resampling_method=nearest"
-        f"{bidx}{colormap}{colormap_name}{rescale}{Nodata}"
+        f"{bidx}{colormap}{colormap_name}{rescale}{no_data}"
+        f"{file_url}{resampling_method}"
+        f"{expression}{algorithm}{algorithm_params}"
     )
     return target_url
 
