@@ -154,11 +154,15 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "default": rescale,
             }
         if endpoint_config.get("ColormapName"):
+            current_cmap = endpoint_config["ColormapName"]
+            veda_enums = list(VEDA_COLORMAPS)
+            if current_cmap not in veda_enums:
+                veda_enums.append(current_cmap)
             schema["properties"]["colormap_name"] = {
                 "type": "string",
                 "title": "Colormap",
-                "default": endpoint_config["ColormapName"],
-                "enum": VEDA_COLORMAPS,
+                "default": current_cmap,
+                "enum": veda_enums,
             }
         if endpoint_config.get("Bidx"):
             schema["properties"]["bidx"] = {
