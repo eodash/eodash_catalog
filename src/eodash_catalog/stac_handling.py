@@ -194,12 +194,6 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "default": current_cmap,
                 "enum": veda_enums,
             }
-        if endpoint_config.get("Bidx"):
-            schema["properties"]["bidx"] = {
-                "type": "string",
-                "title": "Bands",
-                "default": str(endpoint_config["Bidx"]),
-            }
     elif name == "xcube":
         if endpoint_config.get("Rescale"):
             rescale = endpoint_config["Rescale"]
@@ -285,11 +279,19 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                         "type": "number",
                         "title": "Min",
                         "default": float(params.get("range", "0/1").split("/")[0]),
+                        "format": "range",
+                        "min": 0,
+                        "max": float(params.get("range", "0/1").split("/")[0]) * 1.5
+                        or 1,
                     },
                     "vmax": {
                         "type": "number",
                         "title": "Max",
                         "default": float(params.get("range", "0/1").split("/")[1]),
+                        "format": "range",
+                        "min": 0,
+                        "max": float(params.get("range", "0/1").split("/")[1]) * 1.5
+                        or 1,
                     },
                 },
                 "format": "minmax",
