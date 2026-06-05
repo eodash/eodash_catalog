@@ -25,6 +25,7 @@ from eodash_catalog.stac_handling import (
     add_base_overlay_info,
     add_collection_information,
     add_example_info,
+    add_link_with_rasterform,
     add_process_info_child_collection,
     add_projection_info,
     add_raw_assets,
@@ -1194,7 +1195,6 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     )
     return target_url
 
-
 def add_visualization_info(
     stac_object: Collection | Item,
     collection_config: dict,
@@ -1311,21 +1311,7 @@ def add_visualization_info(
             endpoint_config,
             link,
         )
-        stac_object.add_link(link)
-        # add eodash style visualization info if Style has been provided
-        if endpoint_config.get("Style"):
-            ep_st = endpoint_config.get("Style")
-            style_link = Link(
-                rel="style",
-                target=ep_st
-                if ep_st.startswith("http")
-                else f"{catalog_config['assets_endpoint']}/{ep_st}",
-                media_type="text/tileUrl-styles",
-                extra_fields={
-                    "links:keys": [identifier],
-                },
-            )
-            stac_object.add_link(style_link)
+        add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
     elif endpoint_config["Name"] == "rasdaman":
         extra_fields.update(
             {
@@ -1389,15 +1375,14 @@ def add_visualization_info(
                 vmax,
                 cbar,
             )
-            stac_object.add_link(
-                Link(
-                    rel="xyz",
-                    target=target_url,
-                    media_type="image/png",
-                    title=collection_config["Title"],
-                    extra_fields=extra_fields,
-                )
+            link = Link(
+                rel="xyz",
+                target=target_url,
+                media_type="image/png",
+                title=collection_config["Title"],
+                extra_fields=extra_fields,
             )
+            add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
     elif endpoint_config.get("Type") == "WMTSCapabilities":
         target_url = "{}".format(endpoint_config.get("EndPoint"))
         extra_fields.update(
@@ -1426,29 +1411,15 @@ def add_visualization_info(
             extra_fields["wmts:dimensions"] = dimensions
         identifier = str(uuid.uuid4())
         extra_fields["key"] = identifier
-        stac_object.add_link(
-            Link(
-                rel="wmts",
-                target=target_url,
-                media_type="image/png",
-                title=collection_config["Title"],
-                extra_fields=extra_fields,
-            )
+        link = Link(
+            rel="wmts",
+            target=target_url,
+            media_type="image/png",
+            title=collection_config["Title"],
+            extra_fields=extra_fields,
         )
+        add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
         # add eodash style visualization info if Style has been provided
-        if endpoint_config.get("Style"):
-            ep_st = endpoint_config.get("Style")
-            style_link = Link(
-                rel="style",
-                target=ep_st
-                if ep_st.startswith("http")
-                else f"{catalog_config['assets_endpoint']}/{ep_st}",
-                media_type="text/tileUrl-styles",
-                extra_fields={
-                    "links:keys": [identifier],
-                },
-            )
-            stac_object.add_link(style_link)
     elif endpoint_config["Name"] == "VEDA":
         if endpoint_config["Type"] == "cog":
             target_url = generate_veda_cog_link(endpoint_config, file_url)
@@ -1468,21 +1439,7 @@ def add_visualization_info(
                 endpoint_config,
                 link,
             )
-            stac_object.add_link(link)
-            # add eodash style visualization info if Style has been provided
-            if endpoint_config.get("Style"):
-                ep_st = endpoint_config.get("Style")
-                style_link = Link(
-                    rel="style",
-                    target=ep_st
-                    if ep_st.startswith("http")
-                    else f"{catalog_config['assets_endpoint']}/{ep_st}",
-                    media_type="text/tileUrl-styles",
-                    extra_fields={
-                        "links:keys": [identifier],
-                    },
-                )
-                stac_object.add_link(style_link)
+            add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
     else:
         LOGGER.info(f"Visualization endpoint not supported {endpoint_config['Name']}")
 

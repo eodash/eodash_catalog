@@ -130,6 +130,250 @@ def create_service_link(
     return sl
 
 
+VEDA_COLORMAPS = ["accent","accent_r","afmhot","afmhot_r","autumn","autumn_r","binary","binary_r","blues","blues_r","bone","bone_r","brbg","brbg_r","brg","brg_r","bugn","bugn_r","bupu","bupu_r","bwr","bwr_r","cfastie","cividis","cividis_r","cmrmap","cmrmap_r","cool","cool_r","coolwarm","coolwarm_r","copper","copper_r","cubehelix","cubehelix_r","dark2","dark2_r","flag","flag_r","gist_earth","gist_earth_r","gist_gray","gist_gray_r","gist_heat","gist_heat_r","gist_ncar","gist_ncar_r","gist_rainbow","gist_rainbow_r","gist_stern","gist_stern_r","gist_yarg","gist_yarg_r","gnbu","gnbu_r","gnuplot","gnuplot2","gnuplot2_r","gnuplot_r","gray","gray_r","greens","greens_r","greys","greys_r","hot","hot_r","hsv","hsv_r","inferno","inferno_r","jet","jet_r","magma","magma_r","nipy_spectral","nipy_spectral_r","ocean","ocean_r","oranges","oranges_r","orrd","orrd_r","paired","paired_r","pastel1","pastel1_r","pastel2","pastel2_r","pink","pink_r","piyg","piyg_r","plasma","plasma_r","prgn","prgn_r","prism","prism_r","pubu","pubu_r","pubugn","pubugn_r","puor","puor_r","purd","purd_r","purples","purples_r","rainbow","rainbow_r","rdbu","rdbu_r","rdgy","rdgy_r","rdpu","rdpu_r","rdylbu","rdylbu_r","rdylgn","rdylgn_r","reds","reds_r","rplumbo","schwarzwald","seismic","seismic_r","set1","set1_r","set2","set2_r","set3","set3_r","spectral","spectral_r","spring","spring_r","summer","summer_r","tab10","tab10_r","tab20","tab20_r","tab20b","tab20b_r","tab20c","tab20c_r","terrain","terrain_r","twilight","twilight_r","twilight_shifted","twilight_shifted_r","viridis","viridis_r","winter","winter_r","wistia","wistia_r","ylgn","ylgn_r","ylgnbu","ylgnbu_r","ylorbr","ylorbr_r","ylorrd","ylorrd_r"]
+XCUBE_COLORMAPS = ["Accent","Blues","BrBG","BuGn","BuPu","CMRmap","Dark2","GnBu","Grays","Greens","Greys","OrRd","Oranges","PRGn","Paired","Pastel1","Pastel2","PiYG","PuBu","PuBuGn","PuOr","PuRd","Purples","RdBu","RdGy","RdPu","RdYlBu","RdYlGn","Reds","Set1","Set2","Set3","Spectral","Wistia","YlGn","YlGnBu","YlOrBr","YlOrRd","afmhot","algae","algae_i","algae_r_i","amp","amp_i","amp_r_i","autumn","balance","balance_i","balance_r_i","berlin","binary","bone","brg","bwr","chl_DeM2","cividis","cool","coolwarm","copper","cubehelix","curl","curl_i","curl_r_i","deep","deep_i","deep_r_i","delta","delta_i","delta_r_i","dense","dense_i","dense_r_i","diff","diff_i","diff_r_i","esa_cci_lc_classes","flag","gist_earth","gist_gray","gist_grey","gist_heat","gist_ncar","gist_rainbow","gist_stern","gist_yarg","gist_yerg","gnuplot","gnuplot2","gray","gray_i","gray_r_i","grey","haline","haline_i","haline_r_i","hot","hsv","ice","ice_i","ice_r_i","inferno","jet","magma","managua","matter","matter_i","matter_r_i","nipy_spectral","ocean","oxy","oxy_i","oxy_r_i","phase","phase_i","phase_r_i","pink","plasma","plasma_r","prism","rain","rain_i","rain_r_i","rainbow","reg_map","reg_map_i","reg_map_r_i","seismic","solar","solar_i","solar_r_i","speed","speed_i","speed_r_i","spring","summer","tab10","tab20","tab20b","tab20c","tarn","tarn_i","tarn_r_i","tempo","tempo_i","tempo_r_i","terrain","thermal","thermal_i","thermal_r_i","topo","topo_i","topo_r_i","turbid","turbid_i","turbid_r_i","turbo","twilight","twilight_shifted","vanimo","viridis","viridis_alpha","winter"]
+MARINE_COLORMAPS = ["algae", "amp", "balance", "cividis", "cyclic", "delta", "dense", "gray", "haline", "ice", "inferno", "magma", "matter", "phase", "plasma", "rainbow", "solar", "speed", "tempo", "thermal", "viridis"]
+
+
+def generate_rasterform(endpoint_config: dict) -> dict:
+    schema = {"type": "object", "properties": {}}
+    name = endpoint_config.get("Name")
+    if not name:
+        name = endpoint_config.get("protocol", "").upper()
+
+    if name == "VEDA":
+        if endpoint_config.get("Rescale"):
+            rescale = endpoint_config["Rescale"]
+            # convert string to numbers if needed
+            if isinstance(rescale, list):
+                rescale = [float(x) if isinstance(x, str) else x for x in rescale]
+            schema["properties"]["rescale"] = {
+                "type": "array",
+                "items": {"type": "number"},
+                "title": "Rescale",
+                "default": rescale,
+            }
+        if endpoint_config.get("ColormapName"):
+            schema["properties"]["colormap_name"] = {
+                "type": "string",
+                "title": "Colormap",
+                "default": endpoint_config["ColormapName"],
+                "enum": VEDA_COLORMAPS,
+            }
+        if endpoint_config.get("Bidx"):
+            schema["properties"]["bidx"] = {
+                "type": "string",
+                "title": "Bands",
+                "default": str(endpoint_config["Bidx"]),
+            }
+    elif name == "xcube":
+        if endpoint_config.get("Rescale"):
+            rescale = endpoint_config["Rescale"]
+            # convert string to numbers if needed
+            rescale = [float(x) if isinstance(x, str) else x for x in rescale]
+            schema["properties"]["vmin"] = {
+                "type": "number",
+                "title": "Min value",
+                "default": rescale[0],
+                "format": "range",
+                "min": 0,
+                "max": float(rescale[0]) * 1.5 or 1,
+            }
+            schema["properties"]["vmax"] = {
+                "type": "number",
+                "title": "Max value",
+                "default": rescale[1],
+                "format": "range",
+                "min": 0,
+                "max": float(rescale[1]) * 1.5 or 1,
+            }
+        if endpoint_config.get("ColormapName"):
+            schema["properties"]["cbar"] = {
+                "type": "string",
+                "title": "Colormap",
+                "default": endpoint_config["ColormapName"],
+                "enum": XCUBE_COLORMAPS,
+            }
+    elif name == "marinedatastore":
+        style_str = endpoint_config.get("Style", endpoint_config.get("Styles", ""))
+        params = {}
+        if style_str:
+            for part in style_str.split(","):
+                if ":" in part:
+                    k, v = part.split(":", 1)
+                    params[k] = v
+                elif "=" in part:
+                    k, v = part.split("=", 1)
+                    params[k] = v
+                else:
+                    params[part] = True
+
+        # Build schema
+        schema["properties"] = {
+            "cmap": {
+                "type": "string",
+                "title": "Colormap",
+                "enum": MARINE_COLORMAPS,
+                "default": params.get("cmap", "thermal"),
+            },
+            "range_min": {
+                "type": "number",
+                "title": "Range Min",
+                "default": float(params.get("range", "0/1").split("/")[0]),
+            },
+            "range_max": {
+                "type": "number",
+                "title": "Range Max",
+                "default": float(params.get("range", "0/1").split("/")[1]),
+            },
+            "inverse": {
+                "type": "boolean",
+                "title": "Inverse",
+                "default": params.get("inverse", False) is True,
+            },
+            "noClamp": {
+                "type": "boolean",
+                "title": "No Clamp",
+                "default": params.get("noClamp", False) is True,
+            },
+            "logScale": {
+                "type": "boolean",
+                "title": "Log Scale",
+                "default": params.get("logScale", False) is True,
+            },
+        }
+
+        if "vectorStyle" in params or "sea_water_velocity" in endpoint_config.get(
+            "LayerId", ""
+        ):
+            schema["properties"]["vectorStyle"] = {
+                "type": "string",
+                "title": "Vector Style",
+                "enum": ["solid", "solidAndVector", "vector"],
+                "default": params.get("vectorStyle", "solid"),
+            }
+
+        # The composed 'style' property
+        # Use template to join the parts
+        watch = {
+            "cmap": "cmap",
+            "rmin": "range_min",
+            "rmax": "range_max",
+            "inv": "inverse",
+            "clamp": "noClamp",
+            "log": "logScale",
+        }
+
+        template = "cmap:{{cmap}},range:{{rmin}}/{{rmax}}"
+        template += "{{#inv}},inverse{{/inv}}"
+        template += "{{#clamp}},noClamp{{/clamp}}"
+        template += "{{#log}},logScale{{/log}}"
+        if "vectorStyle" in schema["properties"]:
+            template += ",vectorStyle:{{vstyle}}"
+            watch["vstyle"] = "vectorStyle"
+
+        schema["properties"]["style"] = {
+            "type": "string",
+            "title": "Composed Style",
+            "template": template,
+            "watch": watch,
+            "options": {"hidden": True},
+        }
+
+        schema["options"] = {
+            "removeProperties": [
+                "cmap",
+                "range_min",
+                "range_max",
+                "inverse",
+                "noClamp",
+                "logScale",
+                "vectorStyle",
+            ]
+        }
+    elif name == "WMS" or endpoint_config.get("Type") == "WMTSCapabilities":
+        if endpoint_config.get("LayerId") or endpoint_config.get("layers"):
+            layers_key = "LAYERS" if endpoint_config.get("Type") != "WMTSCapabilities" else "layer"
+            layers_val = endpoint_config.get("LayerId", endpoint_config.get("layers"))
+            schema["properties"][layers_key] = {
+                "type": "string",
+                "title": "Layers" if endpoint_config.get("Type") != "WMTSCapabilities" else "Layer",
+                "default": layers_val,
+            }
+        if endpoint_config.get("Styles") or endpoint_config.get("Style") or endpoint_config.get("styles"):
+            styles_key = "STYLES" if endpoint_config.get("Type") != "WMTSCapabilities" else "style"
+            styles_val = endpoint_config.get("Styles", endpoint_config.get("Style", endpoint_config.get("styles", "")))
+            schema["properties"][styles_key] = {
+                "type": "string",
+                "title": "Styles" if endpoint_config.get("Type") != "WMTSCapabilities" else "Style",
+                "default": styles_val,
+            }
+
+    if dimensions_config := endpoint_config.get(
+        "Dimensions", endpoint_config.get("dimensions", {})
+    ):
+        for key, value in dimensions_config.items():
+            if key.lower() == "style":
+                continue
+            dim_type = "string"
+            dim_format = None
+            dim_default = value
+            dim_enum = None
+            if isinstance(value, (int, float)):
+                dim_type = "number"
+                dim_format = "range"
+            elif key.lower() == "time" and endpoint_config.get("Times"):
+                dim_enum = list(endpoint_config["Times"])
+
+            schema["properties"][key] = {
+                "type": dim_type,
+                "title": key,
+                "default": dim_default,
+            }
+            if dim_enum:
+                schema["properties"][key]["enum"] = dim_enum
+            if dim_format:
+                schema["properties"][key]["format"] = dim_format
+                if dim_type == "number":
+                    schema["properties"][key]["min"] = 0
+                    schema["properties"][key]["max"] = float(value) * 1.5 or 1
+
+    return schema
+
+
+def handle_rasterform_config(config: dict, catalog_config: dict) -> dict | str | None:
+    rf = config.get("Rasterform")
+    if rf is False:
+        return None
+    if rf:
+        if isinstance(rf, dict):
+            return rf
+        if isinstance(rf, str):
+            return (
+                rf
+                if rf.startswith("http")
+                else f"{catalog_config['assets_endpoint']}/{rf}"
+            )
+
+    # Try auto generation if it's missing or not explicitly False
+    rf_schema = generate_rasterform(config)
+    if rf_schema.get("properties"):
+        return rf_schema
+    return None
+
+
+def add_link_with_rasterform(
+    stac_object: Collection | Item,
+    link: Link,
+    endpoint_config: dict,
+    catalog_config: dict,
+):
+    rf = handle_rasterform_config(endpoint_config, catalog_config)
+    if rf:
+        link.extra_fields["eodash:rasterform"] = rf
+    stac_object.add_link(link)
+
+
 def create_web_map_link(
     collection: Collection, catalog_config: dict, layer_config: dict, role: str
 ) -> Link:
@@ -197,6 +441,9 @@ def create_web_map_link(
         extra_fields=extra_fields,
     )
     add_projection_info(layer_config, wml)
+    rf = handle_rasterform_config(layer_config, catalog_config)
+    if rf:
+        wml.extra_fields["eodash:rasterform"] = rf
     return wml
 
 
