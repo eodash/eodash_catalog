@@ -147,12 +147,42 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             # convert string to numbers if needed
             if isinstance(rescale, list):
                 rescale = [float(x) if isinstance(x, str) else x for x in rescale]
-            schema["properties"]["rescale"] = {
-                "type": "array",
-                "items": {"type": "number"},
+            schema["properties"]["vminmax"] = {
+                "type": "object",
                 "title": "Rescale",
-                "default": rescale,
+                "properties": {
+                    "vmin": {
+                        "type": "number",
+                        "title": "Min",
+                        "default": rescale[0],
+                        "format": "range",
+                        "min": 0,
+                        "max": float(rescale[0]) * 1.5 or 1,
+                    },
+                    "vmax": {
+                        "type": "number",
+                        "title": "Max",
+                        "default": rescale[1],
+                        "format": "range",
+                        "min": 0,
+                        "max": float(rescale[1]) * 1.5 or 1,
+                    },
+                },
+                "format": "minmax",
             }
+            schema["properties"]["rescale"] = {
+                "type": "string",
+                "title": "Composed Rescale",
+                "template": "{{vminmax.vmin}},{{vminmax.vmax}}",
+                "watch": {"vminmax": "vminmax"},
+                "options": {"hidden": True},
+            }
+            if "options" not in schema:
+                schema["options"] = {}
+            schema["options"]["removeProperties"] = schema["options"].get(
+                "removeProperties", []
+            ) + ["vminmax"]
+
         if endpoint_config.get("ColormapName"):
             current_cmap = endpoint_config["ColormapName"]
             veda_enums = list(VEDA_COLORMAPS)
@@ -175,22 +205,49 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             rescale = endpoint_config["Rescale"]
             # convert string to numbers if needed
             rescale = [float(x) if isinstance(x, str) else x for x in rescale]
+            schema["properties"]["vminmax"] = {
+                "type": "object",
+                "title": "Rescale",
+                "properties": {
+                    "vmin": {
+                        "type": "number",
+                        "title": "Min",
+                        "default": rescale[0],
+                        "format": "range",
+                        "min": 0,
+                        "max": float(rescale[0]) * 1.5 or 1,
+                    },
+                    "vmax": {
+                        "type": "number",
+                        "title": "Max",
+                        "default": rescale[1],
+                        "format": "range",
+                        "min": 0,
+                        "max": float(rescale[1]) * 1.5 or 1,
+                    },
+                },
+                "format": "minmax",
+            }
             schema["properties"]["vmin"] = {
                 "type": "number",
                 "title": "Min value",
-                "default": rescale[0],
-                "format": "range",
-                "min": 0,
-                "max": float(rescale[0]) * 1.5 or 1,
+                "template": "{{vminmax.vmin}}",
+                "watch": {"vminmax": "vminmax"},
+                "options": {"hidden": True},
             }
             schema["properties"]["vmax"] = {
                 "type": "number",
                 "title": "Max value",
-                "default": rescale[1],
-                "format": "range",
-                "min": 0,
-                "max": float(rescale[1]) * 1.5 or 1,
+                "template": "{{vminmax.vmax}}",
+                "watch": {"vminmax": "vminmax"},
+                "options": {"hidden": True},
             }
+            if "options" not in schema:
+                schema["options"] = {}
+            schema["options"]["removeProperties"] = schema["options"].get(
+                "removeProperties", []
+            ) + ["vminmax"]
+
         if endpoint_config.get("ColormapName"):
             schema["properties"]["cbar"] = {
                 "type": "string",
@@ -220,15 +277,22 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "enum": MARINE_COLORMAPS,
                 "default": params.get("cmap", "thermal"),
             },
-            "range_min": {
-                "type": "number",
-                "title": "Range Min",
-                "default": float(params.get("range", "0/1").split("/")[0]),
-            },
-            "range_max": {
-                "type": "number",
-                "title": "Range Max",
-                "default": float(params.get("range", "0/1").split("/")[1]),
+            "vminmax": {
+                "type": "object",
+                "title": "Range",
+                "properties": {
+                    "vmin": {
+                        "type": "number",
+                        "title": "Min",
+                        "default": float(params.get("range", "0/1").split("/")[0]),
+                    },
+                    "vmax": {
+                        "type": "number",
+                        "title": "Max",
+                        "default": float(params.get("range", "0/1").split("/")[1]),
+                    },
+                },
+                "format": "minmax",
             },
             "inverse": {
                 "type": "boolean",
@@ -261,14 +325,13 @@ def generate_rasterform(endpoint_config: dict) -> dict:
         # Use template to join the parts
         watch = {
             "cmap": "cmap",
-            "rmin": "range_min",
-            "rmax": "range_max",
+            "vminmax": "vminmax",
             "inv": "inverse",
             "clamp": "noClamp",
             "log": "logScale",
         }
 
-        template = "cmap:{{cmap}},range:{{rmin}}/{{rmax}}"
+        template = "cmap:{{cmap}},range:{{vminmax.vmin}}/{{vminmax.vmax}}"
         template += "{{#inv}},inverse{{/inv}}"
         template += "{{#clamp}},noClamp{{/clamp}}"
         template += "{{#log}},logScale{{/log}}"
@@ -287,8 +350,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
         schema["options"] = {
             "removeProperties": [
                 "cmap",
-                "range_min",
-                "range_max",
+                "vminmax",
                 "inverse",
                 "noClamp",
                 "logScale",
