@@ -358,21 +358,31 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             ]
         }
     elif name == "WMS" or endpoint_config.get("Type") == "WMTSCapabilities":
-        if endpoint_config.get("LayerId") or endpoint_config.get("layers"):
-            layers_key = "LAYERS" if endpoint_config.get("Type") != "WMTSCapabilities" else "layer"
-            layers_val = endpoint_config.get("LayerId", endpoint_config.get("layers"))
-            schema["properties"][layers_key] = {
-                "type": "string",
-                "title": "Layers" if endpoint_config.get("Type") != "WMTSCapabilities" else "Layer",
-                "default": layers_val,
-            }
-        if endpoint_config.get("Styles") or endpoint_config.get("Style") or endpoint_config.get("styles"):
-            styles_key = "STYLES" if endpoint_config.get("Type") != "WMTSCapabilities" else "style"
-            styles_val = endpoint_config.get("Styles", endpoint_config.get("Style", endpoint_config.get("styles", "")))
+        styles_key = (
+            "STYLES" if endpoint_config.get("Type") != "WMTSCapabilities" else "style"
+        )
+        # Determine default style
+        default_style = endpoint_config.get(
+            "Styles", endpoint_config.get("Style", endpoint_config.get("styles", ""))
+        )
+        if isinstance(default_style, list):
+            default_style = default_style[0] if default_style else ""
+
+        # Check if we have multiple styles to choose from
+        available_styles = endpoint_config.get("AvailableStyles")
+        if not available_styles and isinstance(endpoint_config.get("Styles"), list):
+            available_styles = endpoint_config["Styles"]
+
+        if available_styles and len(available_styles) > 1:
             schema["properties"][styles_key] = {
                 "type": "string",
-                "title": "Styles" if endpoint_config.get("Type") != "WMTSCapabilities" else "Style",
-                "default": styles_val,
+                "title": (
+                    "Styles"
+                    if endpoint_config.get("Type") != "WMTSCapabilities"
+                    else "Style"
+                ),
+                "default": default_style,
+                "enum": available_styles,
             }
 
     if dimensions_config := endpoint_config.get(

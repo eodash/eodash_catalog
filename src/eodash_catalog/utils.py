@@ -116,14 +116,18 @@ def retrieveExtentFromWCS(
 
 def retrieveExtentFromWMSWMTS(
     capabilities_url: str, layer: str, version: str = "1.1.1", wmts: bool = False
-) -> tuple[list[float], list[datetime]]:
+) -> tuple[list[float], list[datetime], list[str]]:
     times = []
+    styles = []
     try:
         if not wmts:
             service = WebMapService(capabilities_url, version=version)
         else:
             service = WebMapTileService(capabilities_url)
         if layer in list(service.contents):
+            # Extract available styles
+            styles = list(service[layer].styles.keys())
+
             tps = []
             if not wmts and service[layer].timepositions is not None:
                 tps = service[layer].timepositions
@@ -159,7 +163,7 @@ def retrieveExtentFromWMSWMTS(
         bbox = [float(x) for x in service[layer].boundingBoxWGS84]
 
     datetimes = [parse_datestring_to_tz_aware_datetime(time_str) for time_str in times]
-    return bbox, datetimes
+    return bbox, datetimes, styles
 
 
 def interval(start: datetime, stop: datetime, delta: timedelta) -> Iterator[datetime]:
