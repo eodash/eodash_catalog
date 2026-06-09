@@ -298,7 +298,7 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
                 rescale += f"&rescale={rescale_config[0]},{rescale_config[1]}"
         else:
             # shared rescale definition for all bands
-            rescale = "&rescale={},{}".format(rescale_configs[0], rescale_configs[1])
+            rescale = f"&rescale={rescale_configs[0]},{rescale_configs[1]}"
 
     expression = ""
     if expr := endpoint_config.get("Expression"):

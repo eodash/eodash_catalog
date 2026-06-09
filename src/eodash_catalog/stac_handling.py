@@ -17,6 +17,11 @@ from pystac import (
 )
 from structlog import get_logger
 
+from eodash_catalog.colormaps import (
+    MARINE_COLORMAPS,
+    VEDA_COLORMAPS,
+    XCUBE_COLORMAPS,
+)
 from eodash_catalog.utils import (
     convert_layers_config_to_assets_configs,
     generateDatetimesFromInterval,
@@ -130,11 +135,6 @@ def create_service_link(
     return sl
 
 
-VEDA_COLORMAPS = ["accent","accent_r","afmhot","afmhot_r","autumn","autumn_r","binary","binary_r","blues","blues_r","bone","bone_r","brbg","brbg_r","brg","brg_r","bugn","bugn_r","bupu","bupu_r","bwr","bwr_r","cfastie","cividis","cividis_r","cmrmap","cmrmap_r","cool","cool_r","coolwarm","coolwarm_r","copper","copper_r","cubehelix","cubehelix_r","dark2","dark2_r","flag","flag_r","gist_earth","gist_earth_r","gist_gray","gist_gray_r","gist_heat","gist_heat_r","gist_ncar","gist_ncar_r","gist_rainbow","gist_rainbow_r","gist_stern","gist_stern_r","gist_yarg","gist_yarg_r","gnbu","gnbu_r","gnuplot","gnuplot2","gnuplot2_r","gnuplot_r","gray","gray_r","greens","greens_r","greys","greys_r","hot","hot_r","hsv","hsv_r","inferno","inferno_r","jet","jet_r","magma","magma_r","nipy_spectral","nipy_spectral_r","ocean","ocean_r","oranges","oranges_r","orrd","orrd_r","paired","paired_r","pastel1","pastel1_r","pastel2","pastel2_r","pink","pink_r","piyg","piyg_r","plasma","plasma_r","prgn","prgn_r","prism","prism_r","pubu","pubu_r","pubugn","pubugn_r","puor","puor_r","purd","purd_r","purples","purples_r","rainbow","rainbow_r","rdbu","rdbu_r","rdgy","rdgy_r","rdpu","rdpu_r","rdylbu","rdylbu_r","rdylgn","rdylgn_r","reds","reds_r","rplumbo","schwarzwald","seismic","seismic_r","set1","set1_r","set2","set2_r","set3","set3_r","spectral","spectral_r","spring","spring_r","summer","summer_r","tab10","tab10_r","tab20","tab20_r","tab20b","tab20b_r","tab20c","tab20c_r","terrain","terrain_r","twilight","twilight_r","twilight_shifted","twilight_shifted_r","viridis","viridis_r","winter","winter_r","wistia","wistia_r","ylgn","ylgn_r","ylgnbu","ylgnbu_r","ylorbr","ylorbr_r","ylorrd","ylorrd_r"]
-XCUBE_COLORMAPS = ["Accent","Blues","BrBG","BuGn","BuPu","CMRmap","Dark2","GnBu","Grays","Greens","Greys","OrRd","Oranges","PRGn","Paired","Pastel1","Pastel2","PiYG","PuBu","PuBuGn","PuOr","PuRd","Purples","RdBu","RdGy","RdPu","RdYlBu","RdYlGn","Reds","Set1","Set2","Set3","Spectral","Wistia","YlGn","YlGnBu","YlOrBr","YlOrRd","afmhot","algae","algae_i","algae_r_i","amp","amp_i","amp_r_i","autumn","balance","balance_i","balance_r_i","berlin","binary","bone","brg","bwr","chl_DeM2","cividis","cool","coolwarm","copper","cubehelix","curl","curl_i","curl_r_i","deep","deep_i","deep_r_i","delta","delta_i","delta_r_i","dense","dense_i","dense_r_i","diff","diff_i","diff_r_i","esa_cci_lc_classes","flag","gist_earth","gist_gray","gist_grey","gist_heat","gist_ncar","gist_rainbow","gist_stern","gist_yarg","gist_yerg","gnuplot","gnuplot2","gray","gray_i","gray_r_i","grey","haline","haline_i","haline_r_i","hot","hsv","ice","ice_i","ice_r_i","inferno","jet","magma","managua","matter","matter_i","matter_r_i","nipy_spectral","ocean","oxy","oxy_i","oxy_r_i","phase","phase_i","phase_r_i","pink","plasma","plasma_r","prism","rain","rain_i","rain_r_i","rainbow","reg_map","reg_map_i","reg_map_r_i","seismic","solar","solar_i","solar_r_i","speed","speed_i","speed_r_i","spring","summer","tab10","tab20","tab20b","tab20c","tarn","tarn_i","tarn_r_i","tempo","tempo_i","tempo_r_i","terrain","thermal","thermal_i","thermal_r_i","topo","topo_i","topo_r_i","turbid","turbid_i","turbid_r_i","turbo","twilight","twilight_shifted","vanimo","viridis","viridis_alpha","winter"]
-MARINE_COLORMAPS = ["algae", "amp", "balance", "cividis", "cyclic", "delta", "dense", "gray", "haline", "ice", "inferno", "magma", "matter", "phase", "plasma", "rainbow", "solar", "speed", "tempo", "thermal", "viridis"]
-
-
 def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) -> dict:
     schema = {"type": "object", "properties": {}, "options": {}}
     if colorlegend:
@@ -143,7 +143,7 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             "scaleType": colorlegend.get("scaleType", "continuous"),
             "tickFormat": colorlegend.get("tickFormat", ".1f"),
         }
-    
+
     name = endpoint_config.get("Name")
     if not name:
         name = endpoint_config.get("protocol", "").upper()
@@ -189,9 +189,10 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             schema["legend"].update(
                 {"domainProperties": ["vminmax.vmin", "vminmax.vmax"]}
             )
-            schema["options"]["removeProperties"] = schema["options"].get(
-                "removeProperties", []
-            ) + ["vminmax"]
+            schema["options"]["removeProperties"] = [
+                *schema["options"].get("removeProperties", []),
+                "vminmax",
+            ]
 
         if endpoint_config.get("ColormapName"):
             current_cmap = endpoint_config["ColormapName"]
@@ -254,9 +255,10 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             schema["legend"].update(
                 {"domainProperties": ["vminmax.vmin", "vminmax.vmax"]}
             )
-            schema["options"]["removeProperties"] = schema["options"].get(
-                "removeProperties", []
-            ) + ["vminmax"]
+            schema["options"]["removeProperties"] = [
+                *schema["options"].get("removeProperties", []),
+                "vminmax",
+            ]
 
         if endpoint_config.get("ColormapName"):
             schema["properties"]["cbar"] = {
@@ -425,7 +427,7 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             dim_format = None
             dim_default = value
             dim_enum = None
-            if isinstance(value, (int, float)):
+            if isinstance(value, int | float):
                 dim_type = "number"
                 dim_format = "range"
             elif key.lower() == "time" and endpoint_config.get("Times"):
