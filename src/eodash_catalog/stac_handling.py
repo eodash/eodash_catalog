@@ -135,8 +135,15 @@ XCUBE_COLORMAPS = ["Accent","Blues","BrBG","BuGn","BuPu","CMRmap","Dark2","GnBu"
 MARINE_COLORMAPS = ["algae", "amp", "balance", "cividis", "cyclic", "delta", "dense", "gray", "haline", "ice", "inferno", "magma", "matter", "phase", "plasma", "rainbow", "solar", "speed", "tempo", "thermal", "viridis"]
 
 
-def generate_rasterform(endpoint_config: dict) -> dict:
-    schema = {"type": "object", "properties": {}}
+def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) -> dict:
+    schema = {"type": "object", "properties": {}, "options": {}}
+    if colorlegend:
+        schema["legend"] = {
+            "title": colorlegend.get("title", "Data Range"),
+            "scaleType": colorlegend.get("scaleType", "continuous"),
+            "tickFormat": colorlegend.get("tickFormat", ".1f"),
+        }
+    
     name = endpoint_config.get("Name")
     if not name:
         name = endpoint_config.get("protocol", "").upper()
@@ -177,8 +184,11 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "watch": {"vminmax": "vminmax"},
                 "options": {"hidden": True},
             }
-            if "options" not in schema:
-                schema["options"] = {}
+            if "legend" not in schema:
+                schema["legend"] = {}
+            schema["legend"].update(
+                {"domainProperties": ["vminmax.vmin", "vminmax.vmax"]}
+            )
             schema["options"]["removeProperties"] = schema["options"].get(
                 "removeProperties", []
             ) + ["vminmax"]
@@ -194,6 +204,9 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "default": current_cmap,
                 "enum": veda_enums,
             }
+            if "legend" not in schema:
+                schema["legend"] = {}
+            schema["legend"]["rangeProperty"] = "colormap_name"
     elif name == "xcube":
         if endpoint_config.get("Rescale"):
             rescale = endpoint_config["Rescale"]
@@ -236,8 +249,11 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "watch": {"vminmax": "vminmax"},
                 "options": {"hidden": True},
             }
-            if "options" not in schema:
-                schema["options"] = {}
+            if "legend" not in schema:
+                schema["legend"] = {}
+            schema["legend"].update(
+                {"domainProperties": ["vminmax.vmin", "vminmax.vmax"]}
+            )
             schema["options"]["removeProperties"] = schema["options"].get(
                 "removeProperties", []
             ) + ["vminmax"]
@@ -249,6 +265,9 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "default": endpoint_config["ColormapName"],
                 "enum": XCUBE_COLORMAPS,
             }
+            if "legend" not in schema:
+                schema["legend"] = {}
+            schema["legend"]["rangeProperty"] = "cbar"
     elif name == "marinedatastore":
         style_str = endpoint_config.get("Style", endpoint_config.get("Styles", ""))
         params = {}
@@ -324,6 +343,15 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             }
 
         # The composed 'style' property
+        if "legend" not in schema:
+            schema["legend"] = {}
+        schema["legend"].update(
+            {
+                "rangeProperty": "cmap",
+                "domainProperties": ["vminmax.vmin", "vminmax.vmax"],
+            }
+        )
+
         # Use template to join the parts
         watch = {
             "cmap": "cmap",
@@ -434,7 +462,7 @@ def handle_rasterform_config(config: dict, catalog_config: dict) -> dict | str |
             )
 
     # Try auto generation if it's missing or not explicitly False
-    rf_schema = generate_rasterform(config)
+    rf_schema = generate_rasterform(config, config.get("Colorlegend"))
     if rf_schema.get("properties"):
         return rf_schema
     return None
