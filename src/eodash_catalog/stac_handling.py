@@ -284,7 +284,15 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 schema["legend"] = {}
             schema["legend"]["rangeProperty"] = "cbar"
     elif name == "marinedatastore":
-        style_str = endpoint_config.get("Style", endpoint_config.get("Styles", ""))
+        style_str = endpoint_config.get(
+            "Style",
+            endpoint_config.get(
+                "Styles",
+                endpoint_config.get("Dimensions", {}).get(
+                    "style", endpoint_config.get("dimensions", {}).get("style", "")
+                ),
+            ),
+        )
         params = {}
         if style_str:
             for part in style_str.split(","):
@@ -297,8 +305,11 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 else:
                     params[part] = True
 
-        vmin_def = float(params.get("range", "0/1").split("/")[0])
-        vmax_def = float(params.get("range", "0/1").split("/")[1])
+        if "range" in params:
+            vmin_def = float(params.get("range", "0/1").split("/")[0])
+            vmax_def = float(params.get("range", "0/1").split("/")[1])
+        else:
+            vmin_def, vmax_def = endpoint_config.get("ScientificRange", (0.0, 1.0))
 
         # Build schema
         schema["jsonform"]["properties"] = {
@@ -306,7 +317,9 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "type": "string",
                 "title": "Colormap",
                 "enum": list(MARINE_COLORMAPS),
-                "default": params.get("cmap", "thermal"),
+                "default": params.get(
+                    "cmap", endpoint_config.get("DefaultScientificCmap", "thermal")
+                ),
             },
             "vminmax": {
                 "type": "object",
@@ -346,6 +359,14 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             },
         }
 
+        if elevations := endpoint_config.get("AvailableElevations"):
+            schema["jsonform"]["properties"]["elevation"] = {
+                "type": "string",
+                "title": "Elevation",
+                "enum": elevations,
+                "default": elevations[0],
+            }
+
         if "vectorStyle" in params or "sea_water_velocity" in endpoint_config.get(
             "LayerId", ""
         ):
@@ -356,6 +377,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "default": params.get("vectorStyle", "solid"),
             }
 
+        # The composed 'style' property
         if "tickFormat" not in schema["legend"]:
             schema["legend"]["tickFormat"] = get_tick_format(vmin_def, vmax_def)
         schema["legend"].update(
@@ -480,7 +502,7 @@ def handle_rasterform_config(config: dict, catalog_config: dict) -> dict | str |
 
     # Try auto generation if it's missing or not explicitly False
     rf_schema = generate_rasterform(config)
-    if rf_schema.get("properties"):
+    if rf_schema.get("jsonform", {}).get("properties"):
         return rf_schema
     return None
 
@@ -494,6 +516,9 @@ def add_link_with_rasterform(
     rf = handle_rasterform_config(endpoint_config, catalog_config)
     if rf:
         link.extra_fields["eodash:rasterform"] = rf
+        # For indicators (Collections), we also bubble it up to extra_fields for discoverability
+        if isinstance(stac_object, Collection):
+            stac_object.extra_fields["eodash:rasterform"] = rf
     stac_object.add_link(link)
 
 

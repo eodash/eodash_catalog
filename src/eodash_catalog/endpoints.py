@@ -1086,7 +1086,14 @@ def handle_WMS_endpoint(
         # some endpoints allow "narrowed-down" capabilities per-layer, which we utilize to not
         # have to process full service capabilities XML
         capabilities_url = endpoint_config["EndPoint"]
-        spatial_extent, datetimes_retrieved, styles_retrieved = retrieveExtentFromWMSWMTS(
+        (
+            spatial_extent,
+            datetimes_retrieved,
+            styles_retrieved,
+            scientific_range,
+            default_scientific_cmap,
+            elevations_retrieved,
+        ) = retrieveExtentFromWMSWMTS(
             capabilities_url,
             endpoint_config["LayerId"],
             version=endpoint_config.get("Version", "1.1.1"),
@@ -1097,6 +1104,15 @@ def handle_WMS_endpoint(
         if styles_retrieved and len(styles_retrieved) > 1:
             # Add retrieved styles to config so generate_rasterform can use them
             endpoint_config["AvailableStyles"] = styles_retrieved
+        if scientific_range:
+            # Add retrieved scientific range to config so generate_rasterform can use it
+            endpoint_config["ScientificRange"] = scientific_range
+        if default_scientific_cmap:
+            # Add retrieved default colormap to config so generate_rasterform can use it
+            endpoint_config["DefaultScientificCmap"] = default_scientific_cmap
+        if elevations_retrieved:
+            # Add retrieved elevations to config so generate_rasterform can use them
+            endpoint_config["AvailableElevations"] = elevations_retrieved
     # optionally filter time results
     if query := endpoint_config.get("Query"):
         datetimes = filter_time_entries(datetimes, query)
