@@ -136,7 +136,7 @@ def create_service_link(
 
 
 def generate_rasterform(endpoint_config: dict) -> dict:
-    schema = {"jsonform": {"type": "object", "properties": {}, "options": {}}}
+    schema = {"jsonform": {"type": "object", "properties": {}}}
 
     def get_tick_format(vmin: float, vmax: float) -> str:
         diff = abs(vmax - vmin)
