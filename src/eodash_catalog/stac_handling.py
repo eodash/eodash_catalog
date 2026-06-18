@@ -155,7 +155,6 @@ def generate_rasterform(endpoint_config: dict) -> dict:
     schema["legend"] = {
         "title": title,
         "scaleType": "continuous",
-        "range": ["#cccccc", "#333333"],
     }
     colorlegend = endpoint_config.get("Colorlegend")
     if colorlegend and colorlegend.get("tickFormat"):
@@ -296,7 +295,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             vmin_def, vmax_def = endpoint_config.get("ScientificRange", (0.0, 1.0))
 
         # Build schema
-        schema["jsonform"]["properties"] = {
+        schema["jsonform"]["properties"].update({
             "cmap": {
                 "type": "string",
                 "title": "Colormap",
@@ -341,7 +340,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "title": "Log Scale",
                 "default": params.get("logScale", False) is True,
             },
-        }
+        })
 
         if elevations := endpoint_config.get("AvailableElevations"):
             schema["jsonform"]["properties"]["elevation"] = {
@@ -426,7 +425,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
         "Dimensions", endpoint_config.get("dimensions", {})
     ):
         for key, value in dimensions_config.items():
-            if key.lower() == "style":
+            if key.lower() == "style" or key in schema["jsonform"]["properties"]:
                 continue
             dim_type = "string"
             dim_format = None
@@ -440,7 +439,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
 
             schema["jsonform"]["properties"][key] = {
                 "type": dim_type,
-                "title": unit if unit and key.lower() != "time" else key,
+                "title": key,
                 "default": dim_default,
             }
             if dim_enum:
@@ -484,9 +483,8 @@ def add_link_with_rasterform(
     rf = handle_rasterform_config(endpoint_config, catalog_config)
     if rf:
         link.extra_fields["eodash:rasterform"] = rf
-        # For indicators (Collections), we also bubble it up to extra_fields for discoverability
-        if isinstance(stac_object, Collection):
-            stac_object.extra_fields["eodash:rasterform"] = rf
+    if "Colorlegend" in endpoint_config:
+        link.extra_fields["eox:colorlegend"] = endpoint_config["Colorlegend"]
     stac_object.add_link(link)
 
 
@@ -547,8 +545,7 @@ def create_web_map_link(
             add_authentication(collection, layer_config["url"], extra_fields)
     if layer_config.get("Attribution"):
         extra_fields["attribution"] = layer_config["Attribution"]
-    if layer_config.get("Colorlegend"):
-        extra_fields["eox:colorlegend"] = layer_config["Colorlegend"]
+
     wml = Link(
         rel=layer_config["protocol"],
         target=layer_config["url"],
@@ -560,6 +557,8 @@ def create_web_map_link(
     rf = handle_rasterform_config(layer_config, catalog_config)
     if rf:
         wml.extra_fields["eodash:rasterform"] = rf
+    if "Colorlegend" in layer_config:
+        wml.extra_fields["eox:colorlegend"] = layer_config["Colorlegend"]
     return wml
 
 
@@ -577,8 +576,6 @@ def add_raw_assets(time_entry: dict, endpoint_config: dict, catalog_config: dict
 
     if endpoint_config.get("Attribution"):
         extra_fields_asset["attribution"] = endpoint_config["Attribution"]
-    if endpoint_config.get("Colorlegend"):
-        extra_fields_asset["eox:colorlegend"] = endpoint_config["Colorlegend"]
 
     if endpoint_config["Name"] == "COG source":
         style_type = "text/cog-styles"
