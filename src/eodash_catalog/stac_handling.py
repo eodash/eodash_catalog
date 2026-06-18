@@ -135,14 +135,30 @@ def create_service_link(
     return sl
 
 
-def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) -> dict:
-    schema = {"type": "object", "properties": {}, "options": {}}
-    if colorlegend:
-        schema["legend"] = {
-            "title": colorlegend.get("title", "Data Range"),
-            "scaleType": colorlegend.get("scaleType", "continuous"),
-            "tickFormat": colorlegend.get("tickFormat", ".1f"),
-        }
+def generate_rasterform(endpoint_config: dict) -> dict:
+    schema = {"jsonform": {"type": "object", "properties": {}, "options": {}}}
+
+    def get_tick_format(vmin: float, vmax: float) -> str:
+        diff = abs(vmax - vmin)
+        if diff >= 10:
+            return ".0f"
+        if diff >= 1:
+            return ".1f"
+        for i in range(2, 6):
+            if diff >= 10**-i:
+                return f".{i}f"
+        return ".5f"
+
+    unit = endpoint_config.get("Unit")
+    title = unit if unit else "Data Range"
+
+    schema["legend"] = {
+        "title": title,
+        "scaleType": "continuous",
+    }
+    colorlegend = endpoint_config.get("Colorlegend")
+    if colorlegend and colorlegend.get("tickFormat"):
+        schema["legend"]["tickFormat"] = colorlegend["tickFormat"]
 
     name = endpoint_config.get("Name")
     if not name:
@@ -154,43 +170,40 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             # convert string to numbers if needed
             if isinstance(rescale, list):
                 rescale = [float(x) if isinstance(x, str) else x for x in rescale]
-            schema["properties"]["vminmax"] = {
+            schema["jsonform"]["properties"]["vminmax"] = {
                 "type": "object",
-                "title": "Rescale",
+                "title": title,
                 "properties": {
                     "vmin": {
                         "type": "number",
                         "title": "Min",
                         "default": rescale[0],
                         "format": "range",
-                        "min": 0,
-                        "max": float(rescale[0]) * 1.5 or 1,
+                        "minimum": 0,
                     },
                     "vmax": {
                         "type": "number",
                         "title": "Max",
                         "default": rescale[1],
                         "format": "range",
-                        "min": 0,
-                        "max": float(rescale[1]) * 1.5 or 1,
+                        "maximum": float(rescale[1]) * 1.5 or 1,
                     },
                 },
                 "format": "minmax",
             }
-            schema["properties"]["rescale"] = {
+            schema["jsonform"]["properties"]["rescale"] = {
                 "type": "string",
                 "title": "Composed Rescale",
                 "template": "{{vminmax.vmin}},{{vminmax.vmax}}",
                 "watch": {"vminmax": "vminmax"},
                 "options": {"hidden": True},
             }
-            if "legend" not in schema:
-                schema["legend"] = {}
-            schema["legend"].update(
-                {"domainProperties": ["vminmax.vmin", "vminmax.vmax"]}
-            )
-            schema["options"]["removeProperties"] = [
-                *schema["options"].get("removeProperties", []),
+            if "tickFormat" not in schema["legend"]:
+                schema["legend"]["tickFormat"] = get_tick_format(rescale[0], rescale[1])
+            schema["legend"]["domainProperties"] = ["vminmax.vmin", "vminmax.vmax"]
+
+            schema["jsonform"]["options"]["removeProperties"] = [
+                *schema["jsonform"]["options"].get("removeProperties", []),
                 "vminmax",
             ]
 
@@ -199,7 +212,7 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             veda_enums = list(VEDA_COLORMAPS)
             if current_cmap not in veda_enums:
                 veda_enums.append(current_cmap)
-            schema["properties"]["colormap_name"] = {
+            schema["jsonform"]["properties"]["colormap_name"] = {
                 "type": "string",
                 "title": "Colormap",
                 "default": current_cmap,
@@ -208,60 +221,60 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             if "legend" not in schema:
                 schema["legend"] = {}
             schema["legend"]["rangeProperty"] = "colormap_name"
+
+            if colorlegend and colorlegend.get("unit"):
+                schema["legend"]["title"] += f" [{colorlegend['unit']}]"
     elif name == "xcube":
         if endpoint_config.get("Rescale"):
             rescale = endpoint_config["Rescale"]
             # convert string to numbers if needed
             rescale = [float(x) if isinstance(x, str) else x for x in rescale]
-            schema["properties"]["vminmax"] = {
+            schema["jsonform"]["properties"]["vminmax"] = {
                 "type": "object",
-                "title": "Rescale",
+                "title": title,
                 "properties": {
                     "vmin": {
                         "type": "number",
                         "title": "Min",
                         "default": rescale[0],
                         "format": "range",
-                        "min": 0,
-                        "max": float(rescale[0]) * 1.5 or 1,
+                        "minimum": 0,
                     },
                     "vmax": {
                         "type": "number",
                         "title": "Max",
                         "default": rescale[1],
                         "format": "range",
-                        "min": 0,
-                        "max": float(rescale[1]) * 1.5 or 1,
+                        "maximum": float(rescale[1]) * 1.5 or 1,
                     },
                 },
                 "format": "minmax",
             }
-            schema["properties"]["vmin"] = {
+            schema["jsonform"]["properties"]["vmin"] = {
                 "type": "number",
                 "title": "Min value",
                 "template": "{{vminmax.vmin}}",
                 "watch": {"vminmax": "vminmax"},
                 "options": {"hidden": True},
             }
-            schema["properties"]["vmax"] = {
+            schema["jsonform"]["properties"]["vmax"] = {
                 "type": "number",
                 "title": "Max value",
                 "template": "{{vminmax.vmax}}",
                 "watch": {"vminmax": "vminmax"},
                 "options": {"hidden": True},
             }
-            if "legend" not in schema:
-                schema["legend"] = {}
-            schema["legend"].update(
-                {"domainProperties": ["vminmax.vmin", "vminmax.vmax"]}
-            )
-            schema["options"]["removeProperties"] = [
-                *schema["options"].get("removeProperties", []),
+            if "tickFormat" not in schema["legend"]:
+                schema["legend"]["tickFormat"] = get_tick_format(rescale[0], rescale[1])
+            schema["legend"]["domainProperties"] = ["vminmax.vmin", "vminmax.vmax"]
+
+            schema["jsonform"]["options"]["removeProperties"] = [
+                *schema["jsonform"]["options"].get("removeProperties", []),
                 "vminmax",
             ]
 
         if endpoint_config.get("ColormapName"):
-            schema["properties"]["cbar"] = {
+            schema["jsonform"]["properties"]["cbar"] = {
                 "type": "string",
                 "title": "Colormap",
                 "default": endpoint_config["ColormapName"],
@@ -285,7 +298,7 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
                     params[part] = True
 
         # Build schema
-        schema["properties"] = {
+        schema["jsonform"]["properties"] = {
             "cmap": {
                 "type": "string",
                 "title": "Colormap",
@@ -294,25 +307,21 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             },
             "vminmax": {
                 "type": "object",
-                "title": "Range",
+                "title": title,
                 "properties": {
                     "vmin": {
                         "type": "number",
                         "title": "Min",
-                        "default": float(params.get("range", "0/1").split("/")[0]),
+                        "default": vmin_def,
                         "format": "range",
-                        "min": 0,
-                        "max": float(params.get("range", "0/1").split("/")[0]) * 1.5
-                        or 1,
+                        "minimum": 0,
                     },
                     "vmax": {
                         "type": "number",
                         "title": "Max",
-                        "default": float(params.get("range", "0/1").split("/")[1]),
+                        "default": vmax_def,
                         "format": "range",
-                        "min": 0,
-                        "max": float(params.get("range", "0/1").split("/")[1]) * 1.5
-                        or 1,
+                        "maximum": vmax_def * 1.5 or 1,
                     },
                 },
                 "format": "minmax",
@@ -337,16 +346,18 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
         if "vectorStyle" in params or "sea_water_velocity" in endpoint_config.get(
             "LayerId", ""
         ):
-            schema["properties"]["vectorStyle"] = {
+            schema["jsonform"]["properties"]["vectorStyle"] = {
                 "type": "string",
                 "title": "Vector Style",
                 "enum": ["solid", "solidAndVector", "vector"],
                 "default": params.get("vectorStyle", "solid"),
             }
 
-        # The composed 'style' property
-        if "legend" not in schema:
-            schema["legend"] = {}
+        vmin_def = float(params.get("range", "0/1").split("/")[0])
+        vmax_def = float(params.get("range", "0/1").split("/")[1])
+
+        if "tickFormat" not in schema["legend"]:
+            schema["legend"]["tickFormat"] = get_tick_format(vmin_def, vmax_def)
         schema["legend"].update(
             {
                 "rangeProperty": "cmap",
@@ -367,11 +378,11 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
         template += "{{#inv}},inverse{{/inv}}"
         template += "{{#clamp}},noClamp{{/clamp}}"
         template += "{{#log}},logScale{{/log}}"
-        if "vectorStyle" in schema["properties"]:
+        if "vectorStyle" in schema["jsonform"]["properties"]:
             template += ",vectorStyle:{{vstyle}}"
             watch["vstyle"] = "vectorStyle"
 
-        schema["properties"]["style"] = {
+        schema["jsonform"]["properties"]["style"] = {
             "type": "string",
             "title": "Composed Style",
             "template": template,
@@ -379,7 +390,7 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             "options": {"hidden": True},
         }
 
-        schema["options"] = {
+        schema["jsonform"]["options"] = {
             "removeProperties": [
                 "cmap",
                 "vminmax",
@@ -406,7 +417,7 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             available_styles = endpoint_config["Styles"]
 
         if available_styles and len(available_styles) > 1:
-            schema["properties"][styles_key] = {
+            schema["jsonform"]["properties"][styles_key] = {
                 "type": "string",
                 "title": (
                     "Styles"
@@ -433,18 +444,23 @@ def generate_rasterform(endpoint_config: dict, colorlegend: dict | None = None) 
             elif key.lower() == "time" and endpoint_config.get("Times"):
                 dim_enum = list(endpoint_config["Times"])
 
-            schema["properties"][key] = {
+            schema["jsonform"]["properties"][key] = {
                 "type": dim_type,
-                "title": key,
+                "title": unit if unit and key.lower() != "time" else key,
                 "default": dim_default,
             }
             if dim_enum:
-                schema["properties"][key]["enum"] = dim_enum
+                schema["jsonform"]["properties"][key]["enum"] = dim_enum
             if dim_format:
-                schema["properties"][key]["format"] = dim_format
+                schema["jsonform"]["properties"][key]["format"] = dim_format
                 if dim_type == "number":
-                    schema["properties"][key]["min"] = 0
-                    schema["properties"][key]["max"] = float(value) * 1.5 or 1
+                    schema["jsonform"]["properties"][key]["min"] = 0
+                    schema["jsonform"]["properties"][key]["max"] = float(value) * 1.5 or 1
+        
+        if colorlegend and colorlegend.get("unit"):
+            if "legend" not in schema:
+                schema["legend"] = {}
+            schema["legend"]["title"] += f" [{colorlegend['unit']}]"
 
     return schema
 
@@ -464,7 +480,7 @@ def handle_rasterform_config(config: dict, catalog_config: dict) -> dict | str |
             )
 
     # Try auto generation if it's missing or not explicitly False
-    rf_schema = generate_rasterform(config, config.get("Colorlegend"))
+    rf_schema = generate_rasterform(config)
     if rf_schema.get("properties"):
         return rf_schema
     return None
