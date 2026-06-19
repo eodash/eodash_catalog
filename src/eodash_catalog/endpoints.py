@@ -1339,8 +1339,6 @@ def add_visualization_info(
         endpoint_url = endpoint_config["EndPoint"]
         # custom replacing of all ENV VARS present as template in URL as {VAR}
         endpoint_url = replace_with_env_variables(endpoint_url)
-        identifier = str(uuid.uuid4())
-        extra_fields["key"] = identifier
         link = Link(
             rel="wms",
             target=endpoint_url,
@@ -1450,8 +1448,6 @@ def add_visualization_info(
                 dimensions[key] = value
         if dimensions != {}:
             extra_fields["wmts:dimensions"] = dimensions
-        identifier = str(uuid.uuid4())
-        extra_fields["key"] = identifier
         link = Link(
             rel="wmts",
             target=target_url,
@@ -1467,8 +1463,6 @@ def add_visualization_info(
         elif endpoint_config["Type"] == "tiles":
             target_url = generate_veda_tiles_link(endpoint_config, file_url)
         if target_url:
-            identifier = str(uuid.uuid4())
-            extra_fields["key"] = identifier
             link = Link(
                 rel="xyz",
                 target=target_url,
