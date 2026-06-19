@@ -149,6 +149,15 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 return f".{i}f"
         return ".5f"
 
+    def get_enum_titles(values: list[str]) -> list[str]:
+        titles = []
+        for v in values:
+            try:
+                titles.append(f"{float(v):.1f}")
+            except (ValueError, TypeError):
+                titles.append(str(v))
+        return titles
+
     unit = endpoint_config.get("Unit")
     title = unit if unit else "Data Range"
 
@@ -329,12 +338,14 @@ def generate_rasterform(endpoint_config: dict) -> dict:
         })
 
         if elevations := endpoint_config.get("AvailableElevations"):
-            schema["jsonform"]["properties"]["elevation"] = {
-                "type": "string",
-                "title": "Elevation",
-                "enum": elevations,
-                "default": elevations[0],
-            }
+            if len(elevations) > 1:
+                schema["jsonform"]["properties"]["elevation"] = {
+                    "type": "string",
+                    "title": "Elevation",
+                    "enum": elevations,
+                    "default": elevations[0],
+                    "options": {"enum_titles": get_enum_titles(elevations)},
+                }
 
         if "vectorStyle" in params or "sea_water_velocity" in endpoint_config.get(
             "LayerId", ""
@@ -430,6 +441,10 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             }
             if dim_enum:
                 schema["jsonform"]["properties"][key]["enum"] = dim_enum
+                if key.lower() != "time":
+                    schema["jsonform"]["properties"][key]["options"] = {
+                        "enum_titles": get_enum_titles(dim_enum)
+                    }
             if dim_format:
                 schema["jsonform"]["properties"][key]["format"] = dim_format
                 if dim_type == "number":
