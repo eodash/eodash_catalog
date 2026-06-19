@@ -200,7 +200,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             }
             if "tickFormat" not in schema["legend"]:
                 schema["legend"]["tickFormat"] = get_tick_format(rescale[0], rescale[1])
-            schema["legend"]["domainProperties"] = ["vminmax.vmin", "vminmax.vmax"]
+            schema["legend"]["domainProperties"] = ["vmin", "vmax"]
 
         if endpoint_config.get("ColormapName"):
             current_cmap = endpoint_config["ColormapName"]
@@ -240,23 +240,9 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 },
                 "format": "minmax",
             }
-            schema["jsonform"]["properties"]["vmin"] = {
-                "type": "number",
-                "title": "Min value",
-                "template": "{{vminmax.vmin}}",
-                "watch": {"vminmax": "vminmax"},
-                "options": {"hidden": True},
-            }
-            schema["jsonform"]["properties"]["vmax"] = {
-                "type": "number",
-                "title": "Max value",
-                "template": "{{vminmax.vmax}}",
-                "watch": {"vminmax": "vminmax"},
-                "options": {"hidden": True},
-            }
             if "tickFormat" not in schema["legend"]:
                 schema["legend"]["tickFormat"] = get_tick_format(rescale[0], rescale[1])
-            schema["legend"]["domainProperties"] = ["vminmax.vmin", "vminmax.vmax"]
+            schema["legend"]["domainProperties"] = ["vmin", "vmax"]
 
         if endpoint_config.get("ColormapName"):
             schema["jsonform"]["properties"]["cbar"] = {
@@ -365,7 +351,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
         schema["legend"].update(
             {
                 "rangeProperty": "cmap",
-                "domainProperties": ["vminmax.vmin", "vminmax.vmax"],
+                "domainProperties": ["vmin", "vmax"],
             }
         )
 
@@ -576,6 +562,8 @@ def add_raw_assets(time_entry: dict, endpoint_config: dict, catalog_config: dict
 
     if endpoint_config.get("Attribution"):
         extra_fields_asset["attribution"] = endpoint_config["Attribution"]
+    if endpoint_config.get("Colorlegend"):
+        extra_fields_asset["eox:colorlegend"] = endpoint_config["Colorlegend"]
 
     if endpoint_config["Name"] == "COG source":
         style_type = "text/cog-styles"
@@ -828,8 +816,6 @@ def add_collection_information(
                     roles=["metadata"],
                 ),
             )
-    if collection_config.get("Colorlegend"):
-        collection.extra_fields["eox:colorlegend"] = collection_config["Colorlegend"]
 
 
 def add_process_info(collection: Collection, catalog_config: dict, collection_config: dict) -> None:
