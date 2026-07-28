@@ -1265,6 +1265,8 @@ def add_visualization_info(
                 "role": ["data"],
             }
         )
+        if endpoint_config.get("TileSize"):
+            extra_fields["wms:tilesize"] = endpoint_config["TileSize"]
         dimensions = {}
         if dimensions_config := endpoint_config.get("Dimensions", {}):
             for key, value in dimensions_config.items():
