@@ -181,18 +181,16 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 rescale = [float(x) if isinstance(x, str) else x for x in rescale]
             schema["jsonform"]["properties"]["vminmax"] = {
                 "type": "object",
-                "title": title,
+                "title": "Value range",
                 "properties": {
                     "vmin": {
                         "type": "number",
-                        "title": "Min",
                         "default": rescale[0],
                         "format": "range",
                         "minimum": 0,
                     },
                     "vmax": {
                         "type": "number",
-                        "title": "Max",
                         "default": rescale[1],
                         "format": "range",
                         "maximum": float(rescale[1]) * 1.5 or 1,
@@ -207,6 +205,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "watch": {"vminmax": "vminmax"},
                 "options": {"hidden": True},
             }
+            schema["jsonform"]["required"] = ["vminmax"]
             if "tickFormat" not in schema["legend"]:
                 schema["legend"]["tickFormat"] = get_tick_format(rescale[0], rescale[1])
             schema["legend"]["domainProperties"] = ["vmin", "vmax"]
@@ -230,7 +229,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             rescale = [float(x) if isinstance(x, str) else x for x in rescale]
             schema["jsonform"]["properties"]["vminmax"] = {
                 "type": "object",
-                "title": title,
+                "title": "Value range",
                 "properties": {
                     "vmin": {
                         "type": "number",
@@ -290,52 +289,54 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             vmin_def, vmax_def = endpoint_config.get("ScientificRange", (0.0, 1.0))
 
         # Build schema
-        schema["jsonform"]["properties"].update({
-            "cmap": {
-                "type": "string",
-                "title": "Colormap",
-                "enum": list(MARINE_COLORMAPS),
-                "default": params.get(
-                    "cmap", endpoint_config.get("DefaultScientificCmap", "thermal")
-                ),
-            },
-            "vminmax": {
-                "type": "object",
-                "title": title,
-                "properties": {
-                    "vmin": {
-                        "type": "number",
-                        "title": "Min",
-                        "default": vmin_def,
-                        "format": "range",
-                        "minimum": 0,
-                    },
-                    "vmax": {
-                        "type": "number",
-                        "title": "Max",
-                        "default": vmax_def,
-                        "format": "range",
-                        "maximum": vmax_def * 1.5 or 1,
-                    },
+        schema["jsonform"]["properties"].update(
+            {
+                "cmap": {
+                    "type": "string",
+                    "title": "Colormap",
+                    "enum": list(MARINE_COLORMAPS),
+                    "default": params.get(
+                        "cmap", endpoint_config.get("DefaultScientificCmap", "thermal")
+                    ),
                 },
-                "format": "minmax",
-            },
-            "inverse": {
-                "type": "boolean",
-                "title": "Inverse",
-                "default": params.get("inverse", False) is True,
-            },
-            "noClamp": {
-                "type": "boolean",
-                "title": "No Clamp",
-                "default": params.get("noClamp", False) is True,
-            },
-            "logScale": {
-                "type": "boolean",
-                "title": "Log Scale",
-                "default": params.get("logScale", False) is True,
-            },
-        })
+                "vminmax": {
+                    "type": "object",
+                    "title": title,
+                    "properties": {
+                        "vmin": {
+                            "type": "number",
+                            "title": "Min",
+                            "default": vmin_def,
+                            "format": "range",
+                            "minimum": 0,
+                        },
+                        "vmax": {
+                            "type": "number",
+                            "title": "Max",
+                            "default": vmax_def,
+                            "format": "range",
+                            "maximum": vmax_def * 1.5 or 1,
+                        },
+                    },
+                    "format": "minmax",
+                },
+                "inverse": {
+                    "type": "boolean",
+                    "title": "Inverse",
+                    "default": params.get("inverse", False) is True,
+                },
+                "noClamp": {
+                    "type": "boolean",
+                    "title": "No Clamp",
+                    "default": params.get("noClamp", False) is True,
+                },
+                "logScale": {
+                    "type": "boolean",
+                    "title": "Log Scale",
+                    "default": params.get("logScale", False) is True,
+                },
+            }
+        )
 
         if elevations := endpoint_config.get("AvailableElevations"):
             if len(elevations) > 1:
@@ -347,9 +348,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                     "options": {"enum_titles": get_enum_titles(elevations)},
                 }
 
-        if "vectorStyle" in params or "sea_water_velocity" in endpoint_config.get(
-            "LayerId", ""
-        ):
+        if "vectorStyle" in params or "sea_water_velocity" in endpoint_config.get("LayerId", ""):
             schema["jsonform"]["properties"]["vectorStyle"] = {
                 "type": "string",
                 "title": "Vector Style",
@@ -391,9 +390,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             "options": {"hidden": True},
         }
     elif name == "WMS" or endpoint_config.get("Type") == "WMTSCapabilities":
-        styles_key = (
-            "STYLES" if endpoint_config.get("Type") != "WMTSCapabilities" else "style"
-        )
+        styles_key = "STYLES" if endpoint_config.get("Type") != "WMTSCapabilities" else "style"
         # Determine default style
         default_style = endpoint_config.get(
             "Styles", endpoint_config.get("Style", endpoint_config.get("styles", ""))
@@ -410,9 +407,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             schema["jsonform"]["properties"][styles_key] = {
                 "type": "string",
                 "title": (
-                    "Styles"
-                    if endpoint_config.get("Type") != "WMTSCapabilities"
-                    else "Style"
+                    "Styles" if endpoint_config.get("Type") != "WMTSCapabilities" else "Style"
                 ),
                 "default": default_style,
                 "enum": available_styles,
@@ -462,11 +457,7 @@ def handle_rasterform_config(config: dict, catalog_config: dict) -> dict | str |
         if isinstance(rf, dict):
             return rf
         if isinstance(rf, str):
-            return (
-                rf
-                if rf.startswith("http")
-                else f"{catalog_config['assets_endpoint']}/{rf}"
-            )
+            return rf if rf.startswith("http") else f"{catalog_config['assets_endpoint']}/{rf}"
 
     # Try auto generation if it's missing or not explicitly False
     rf_schema = generate_rasterform(config)
