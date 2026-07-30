@@ -1090,8 +1090,7 @@ def handle_WMS_endpoint(
             spatial_extent,
             datetimes_retrieved,
             styles_retrieved,
-            scientific_range,
-            default_scientific_cmap,
+            variable_information,
             elevations_retrieved,
         ) = retrieveExtentFromWMSWMTS(
             capabilities_url,
@@ -1104,15 +1103,24 @@ def handle_WMS_endpoint(
         if styles_retrieved and len(styles_retrieved) > 1:
             # Add retrieved styles to config so generate_rasterform can use them
             endpoint_config["AvailableStyles"] = styles_retrieved
-        if scientific_range:
+        if variable_information.get("MinimumValue") and variable_information.get("MaximumValue"):
             # Add retrieved scientific range to config so generate_rasterform can use it
-            endpoint_config["ScientificRange"] = scientific_range
-        if default_scientific_cmap:
+            endpoint_config["ScientificRange"] = (
+                float(variable_information["MinimumValue"]),
+                float(variable_information["MaximumValue"]),
+            )
+        if colormap := variable_information.get("Colormap"):
             # Add retrieved default colormap to config so generate_rasterform can use it
-            endpoint_config["DefaultScientificCmap"] = default_scientific_cmap
+            endpoint_config["DefaultScientificCmap"] = colormap
+        if not endpoint_config.get("Unit") and variable_information.get("Unit"):
+            # Add retrieved unit to config
+            endpoint_config["Unit"] = variable_information["Unit"]
+        if LogScale := variable_information.get("LogScale"):
+            endpoint_config["LogScale"] = LogScale
         if elevations_retrieved:
             # Add retrieved elevations to config so generate_rasterform can use them
             endpoint_config["AvailableElevations"] = elevations_retrieved
+    LOGGER.info(endpoint_config)
     # optionally filter time results
     if query := endpoint_config.get("Query"):
         datetimes = filter_time_entries(datetimes, query)
@@ -1235,6 +1243,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
         f"{no_data}{rescale}{expression}{colormap}{resampling}{asset_as_band}{algorithm}{algorithm_params}"
     )
     return target_url
+
 
 def add_visualization_info(
     stac_object: Collection | Item,
@@ -1436,12 +1445,7 @@ def add_visualization_info(
         if datetimes is not None:
             dt = datetimes[0]
             # Date-only format for midnight timestamps
-            if (
-                dt.hour == 0
-                and dt.minute == 0
-                and dt.second == 0
-                and dt.microsecond == 0
-            ):
+            if dt.hour == 0 and dt.minute == 0 and dt.second == 0 and dt.microsecond == 0:
                 dimensions["time"] = dt.strftime("%Y-%m-%d")
             else:
                 dimensions["time"] = format_datetime_to_isostring_zulu(dt)

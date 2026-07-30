@@ -233,14 +233,12 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "properties": {
                     "vmin": {
                         "type": "number",
-                        "title": "Min",
                         "default": rescale[0],
                         "format": "range",
                         "minimum": 0,
                     },
                     "vmax": {
                         "type": "number",
-                        "title": "Max",
                         "default": rescale[1],
                         "format": "range",
                         "maximum": float(rescale[1]) * 1.5 or 1,
@@ -261,15 +259,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             }
             schema["legend"]["rangeProperty"] = "cbar"
     elif name == "marinedatastore":
-        style_str = endpoint_config.get(
-            "Style",
-            endpoint_config.get(
-                "Styles",
-                endpoint_config.get("Dimensions", {}).get(
-                    "style", endpoint_config.get("dimensions", {}).get("style", "")
-                ),
-            ),
-        )
+        style_str = endpoint_config.get("Dimensions", {}).get("style")
         params = {}
         if style_str:
             for part in style_str.split(","):
@@ -283,78 +273,94 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                     params[part] = True
 
         if "range" in params:
-            vmin_def = float(params.get("range", "0/1").split("/")[0])
-            vmax_def = float(params.get("range", "0/1").split("/")[1])
+            vmin_def = float((params["range"]).split("/")[0])
+            vmax_def = float((params["range"]).split("/")[1])
         else:
             vmin_def, vmax_def = endpoint_config.get("ScientificRange", (0.0, 1.0))
 
         # Build schema
-        schema["jsonform"]["properties"].update(
-            {
-                "cmap": {
-                    "type": "string",
-                    "title": "Colormap",
-                    "enum": list(MARINE_COLORMAPS),
-                    "default": params.get(
-                        "cmap", endpoint_config.get("DefaultScientificCmap", "thermal")
-                    ),
-                },
-                "vminmax": {
-                    "type": "object",
-                    "title": title,
-                    "properties": {
-                        "vmin": {
-                            "type": "number",
-                            "title": "Min",
-                            "default": vmin_def,
-                            "format": "range",
-                            "minimum": 0,
-                        },
-                        "vmax": {
-                            "type": "number",
-                            "title": "Max",
-                            "default": vmax_def,
-                            "format": "range",
-                            "maximum": vmax_def * 1.5 or 1,
-                        },
+        schema["jsonform"]["required"] = ["vminmax", "cmap"]
+        # default url style dimension template
+        template = "cmap:{{cmap}},range:{{vminmax.vmin}}/{{vminmax.vmax}}"
+        # Use template to join the parts
+        watch = {
+            "cmap": "cmap",
+            "vminmax": "vminmax",
+        }
+        schema["jsonform"]["properties"] = {
+            "cmap": {
+                "type": "string",
+                "title": "Colormap",
+                "enum": list(MARINE_COLORMAPS),
+                "default": params.get(
+                    "cmap", endpoint_config.get("DefaultScientificCmap", "thermal")
+                ),
+            },
+            "vminmax": {
+                "type": "object",
+                "title": "Value range",
+                "properties": {
+                    "vmin": {
+                        "type": "number",
+                        "default": vmin_def,
+                        "format": "range",
+                        "minimum": 0,
                     },
-                    "format": "minmax",
+                    "vmax": {
+                        "type": "number",
+                        "default": vmax_def,
+                        "format": "range",
+                        "maximum": vmax_def * 1.5 or 1,
+                    },
                 },
-                "inverse": {
-                    "type": "boolean",
-                    "title": "Inverse",
-                    "default": params.get("inverse", False) is True,
-                },
-                "noClamp": {
-                    "type": "boolean",
-                    "title": "No Clamp",
-                    "default": params.get("noClamp", False) is True,
-                },
-                "logScale": {
-                    "type": "boolean",
-                    "title": "Log Scale",
-                    "default": params.get("logScale", False) is True,
-                },
-            }
-        )
-
-        if elevations := endpoint_config.get("AvailableElevations"):
-            if len(elevations) > 1:
-                schema["jsonform"]["properties"]["elevation"] = {
-                    "type": "string",
-                    "title": "Elevation",
-                    "enum": elevations,
-                    "default": elevations[0],
-                    "options": {"enum_titles": get_enum_titles(elevations)},
-                }
-
-        if "vectorStyle" in params or "sea_water_velocity" in endpoint_config.get("LayerId", ""):
+                "format": "minmax",
+            },
+        }
+        # commented out because layerconfig does not support adding or removing parameter
+        # if boolean true or false via default jsonform template (just string replace)
+        # without a custom js callback or a special template engine
+        # e.g. "inverse" Add this attribute to invert the colormap
+        # if noClamp := params.get("noClamp"):
+        #     schema["jsonform"]["noClamp"] = {
+        #         "type": "boolean",
+        #         "title": "No Clamp",
+        #         "default": noClamp,
+        #     }
+        #     schema["jsonform"]["required"].append("noClamp")
+        #     template += ",noClamp"
+        #     watch["noClamp"] = "noClamp"
+        # logScale = params.get("logScale") or endpoint_config.get("LogScale")
+        # if logScale:
+        #     schema["jsonform"]["logScale"] = {
+        #         "type": "boolean",
+        #         "title": "Log Scale",
+        #         "default": logScale,
+        #     }
+        #     schema["jsonform"]["required"].append("logScale")
+        #     template += ",logScale"
+        #     watch["logScale"] = "logScale"
+        if vectorStyle := params.get("vectorStyle"):
             schema["jsonform"]["properties"]["vectorStyle"] = {
                 "type": "string",
                 "title": "Vector Style",
                 "enum": ["solid", "solidAndVector", "vector"],
-                "default": params.get("vectorStyle", "solid"),
+                "default": vectorStyle,
             }
+            schema["jsonform"]["required"].append("vectorStyle")
+            template += ",vectorStyle:{{vectorStyle}}"
+            watch["vectorStyle"] = "vectorStyle"
+
+        if (elevations := endpoint_config.get("AvailableElevations")) and len(elevations) > 1:
+            # wmts capabilities list them from largest depth to surface
+            elevations.reverse()
+            schema["jsonform"]["properties"]["elevation"] = {
+                "type": "string",
+                "title": "Depth",
+                "enum": elevations,
+                "default": elevations[0],
+                "options": {"enum_titles": get_enum_titles(elevations)},
+            }
+            schema["jsonform"]["required"].append("elevation")
 
         if "tickFormat" not in schema["legend"]:
             schema["legend"]["tickFormat"] = get_tick_format(vmin_def, vmax_def)
@@ -365,26 +371,8 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             }
         )
 
-        # Use template to join the parts
-        watch = {
-            "cmap": "cmap",
-            "vminmax": "vminmax",
-            "inv": "inverse",
-            "clamp": "noClamp",
-            "log": "logScale",
-        }
-
-        template = "cmap:{{cmap}},range:{{vminmax.vmin}}/{{vminmax.vmax}}"
-        template += "{{#inv}},inverse{{/inv}}"
-        template += "{{#clamp}},noClamp{{/clamp}}"
-        template += "{{#log}},logScale{{/log}}"
-        if "vectorStyle" in schema["jsonform"]["properties"]:
-            template += ",vectorStyle:{{vstyle}}"
-            watch["vstyle"] = "vectorStyle"
-
         schema["jsonform"]["properties"]["style"] = {
             "type": "string",
-            "title": "Composed Style",
             "template": template,
             "watch": watch,
             "options": {"hidden": True},

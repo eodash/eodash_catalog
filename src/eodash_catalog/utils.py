@@ -120,15 +120,15 @@ def retrieveExtentFromWMSWMTS(
     list[float],
     list[datetime],
     list[str],
-    tuple[float, float] | None,
-    str | None,
+    dict[str, str],
     list[str],
 ]:
     times = []
     styles = []
     elevations = []
-    scientific_range = None
-    default_scientific_cmap = None
+    variable_information = {}
+    ows_ns = "{http://www.opengis.net/ows/1.1}"
+    ns = "{http://www.opengis.net/wmts/1.0}"
     try:
         if not wmts:
             service = WebMapService(capabilities_url, version=version)
@@ -143,25 +143,27 @@ def retrieveExtentFromWMSWMTS(
             elev_dim = dims.get("elevation") or dims.get("ELEVATION")
             if elev_dim and "values" in elev_dim:
                 elevations = [str(v).strip() for v in elev_dim["values"]]
-
-            # Try to extract scientific metadata (Copernicus Marine extension)
-            if hasattr(service[layer], "_elem"):
-                elem = service[layer]._elem
-                min_val = elem.find(".//{http://www.opengis.net/wms}MinimumValue")
-                max_val = elem.find(".//{http://www.opengis.net/wms}MaximumValue")
-                if min_val is None:
-                    min_val = elem.find(".//MinimumValue")
-                if max_val is None:
-                    max_val = elem.find(".//MaximumValue")
-                if min_val is not None and max_val is not None:
-                    scientific_range = (float(min_val.text), float(max_val.text))
-
-                # Try to find default cmap from styles
-                for s in styles:
-                    if s.startswith("cmap:"):
-                        default_scientific_cmap = s.split("cmap:")[1]
+            # Try to extract variable metadata because owslib does not extract ows:Metadata
+            elem = None
+            if wmts and hasattr(service, "_capabilities"):
+                # Search for the layer element manually in the capabilities XML
+                for l_elem in service._capabilities.findall(f".//{ns}Layer"):
+                    ident = l_elem.find(f"{ows_ns}Identifier")
+                    if ident is not None and layer in ident.text:
+                        elem = l_elem
                         break
 
+            if elem is not None:
+                metadata_elem = elem.find(f".//{ows_ns}Metadata")
+                # Search specifically within VariableInformation if present
+                if metadata_elem is not None:
+                    search_root = metadata_elem.find(".//{ns}VariableInformation")
+                    if search_root is not None:
+                        variable_information = {
+                            child.tag: child.text.strip()
+                            for child in search_root
+                            if child.text is not None
+                        }
             tps = []
             if not wmts and service[layer].timepositions is not None:
                 tps = service[layer].timepositions
@@ -197,7 +199,13 @@ def retrieveExtentFromWMSWMTS(
         bbox = [float(x) for x in service[layer].boundingBoxWGS84]
 
     datetimes = [parse_datestring_to_tz_aware_datetime(time_str) for time_str in times]
-    return bbox, datetimes, styles, scientific_range, default_scientific_cmap, elevations
+    return (
+        bbox,
+        datetimes,
+        styles,
+        variable_information,
+        elevations,
+    )
 
 
 def interval(start: datetime, stop: datetime, delta: timedelta) -> Iterator[datetime]:
