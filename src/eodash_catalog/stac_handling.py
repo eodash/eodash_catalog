@@ -310,7 +310,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                         "type": "number",
                         "default": vmax_def,
                         "format": "range",
-                        "maximum": vmax_def * 1.5 or 1,
+                        "maximum": round(vmax_def * 1.5, 3) or 1,
                     },
                 },
                 "format": "minmax",
@@ -377,63 +377,6 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             "watch": watch,
             "options": {"hidden": True},
         }
-    elif name == "WMS" or endpoint_config.get("Type") == "WMTSCapabilities":
-        styles_key = "STYLES" if endpoint_config.get("Type") != "WMTSCapabilities" else "style"
-        # Determine default style
-        default_style = endpoint_config.get(
-            "Styles", endpoint_config.get("Style", endpoint_config.get("styles", ""))
-        )
-        if isinstance(default_style, list):
-            default_style = default_style[0] if default_style else ""
-
-        # Check if we have multiple styles to choose from
-        available_styles = endpoint_config.get("AvailableStyles")
-        if not available_styles and isinstance(endpoint_config.get("Styles"), list):
-            available_styles = endpoint_config["Styles"]
-
-        if available_styles and len(available_styles) > 1:
-            schema["jsonform"]["properties"][styles_key] = {
-                "type": "string",
-                "title": (
-                    "Styles" if endpoint_config.get("Type") != "WMTSCapabilities" else "Style"
-                ),
-                "default": default_style,
-                "enum": available_styles,
-            }
-
-    if dimensions_config := endpoint_config.get(
-        "Dimensions", endpoint_config.get("dimensions", {})
-    ):
-        for key, value in dimensions_config.items():
-            if key.lower() == "style" or key in schema["jsonform"]["properties"]:
-                continue
-            dim_type = "string"
-            dim_format = None
-            dim_default = value
-            dim_enum = None
-            if isinstance(value, int | float):
-                dim_type = "number"
-                dim_format = "range"
-            elif key.lower() == "time" and endpoint_config.get("Times"):
-                dim_enum = list(endpoint_config["Times"])
-
-            schema["jsonform"]["properties"][key] = {
-                "type": dim_type,
-                "title": key,
-                "default": dim_default,
-            }
-            if dim_enum:
-                schema["jsonform"]["properties"][key]["enum"] = dim_enum
-                if key.lower() != "time":
-                    schema["jsonform"]["properties"][key]["options"] = {
-                        "enum_titles": get_enum_titles(dim_enum)
-                    }
-            if dim_format:
-                schema["jsonform"]["properties"][key]["format"] = dim_format
-                if dim_type == "number":
-                    schema["jsonform"]["properties"][key]["min"] = 0
-                    schema["jsonform"]["properties"][key]["max"] = float(value) * 1.5
-
     return schema
 
 
