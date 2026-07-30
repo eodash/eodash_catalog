@@ -176,9 +176,6 @@ def process_STAC_Datacube_Endpoint(
         coll_path_rel_to_root_catalog,
         options.gp,
     )
-    unit = variables.get(endpoint_config.get("Variable")).get("unit")
-    if unit and "yAxis" not in collection_config:
-        collection_config["yAxis"] = unit
     if datetimes and not options.gp:
         collection.update_extent_from_items()
     elif not datetimes:
@@ -1012,18 +1009,6 @@ def handle_GeoDB_endpoint(
         add_collection_information(catalog_config, locations_collection, collection_config)
         add_base_overlay_info(locations_collection, catalog_config, collection_config)
 
-    if "yAxis" not in collection_config:
-        # fetch yAxis and store it to data, preventing need to save it per dataset in yml
-        select = "?select=y_axis&limit=1"
-        url = (
-            endpoint_config["EndPoint"]
-            + endpoint_config["Database"]
-            + "_{}".format(endpoint_config["CollectionId"])
-            + select
-        )
-        response = json.loads(requests.get(url).text)
-        yAxis = response[0]["y_axis"]
-        collection_config["yAxis"] = yAxis
     add_collection_information(catalog_config, collection, collection_config)
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
     collection.extra_fields["locations"] = True

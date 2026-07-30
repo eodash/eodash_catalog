@@ -1006,8 +1006,6 @@ def add_base_overlay_info(
 def add_extra_fields(
     stac_object: Collection | Link, collection_config: dict, is_root_collection: bool = False
 ) -> None:
-    if collection_config.get("yAxis"):
-        stac_object.extra_fields["yAxis"] = collection_config["yAxis"]
     if collection_config.get("Themes"):
         stac_object.extra_fields["themes"] = collection_config["Themes"]
     if (
