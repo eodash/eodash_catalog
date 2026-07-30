@@ -194,7 +194,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                         "type": "number",
                         "default": rescale[1],
                         "format": "range",
-                        "maximum": float(rescale[1]) * 1.5 or 1,
+                        "maximum": rescale[1] * 1.5 or 1,
                     },
                 },
                 "format": "minmax",

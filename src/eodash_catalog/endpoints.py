@@ -1092,8 +1092,8 @@ def handle_WMS_endpoint(
         if variable_information.get("MinimumValue") and variable_information.get("MaximumValue"):
             # Add retrieved scientific range to config so generate_rasterform can use it
             endpoint_config["ScientificRange"] = (
-                float(variable_information["MinimumValue"]),
-                float(variable_information["MaximumValue"]),
+                round(float(variable_information["MinimumValue"]), 3),
+                round(float(variable_information["MaximumValue"]), 3),
             )
         if colormap := variable_information.get("Colormap"):
             # Add retrieved default colormap to config so generate_rasterform can use it
