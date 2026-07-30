@@ -17,6 +17,11 @@ from pystac import (
 )
 from structlog import get_logger
 
+from eodash_catalog.colormaps import (
+    MARINE_COLORMAPS,
+    VEDA_COLORMAPS,
+    XCUBE_COLORMAPS,
+)
 from eodash_catalog.utils import (
     convert_layers_config_to_assets_configs,
     generateDatetimesFromInterval,
@@ -130,6 +135,282 @@ def create_service_link(
     return sl
 
 
+def get_tick_format(vmin: float, vmax: float) -> str:
+    diff = abs(vmax - vmin)
+    if diff >= 10:
+        return ".0f"
+    if diff >= 1:
+        return ".1f"
+    for i in range(2, 6):
+        if diff >= 10**-i:
+            return f".{i}f"
+    return ".5f"
+
+
+def get_enum_titles(values: list[str]) -> list[str]:
+    titles = []
+    for v in values:
+        try:
+            titles.append(f"{float(v):.1f}")
+        except (ValueError, TypeError):
+            titles.append(str(v))
+    return titles
+
+
+def generate_rasterform(endpoint_config: dict) -> dict:
+    schema = {"jsonform": {"type": "object", "properties": {}}}
+    unit = endpoint_config.get("Unit")
+    title = unit if unit else "Value Range"
+
+    schema["legend"] = {
+        "title": title,
+        "scaleType": "continuous",
+    }
+    colorlegend = endpoint_config.get("Colorlegend")
+    if colorlegend and colorlegend.get("tickFormat"):
+        schema["legend"]["tickFormat"] = colorlegend["tickFormat"]
+
+    name = endpoint_config.get("Name")
+    if not name:
+        name = endpoint_config.get("protocol", "").upper()
+
+    if name == "VEDA":
+        if endpoint_config.get("Rescale"):
+            rescale = endpoint_config["Rescale"]
+            # convert string to numbers if needed
+            if isinstance(rescale, list):
+                rescale = [float(x) if isinstance(x, str) else x for x in rescale]
+            schema["jsonform"]["properties"]["vminmax"] = {
+                "type": "object",
+                "title": "Value Range",
+                "properties": {
+                    "vmin": {
+                        "type": "number",
+                        "default": rescale[0],
+                        "format": "range",
+                        "minimum": 0,
+                    },
+                    "vmax": {
+                        "type": "number",
+                        "default": rescale[1],
+                        "format": "range",
+                        "maximum": rescale[1] * 1.5 or 1,
+                    },
+                },
+                "format": "minmax",
+            }
+            schema["jsonform"]["properties"]["rescale"] = {
+                "type": "string",
+                "template": "{{vminmax.vmin}},{{vminmax.vmax}}",
+                "watch": {"vminmax": "vminmax"},
+                "options": {"hidden": True},
+            }
+            schema["jsonform"]["required"] = ["vminmax"]
+            if "tickFormat" not in schema["legend"]:
+                schema["legend"]["tickFormat"] = get_tick_format(rescale[0], rescale[1])
+            schema["legend"]["domainProperties"] = ["vmin", "vmax"]
+
+        if endpoint_config.get("ColormapName"):
+            current_cmap = endpoint_config["ColormapName"]
+            veda_enums = list(VEDA_COLORMAPS)
+            if current_cmap not in veda_enums:
+                veda_enums.append(current_cmap)
+            schema["jsonform"]["properties"]["colormap_name"] = {
+                "type": "string",
+                "title": "Colormap",
+                "default": current_cmap,
+                "enum": veda_enums,
+            }
+            schema["legend"]["rangeProperty"] = "colormap_name"
+    elif name == "xcube":
+        if endpoint_config.get("Rescale"):
+            rescale = endpoint_config["Rescale"]
+            # convert string to numbers if needed
+            rescale = [float(x) if isinstance(x, str) else x for x in rescale]
+            schema["jsonform"]["properties"]["vminmax"] = {
+                "type": "object",
+                "title": "Value Range",
+                "properties": {
+                    "vmin": {
+                        "type": "number",
+                        "default": rescale[0],
+                        "format": "range",
+                        "minimum": 0,
+                    },
+                    "vmax": {
+                        "type": "number",
+                        "default": rescale[1],
+                        "format": "range",
+                        "maximum": float(rescale[1]) * 1.5 or 1,
+                    },
+                },
+                "format": "minmax",
+            }
+            if "tickFormat" not in schema["legend"]:
+                schema["legend"]["tickFormat"] = get_tick_format(rescale[0], rescale[1])
+            schema["legend"]["domainProperties"] = ["vmin", "vmax"]
+
+        if endpoint_config.get("ColormapName"):
+            schema["jsonform"]["properties"]["cbar"] = {
+                "type": "string",
+                "title": "Colormap",
+                "default": endpoint_config["ColormapName"],
+                "enum": XCUBE_COLORMAPS,
+            }
+            schema["legend"]["rangeProperty"] = "cbar"
+    elif name == "marinedatastore":
+        style_str = endpoint_config.get("Dimensions", {}).get("style")
+        params = {}
+        if style_str:
+            for part in style_str.split(","):
+                if ":" in part:
+                    k, v = part.split(":", 1)
+                    params[k] = v
+                elif "=" in part:
+                    k, v = part.split("=", 1)
+                    params[k] = v
+                else:
+                    params[part] = True
+
+        if "range" in params:
+            vmin_def = float((params["range"]).split("/")[0])
+            vmax_def = float((params["range"]).split("/")[1])
+        else:
+            vmin_def, vmax_def = endpoint_config.get("ScientificRange", (0.0, 1.0))
+
+        # Build schema
+        schema["jsonform"]["required"] = ["vminmax", "cmap"]
+        # default url style dimension template
+        template = "cmap:{{cmap}},range:{{vminmax.vmin}}/{{vminmax.vmax}}"
+        # Use template to join the parts
+        watch = {
+            "cmap": "cmap",
+            "vminmax": "vminmax",
+        }
+        schema["jsonform"]["properties"] = {
+            "cmap": {
+                "type": "string",
+                "title": "Colormap",
+                "enum": list(MARINE_COLORMAPS),
+                "default": params.get(
+                    "cmap", endpoint_config.get("DefaultScientificCmap", "thermal")
+                ),
+            },
+            "vminmax": {
+                "type": "object",
+                "title": "Value Range",
+                "properties": {
+                    "vmin": {
+                        "type": "number",
+                        "default": vmin_def,
+                        "format": "range",
+                        "minimum": 0,
+                    },
+                    "vmax": {
+                        "type": "number",
+                        "default": vmax_def,
+                        "format": "range",
+                        "maximum": round(vmax_def * 1.5, 3) or 1,
+                    },
+                },
+                "format": "minmax",
+            },
+        }
+        if params.get("noClamp"):
+            schema["jsonform"]["properties"]["noClamp"] = {
+                "type": "string",
+                "title": "Transparent outside (Min/Max)",
+                "enum": [",noClamp", ""],
+                "options": {"enum_titles": ["On", "Off"]},
+            }
+            schema["jsonform"]["required"].append("noClamp")
+            template += "{{noClamp}}"
+            watch["noClamp"] = "noClamp"
+        logScale = params.get("logScale") or endpoint_config.get("LogScale") == "true"
+        if logScale:
+            schema["jsonform"]["properties"]["logScale"] = {
+                "type": "string",
+                "title": "Log Scale",
+                "enum": [",logScale", ""],
+                "options": {"enum_titles": ["Log Scale", "Linear Scale"]},
+            }
+            schema["jsonform"]["required"].append("logScale")
+            template += "{{logScale}}"
+            watch["logScale"] = "logScale"
+            # statically set, dynamic legend watcher for scaleType is not implemented
+            schema["legend"]["scaleType"] = "log10"
+        if vectorStyle := params.get("vectorStyle"):
+            schema["jsonform"]["properties"]["vectorStyle"] = {
+                "type": "string",
+                "title": "Vector Style",
+                "enum": ["solid", "solidAndVector", "vector"],
+                "default": vectorStyle,
+            }
+            schema["jsonform"]["required"].append("vectorStyle")
+            template += ",vectorStyle:{{vectorStyle}}"
+            watch["vectorStyle"] = "vectorStyle"
+
+        if (elevations := endpoint_config.get("AvailableElevations")) and len(elevations) > 1:
+            # wmts capabilities list them from largest depth to surface
+            elevations.reverse()
+            schema["jsonform"]["properties"]["elevation"] = {
+                "type": "string",
+                "title": "Depth",
+                "enum": elevations,
+                "default": elevations[0],
+                "options": {"enum_titles": get_enum_titles(elevations)},
+            }
+            schema["jsonform"]["required"].append("elevation")
+
+        if "tickFormat" not in schema["legend"]:
+            schema["legend"]["tickFormat"] = get_tick_format(vmin_def, vmax_def)
+        schema["legend"].update(
+            {
+                "rangeProperty": "cmap",
+                "domainProperties": ["vmin", "vmax"],
+            }
+        )
+
+        schema["jsonform"]["properties"]["style"] = {
+            "type": "string",
+            "template": template,
+            "watch": watch,
+            "options": {"hidden": True},
+        }
+    return schema
+
+
+def handle_rasterform_config(config: dict, catalog_config: dict) -> dict | str | None:
+    rf = config.get("Rasterform")
+    if rf is False:
+        return None
+    if rf:
+        if isinstance(rf, dict):
+            return rf
+        if isinstance(rf, str):
+            return rf if rf.startswith("http") else f"{catalog_config['assets_endpoint']}/{rf}"
+
+    # Try auto generation if it's missing or not explicitly False
+    rf_schema = generate_rasterform(config)
+    if rf_schema.get("jsonform", {}).get("properties"):
+        return rf_schema
+    return None
+
+
+def add_link_with_rasterform(
+    stac_object: Collection | Item,
+    link: Link,
+    endpoint_config: dict,
+    catalog_config: dict,
+):
+    rf = handle_rasterform_config(endpoint_config, catalog_config)
+    if rf:
+        link.extra_fields["eodash:rasterform"] = rf
+    if "Colorlegend" in endpoint_config:
+        link.extra_fields["eox:colorlegend"] = endpoint_config["Colorlegend"]
+    stac_object.add_link(link)
+
+
 def create_web_map_link(
     collection: Collection, catalog_config: dict, layer_config: dict, role: str
 ) -> Link:
@@ -187,8 +468,7 @@ def create_web_map_link(
             add_authentication(collection, layer_config["url"], extra_fields)
     if layer_config.get("Attribution"):
         extra_fields["attribution"] = layer_config["Attribution"]
-    if layer_config.get("Colorlegend"):
-        extra_fields["eox:colorlegend"] = layer_config["Colorlegend"]
+
     wml = Link(
         rel=layer_config["protocol"],
         target=layer_config["url"],
@@ -197,6 +477,11 @@ def create_web_map_link(
         extra_fields=extra_fields,
     )
     add_projection_info(layer_config, wml)
+    rf = handle_rasterform_config(layer_config, catalog_config)
+    if rf:
+        wml.extra_fields["eodash:rasterform"] = rf
+    if "Colorlegend" in layer_config:
+        wml.extra_fields["eox:colorlegend"] = layer_config["Colorlegend"]
     return wml
 
 
@@ -468,8 +753,6 @@ def add_collection_information(
                     roles=["metadata"],
                 ),
             )
-    if collection_config.get("Colorlegend"):
-        collection.extra_fields["eox:colorlegend"] = collection_config["Colorlegend"]
 
 
 def add_process_info(collection: Collection, catalog_config: dict, collection_config: dict) -> None:
@@ -666,8 +949,6 @@ def add_base_overlay_info(
 def add_extra_fields(
     stac_object: Collection | Link, collection_config: dict, is_root_collection: bool = False
 ) -> None:
-    if collection_config.get("yAxis"):
-        stac_object.extra_fields["yAxis"] = collection_config["yAxis"]
     if collection_config.get("Themes"):
         stac_object.extra_fields["themes"] = collection_config["Themes"]
     if (

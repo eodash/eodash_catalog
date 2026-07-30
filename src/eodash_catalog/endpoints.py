@@ -25,6 +25,7 @@ from eodash_catalog.stac_handling import (
     add_base_overlay_info,
     add_collection_information,
     add_example_info,
+    add_link_with_rasterform,
     add_process_info_child_collection,
     add_projection_info,
     add_raw_assets,
@@ -175,9 +176,6 @@ def process_STAC_Datacube_Endpoint(
         coll_path_rel_to_root_catalog,
         options.gp,
     )
-    unit = variables.get(endpoint_config.get("Variable")).get("unit")
-    if unit and "yAxis" not in collection_config:
-        collection_config["yAxis"] = unit
     if datetimes and not options.gp:
         collection.update_extent_from_items()
     elif not datetimes:
@@ -310,6 +308,7 @@ def process_STACAPI_Endpoint(
         collections=[collection_id],
         bbox=bbox,
         datetime=datetime_query,  # type: ignore
+        limit=500,
     )
     # We keep track of potential duplicate times in this list
     added_times = {}
@@ -1010,18 +1009,6 @@ def handle_GeoDB_endpoint(
         add_collection_information(catalog_config, locations_collection, collection_config)
         add_base_overlay_info(locations_collection, catalog_config, collection_config)
 
-    if "yAxis" not in collection_config:
-        # fetch yAxis and store it to data, preventing need to save it per dataset in yml
-        select = "?select=y_axis&limit=1"
-        url = (
-            endpoint_config["EndPoint"]
-            + endpoint_config["Database"]
-            + "_{}".format(endpoint_config["CollectionId"])
-            + select
-        )
-        response = json.loads(requests.get(url).text)
-        yAxis = response[0]["y_axis"]
-        collection_config["yAxis"] = yAxis
     add_collection_information(catalog_config, collection, collection_config)
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
     collection.extra_fields["locations"] = True
@@ -1085,7 +1072,13 @@ def handle_WMS_endpoint(
         # some endpoints allow "narrowed-down" capabilities per-layer, which we utilize to not
         # have to process full service capabilities XML
         capabilities_url = endpoint_config["EndPoint"]
-        spatial_extent, datetimes_retrieved = retrieveExtentFromWMSWMTS(
+        (
+            spatial_extent,
+            datetimes_retrieved,
+            styles_retrieved,
+            variable_information,
+            elevations_retrieved,
+        ) = retrieveExtentFromWMSWMTS(
             capabilities_url,
             endpoint_config["LayerId"],
             version=endpoint_config.get("Version", "1.1.1"),
@@ -1093,6 +1086,26 @@ def handle_WMS_endpoint(
         )
         if datetimes_retrieved:
             datetimes = datetimes_retrieved
+        if styles_retrieved and len(styles_retrieved) > 1:
+            # Add retrieved styles to config so generate_rasterform can use them
+            endpoint_config["AvailableStyles"] = styles_retrieved
+        if variable_information.get("MinimumValue") and variable_information.get("MaximumValue"):
+            # Add retrieved scientific range to config so generate_rasterform can use it
+            endpoint_config["ScientificRange"] = (
+                round(float(variable_information["MinimumValue"]), 3),
+                round(float(variable_information["MaximumValue"]), 3),
+            )
+        if colormap := variable_information.get("Colormap"):
+            # Add retrieved default colormap to config so generate_rasterform can use it
+            endpoint_config["DefaultScientificCmap"] = colormap
+        if variable_information.get("Unit") and not endpoint_config.get("Unit"):
+            # Add retrieved unit to config
+            endpoint_config["Unit"] = variable_information["Unit"]
+        if LogScale := variable_information.get("LogScale"):
+            endpoint_config["LogScale"] = LogScale
+        if elevations_retrieved:
+            # Add retrieved elevations to config so generate_rasterform can use them
+            endpoint_config["AvailableElevations"] = elevations_retrieved
     # optionally filter time results
     if query := endpoint_config.get("Query"):
         datetimes = filter_time_entries(datetimes, query)
@@ -1170,6 +1183,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     colormap = ""
     if endpoint_config.get("Colormap"):
         colormap = "&colormap={}".format(endpoint_config["Colormap"])
+
     rescale = ""
     if rescale_configs := endpoint_config.get("Rescale", ""):
         if isinstance(rescale_configs[0], list):
@@ -1181,16 +1195,37 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
             rescale = "&rescale={},{}".format(
                 endpoint_config["Rescale"][0], endpoint_config["Rescale"][1]
             )
-    if expression := endpoint_config.get("Expression", ""):
-        expression = f"&expression={expression}"
+
+    expression = ""
+    if expr := endpoint_config.get("Expression"):
+        expression = f"&expression={expr}"
+
     no_data = ""
     if endpoint_config.get("NoData") is not None:
         no_data = "&nodata={}".format(endpoint_config["NoData"])
+
+    resampling = ""
+    if res := endpoint_config.get("Resampling"):
+        resampling = f"&resampling={res}"
+
+    asset_as_band = ""
+    if "AssetAsBand" in endpoint_config:
+        asset_as_band = f"&asset_as_band={str(endpoint_config['AssetAsBand']).lower()}"
+
+    algorithm = ""
+    if algo := endpoint_config.get("Algorithm"):
+        algorithm = f"&algorithm={algo}"
+
+    algorithm_params = ""
+    if algo_p := endpoint_config.get("AlgorithmParams"):
+        algorithm_params = f"&algorithm_params={algo_p}"
+
     item = item if item else "{item}"
-    target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
+    target_url_base = endpoint_config["EndPoint"].replace("/stac/", "").replace("/stac", "")
     target_url = (
         f"{target_url_base}/raster/collections/{collection}/items/{item}"
-        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{colormap_name}{color_formula}{no_data}{rescale}{expression}{colormap}"
+        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{colormap_name}{color_formula}"
+        f"{no_data}{rescale}{expression}{colormap}{resampling}{asset_as_band}{algorithm}{algorithm_params}"
     )
     return target_url
 
@@ -1300,8 +1335,6 @@ def add_visualization_info(
         endpoint_url = endpoint_config["EndPoint"]
         # custom replacing of all ENV VARS present as template in URL as {VAR}
         endpoint_url = replace_with_env_variables(endpoint_url)
-        identifier = str(uuid.uuid4())
-        extra_fields["key"] = identifier
         link = Link(
             rel="wms",
             target=endpoint_url,
@@ -1313,21 +1346,7 @@ def add_visualization_info(
             endpoint_config,
             link,
         )
-        stac_object.add_link(link)
-        # add eodash style visualization info if Style has been provided
-        if endpoint_config.get("Style"):
-            ep_st = endpoint_config.get("Style")
-            style_link = Link(
-                rel="style",
-                target=ep_st
-                if ep_st.startswith("http")
-                else f"{catalog_config['assets_endpoint']}/{ep_st}",
-                media_type="text/tileUrl-styles",
-                extra_fields={
-                    "links:keys": [identifier],
-                },
-            )
-            stac_object.add_link(style_link)
+        add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
     elif endpoint_config["Name"] == "rasdaman":
         extra_fields.update(
             {
@@ -1391,15 +1410,14 @@ def add_visualization_info(
                 vmax,
                 cbar,
             )
-            stac_object.add_link(
-                Link(
-                    rel="xyz",
-                    target=target_url,
-                    media_type="image/png",
-                    title=collection_config["Title"],
-                    extra_fields=extra_fields,
-                )
+            link = Link(
+                rel="xyz",
+                target=target_url,
+                media_type="image/png",
+                title=collection_config["Title"],
+                extra_fields=extra_fields,
             )
+            add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
     elif endpoint_config.get("Type") == "WMTSCapabilities":
         target_url = "{}".format(endpoint_config.get("EndPoint"))
         extra_fields.update(
@@ -1412,12 +1430,7 @@ def add_visualization_info(
         if datetimes is not None:
             dt = datetimes[0]
             # Date-only format for midnight timestamps
-            if (
-                dt.hour == 0
-                and dt.minute == 0
-                and dt.second == 0
-                and dt.microsecond == 0
-            ):
+            if dt.hour == 0 and dt.minute == 0 and dt.second == 0 and dt.microsecond == 0:
                 dimensions["time"] = dt.strftime("%Y-%m-%d")
             else:
                 dimensions["time"] = format_datetime_to_isostring_zulu(dt)
@@ -1426,39 +1439,21 @@ def add_visualization_info(
                 dimensions[key] = value
         if dimensions != {}:
             extra_fields["wmts:dimensions"] = dimensions
-        identifier = str(uuid.uuid4())
-        extra_fields["key"] = identifier
-        stac_object.add_link(
-            Link(
-                rel="wmts",
-                target=target_url,
-                media_type="image/png",
-                title=collection_config["Title"],
-                extra_fields=extra_fields,
-            )
+        link = Link(
+            rel="wmts",
+            target=target_url,
+            media_type="image/png",
+            title=collection_config["Title"],
+            extra_fields=extra_fields,
         )
+        add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
         # add eodash style visualization info if Style has been provided
-        if endpoint_config.get("Style"):
-            ep_st = endpoint_config.get("Style")
-            style_link = Link(
-                rel="style",
-                target=ep_st
-                if ep_st.startswith("http")
-                else f"{catalog_config['assets_endpoint']}/{ep_st}",
-                media_type="text/tileUrl-styles",
-                extra_fields={
-                    "links:keys": [identifier],
-                },
-            )
-            stac_object.add_link(style_link)
     elif endpoint_config["Name"] == "VEDA":
         if endpoint_config["Type"] == "cog":
             target_url = generate_veda_cog_link(endpoint_config, file_url)
         elif endpoint_config["Type"] == "tiles":
             target_url = generate_veda_tiles_link(endpoint_config, file_url)
         if target_url:
-            identifier = str(uuid.uuid4())
-            extra_fields["key"] = identifier
             link = Link(
                 rel="xyz",
                 target=target_url,
@@ -1470,21 +1465,7 @@ def add_visualization_info(
                 endpoint_config,
                 link,
             )
-            stac_object.add_link(link)
-            # add eodash style visualization info if Style has been provided
-            if endpoint_config.get("Style"):
-                ep_st = endpoint_config.get("Style")
-                style_link = Link(
-                    rel="style",
-                    target=ep_st
-                    if ep_st.startswith("http")
-                    else f"{catalog_config['assets_endpoint']}/{ep_st}",
-                    media_type="text/tileUrl-styles",
-                    extra_fields={
-                        "links:keys": [identifier],
-                    },
-                )
-                stac_object.add_link(style_link)
+            add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
     else:
         LOGGER.info(f"Visualization endpoint not supported {endpoint_config['Name']}")
 

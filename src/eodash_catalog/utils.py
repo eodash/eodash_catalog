@@ -116,14 +116,54 @@ def retrieveExtentFromWCS(
 
 def retrieveExtentFromWMSWMTS(
     capabilities_url: str, layer: str, version: str = "1.1.1", wmts: bool = False
-) -> tuple[list[float], list[datetime]]:
+) -> tuple[
+    list[float],
+    list[datetime],
+    list[str],
+    dict[str, str],
+    list[str],
+]:
     times = []
+    styles = []
+    elevations = []
+    variable_information = {}
+    ows_ns = "{http://www.opengis.net/ows/1.1}"
+    ns = "{http://www.opengis.net/wmts/1.0}"
     try:
         if not wmts:
             service = WebMapService(capabilities_url, version=version)
         else:
             service = WebMapTileService(capabilities_url)
         if layer in list(service.contents):
+            # Extract available styles
+            styles = list(service[layer].styles.keys())
+
+            # Extract available elevations
+            dims = service[layer].dimensions
+            elev_dim = dims.get("elevation") or dims.get("ELEVATION")
+            if elev_dim and "values" in elev_dim:
+                elevations = [str(v).strip() for v in elev_dim["values"]]
+            # Try to extract variable metadata because owslib does not extract ows:Metadata
+            elem = None
+            if wmts and hasattr(service, "_capabilities"):
+                # Search for the layer element manually in the capabilities XML
+                for l_elem in service._capabilities.findall(f".//{ns}Layer"):
+                    ident = l_elem.find(f"{ows_ns}Identifier")
+                    if ident is not None and layer in ident.text:
+                        elem = l_elem
+                        break
+
+            if elem is not None:
+                metadata_elem = elem.find(f".//{ows_ns}Metadata")
+                # Search specifically within VariableInformation if present
+                if metadata_elem is not None:
+                    search_root = metadata_elem.find(f".//{ns}VariableInformation")
+                    if search_root is not None:
+                        variable_information = {
+                            child.tag.replace(ns, ""): child.text.strip()
+                            for child in search_root
+                            if child.text is not None
+                        }
             tps = []
             if not wmts and service[layer].timepositions is not None:
                 tps = service[layer].timepositions
@@ -159,7 +199,13 @@ def retrieveExtentFromWMSWMTS(
         bbox = [float(x) for x in service[layer].boundingBoxWGS84]
 
     datetimes = [parse_datestring_to_tz_aware_datetime(time_str) for time_str in times]
-    return bbox, datetimes
+    return (
+        bbox,
+        datetimes,
+        styles,
+        variable_information,
+        elevations,
+    )
 
 
 def interval(start: datetime, stop: datetime, delta: timedelta) -> Iterator[datetime]:
@@ -266,7 +312,9 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
     bidx = ""
     if endpoint_config.get("Bidx"):
         # Check if an array was provided
-        if hasattr(endpoint_config["Bidx"], "__len__"):
+        if hasattr(endpoint_config["Bidx"], "__len__") and not isinstance(
+            endpoint_config["Bidx"], str
+        ):
             for band in endpoint_config["Bidx"]:
                 bidx = bidx + f"&bidx={band}"
         else:
@@ -275,30 +323,44 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
     colormap = ""
     if endpoint_config.get("Colormap"):
         colormap = "&colormap={}".format(endpoint_config["Colormap"])
-        # TODO: For now we assume a already urlparsed colormap definition
-        # it could be nice to allow a json and better convert it on the fly
-        # colormap = "&colormap=%s"%(urllib.parse.quote(str(endpoint_config["Colormap"])))
 
-    Nodata = ""
+    no_data = ""
     if endpoint_config.get("Nodata") is not None:
-        Nodata = "&nodata={}".format(endpoint_config["Nodata"])
+        no_data = "&nodata={}".format(endpoint_config["Nodata"])
 
     colormap_name = ""
     if endpoint_config.get("ColormapName"):
         colormap_name = "&colormap_name={}".format(endpoint_config["ColormapName"])
 
     rescale = ""
-    if endpoint_config.get("Rescale"):
-        rescale = "&rescale={},{}".format(
-            endpoint_config["Rescale"][0], endpoint_config["Rescale"][1]
-        )
+    if rescale_configs := endpoint_config.get("Rescale"):
+        if isinstance(rescale_configs[0], list):
+            # one rescale definition for each band
+            for rescale_config in rescale_configs:
+                rescale += f"&rescale={rescale_config[0]},{rescale_config[1]}"
+        else:
+            # shared rescale definition for all bands
+            rescale = f"&rescale={rescale_configs[0]},{rescale_configs[1]}"
 
-    file_url = f"url={file_url}&" if file_url else ""
+    expression = ""
+    if expr := endpoint_config.get("Expression"):
+        expression = f"&expression={expr}"
+    resampling_method = "&resampling_method=nearest"
+
+    algorithm = ""
+    if algo := endpoint_config.get("Algorithm"):
+        algorithm = f"&algorithm={algo}"
+
+    algorithm_params = ""
+    if algo_p := endpoint_config.get("AlgorithmParams"):
+        algorithm_params = f"&algorithm_params={algo_p}"
+    file_url = f"&url={file_url}" if file_url else ""
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
     target_url = (
         f"{target_url_base}/raster/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?"
-        f"{file_url}resampling_method=nearest"
-        f"{bidx}{colormap}{colormap_name}{rescale}{Nodata}"
+        f"{bidx}{colormap}{colormap_name}{rescale}{no_data}"
+        f"{file_url}{resampling_method}"
+        f"{expression}{algorithm}{algorithm_params}"
     )
     return target_url
 
