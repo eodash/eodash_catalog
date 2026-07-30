@@ -1106,7 +1106,6 @@ def handle_WMS_endpoint(
         if elevations_retrieved:
             # Add retrieved elevations to config so generate_rasterform can use them
             endpoint_config["AvailableElevations"] = elevations_retrieved
-    LOGGER.info(endpoint_config)
     # optionally filter time results
     if query := endpoint_config.get("Query"):
         datetimes = filter_time_entries(datetimes, query)

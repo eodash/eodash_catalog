@@ -316,29 +316,29 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "format": "minmax",
             },
         }
-        # commented out because layerconfig does not support adding or removing parameter
-        # if boolean true or false via default jsonform template (just string replace)
-        # without a custom js callback or a special template engine
-        # e.g. "inverse" Add this attribute to invert the colormap
-        # if noClamp := params.get("noClamp"):
-        #     schema["jsonform"]["noClamp"] = {
-        #         "type": "boolean",
-        #         "title": "No Clamp",
-        #         "default": noClamp,
-        #     }
-        #     schema["jsonform"]["required"].append("noClamp")
-        #     template += ",noClamp"
-        #     watch["noClamp"] = "noClamp"
-        # logScale = params.get("logScale") or endpoint_config.get("LogScale")
-        # if logScale:
-        #     schema["jsonform"]["logScale"] = {
-        #         "type": "boolean",
-        #         "title": "Log Scale",
-        #         "default": logScale,
-        #     }
-        #     schema["jsonform"]["required"].append("logScale")
-        #     template += ",logScale"
-        #     watch["logScale"] = "logScale"
+        if params.get("noClamp"):
+            schema["jsonform"]["properties"]["noClamp"] = {
+                "type": "string",
+                "title": "Transparent outside (Min/Max)",
+                "enum": [",noClamp", ""],
+                "options": {"enum_titles": ["On", "Off"]},
+            }
+            schema["jsonform"]["required"].append("noClamp")
+            template += "{{noClamp}}"
+            watch["noClamp"] = "noClamp"
+        logScale = params.get("logScale") or endpoint_config.get("LogScale") == "true"
+        if logScale:
+            schema["jsonform"]["properties"]["logScale"] = {
+                "type": "string",
+                "title": "Log Scale",
+                "enum": [",logScale", ""],
+                "options": {"enum_titles": ["Log Scale", "Linear Scale"]},
+            }
+            schema["jsonform"]["required"].append("logScale")
+            template += "{{logScale}}"
+            watch["logScale"] = "logScale"
+            # statically set, dynamic legend watcher for scaleType is not implemented
+            schema["legend"]["scaleType"] = "log10"
         if vectorStyle := params.get("vectorStyle"):
             schema["jsonform"]["properties"]["vectorStyle"] = {
                 "type": "string",
