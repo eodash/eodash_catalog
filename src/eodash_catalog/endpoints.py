@@ -1098,7 +1098,7 @@ def handle_WMS_endpoint(
         if colormap := variable_information.get("Colormap"):
             # Add retrieved default colormap to config so generate_rasterform can use it
             endpoint_config["DefaultScientificCmap"] = colormap
-        if not endpoint_config.get("Unit") and variable_information.get("Unit"):
+        if variable_information.get("Unit") and not endpoint_config.get("Unit"):
             # Add retrieved unit to config
             endpoint_config["Unit"] = variable_information["Unit"]
         if LogScale := variable_information.get("LogScale"):

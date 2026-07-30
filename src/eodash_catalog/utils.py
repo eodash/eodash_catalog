@@ -157,10 +157,10 @@ def retrieveExtentFromWMSWMTS(
                 metadata_elem = elem.find(f".//{ows_ns}Metadata")
                 # Search specifically within VariableInformation if present
                 if metadata_elem is not None:
-                    search_root = metadata_elem.find(".//{ns}VariableInformation")
+                    search_root = metadata_elem.find(f".//{ns}VariableInformation")
                     if search_root is not None:
                         variable_information = {
-                            child.tag: child.text.strip()
+                            child.tag.replace(ns, ""): child.text.strip()
                             for child in search_root
                             if child.text is not None
                         }

@@ -135,31 +135,32 @@ def create_service_link(
     return sl
 
 
+def get_tick_format(vmin: float, vmax: float) -> str:
+    diff = abs(vmax - vmin)
+    if diff >= 10:
+        return ".0f"
+    if diff >= 1:
+        return ".1f"
+    for i in range(2, 6):
+        if diff >= 10**-i:
+            return f".{i}f"
+    return ".5f"
+
+
+def get_enum_titles(values: list[str]) -> list[str]:
+    titles = []
+    for v in values:
+        try:
+            titles.append(f"{float(v):.1f}")
+        except (ValueError, TypeError):
+            titles.append(str(v))
+    return titles
+
+
 def generate_rasterform(endpoint_config: dict) -> dict:
     schema = {"jsonform": {"type": "object", "properties": {}}}
-
-    def get_tick_format(vmin: float, vmax: float) -> str:
-        diff = abs(vmax - vmin)
-        if diff >= 10:
-            return ".0f"
-        if diff >= 1:
-            return ".1f"
-        for i in range(2, 6):
-            if diff >= 10**-i:
-                return f".{i}f"
-        return ".5f"
-
-    def get_enum_titles(values: list[str]) -> list[str]:
-        titles = []
-        for v in values:
-            try:
-                titles.append(f"{float(v):.1f}")
-            except (ValueError, TypeError):
-                titles.append(str(v))
-        return titles
-
     unit = endpoint_config.get("Unit")
-    title = unit if unit else "Data Range"
+    title = unit if unit else "Value Range"
 
     schema["legend"] = {
         "title": title,
@@ -181,7 +182,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 rescale = [float(x) if isinstance(x, str) else x for x in rescale]
             schema["jsonform"]["properties"]["vminmax"] = {
                 "type": "object",
-                "title": "Value range",
+                "title": "Value Range",
                 "properties": {
                     "vmin": {
                         "type": "number",
@@ -200,7 +201,6 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             }
             schema["jsonform"]["properties"]["rescale"] = {
                 "type": "string",
-                "title": "Composed Rescale",
                 "template": "{{vminmax.vmin}},{{vminmax.vmax}}",
                 "watch": {"vminmax": "vminmax"},
                 "options": {"hidden": True},
@@ -229,7 +229,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             rescale = [float(x) if isinstance(x, str) else x for x in rescale]
             schema["jsonform"]["properties"]["vminmax"] = {
                 "type": "object",
-                "title": "Value range",
+                "title": "Value Range",
                 "properties": {
                     "vmin": {
                         "type": "number",
@@ -298,7 +298,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             },
             "vminmax": {
                 "type": "object",
-                "title": "Value range",
+                "title": "Value Range",
                 "properties": {
                     "vmin": {
                         "type": "number",
