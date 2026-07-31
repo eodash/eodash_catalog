@@ -308,7 +308,7 @@ def process_STACAPI_Endpoint(
         collections=[collection_id],
         bbox=bbox,
         datetime=datetime_query,  # type: ignore
-        limit=500,
+        limit=100,
     )
     # We keep track of potential duplicate times in this list
     added_times = {}
