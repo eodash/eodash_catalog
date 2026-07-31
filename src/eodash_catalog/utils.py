@@ -139,10 +139,11 @@ def retrieveExtentFromWMSWMTS(
             styles = list(service[layer].styles.keys())
 
             # Extract available elevations
-            dims = service[layer].dimensions
-            elev_dim = dims.get("elevation") or dims.get("ELEVATION")
-            if elev_dim and "values" in elev_dim:
-                elevations = [str(v).strip() for v in elev_dim["values"]]
+            if wmts:
+                dims = service[layer].dimensions
+                elev_dim = dims.get("elevation") or dims.get("ELEVATION")
+                if elev_dim and "values" in elev_dim:
+                    elevations = [str(v).strip() for v in elev_dim["values"]]
             # Try to extract variable metadata because owslib does not extract ows:Metadata
             elem = None
             if wmts and hasattr(service, "_capabilities"):
