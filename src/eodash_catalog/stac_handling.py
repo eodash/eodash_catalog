@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from urllib.parse import parse_qs, urlparse
 
 import requests
@@ -155,6 +156,36 @@ def get_enum_titles(values: list[str]) -> list[str]:
         except (ValueError, TypeError):
             titles.append(str(v))
     return titles
+
+
+def process_elevation_entries(entries: list[str]) -> tuple[list[str], str | None]:
+    """Sorts string numerical entries based on sign rules without precision loss,
+
+    returning the sorted string list and context-specific default string value.
+    """
+    if not entries:
+        return [], None
+
+    # Check sign conditions using Decimal for accuracy
+    all_negative = all(Decimal(x) < 0 for x in entries)
+    all_positive = all(Decimal(x) > 0 for x in entries)
+
+    if all_negative:
+        # Depth: Smallest depth (-1.0) to highest depth (-50.000) -> Descending
+        sorted_list = sorted(entries, key=Decimal, reverse=True)
+        default_val = sorted_list[0]  # Highest numerical value
+
+    elif all_positive:
+        # Elevation: Lowest elevation to highest elevation -> Ascending
+        sorted_list = sorted(entries, key=Decimal)
+        default_val = sorted_list[0]  # Lowest numerical value
+
+    else:
+        # Mixed: Smallest to highest -> Ascending
+        sorted_list = sorted(entries, key=Decimal)
+        default_val = min(entries, key=lambda x: abs(Decimal(x)))  # Closest to 0
+
+    return sorted_list, default_val
 
 
 def generate_rasterform(endpoint_config: dict) -> dict:
@@ -352,13 +383,13 @@ def generate_rasterform(endpoint_config: dict) -> dict:
 
         if (elevations := endpoint_config.get("AvailableElevations")) and len(elevations) > 1:
             # wmts capabilities list them from largest depth to surface
-            elevations.reverse()
+            sorted_depths, default_depth = process_elevation_entries(elevations)
             schema["jsonform"]["properties"]["elevation"] = {
                 "type": "string",
                 "title": "Depth",
-                "enum": elevations,
-                "default": elevations[0],
-                "options": {"enum_titles": get_enum_titles(elevations)},
+                "enum": sorted_depths,
+                "default": default_depth,
+                "options": {"enum_titles": get_enum_titles(sorted_depths)},
             }
             schema["jsonform"]["required"].append("elevation")
 
