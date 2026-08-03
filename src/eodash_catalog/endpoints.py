@@ -103,7 +103,7 @@ def process_STAC_Datacube_Endpoint(
         endpoint_config,
         catalog_config,
     )
-    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     stac_endpoint_url = endpoint_config["EndPoint"]
     if endpoint_config.get("Name") == "xcube":
         stac_endpoint_url = stac_endpoint_url + endpoint_config.get("StacEndpoint", "")
@@ -122,7 +122,7 @@ def process_STAC_Datacube_Endpoint(
     variables = item.properties.get("cube:variables", {})
     if endpoint_config.get("Variable") not in variables:
         raise Exception(
-            f'Variable {endpoint_config.get("Variable")} not found in datacube {variables}'
+            f"Variable {endpoint_config.get('Variable')} not found in datacube {variables}"
         )
     time_dimension = "time"
     for k, v in dimensions.items():
@@ -195,7 +195,7 @@ def handle_STAC_based_endpoint(
     options: Options,
     headers=None,
 ) -> Collection:
-    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     if collection_config.get("Locations"):
         root_collection = get_or_create_collection(
             catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
@@ -226,7 +226,7 @@ def handle_STAC_based_endpoint(
                 collection.description = root_collection.description
             # TODO: should we remove all assets from sub collections?
             link = root_collection.add_child(collection)
-            latlng = f'{location["Point"][1]},{location["Point"][0]}'.strip()
+            latlng = f"{location['Point'][1]},{location['Point'][0]}".strip()
             # Add extra properties we need
             link.extra_fields["id"] = location["Identifier"]
             link.extra_fields["latlng"] = latlng
@@ -480,7 +480,7 @@ def handle_SH_WMS_endpoint(
     root_collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     if collection_config.get("Locations"):
         for location in collection_config["Locations"]:
             # create and populate location collections based on times
@@ -638,8 +638,8 @@ def handle_GeoDB_Features_endpoint(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
-    select = f'?select={endpoint_config["TimeParameter"]}'
+    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
+    select = f"?select={endpoint_config['TimeParameter']}"
     url = (
         endpoint_config["EndPoint"]
         + endpoint_config["Database"]
@@ -749,7 +749,7 @@ def handle_GeoDB_endpoint(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     select = "?select=aoi,aoi_id,country,city,time,input_data,sub_aoi"
     url = (
         endpoint_config["EndPoint"]
@@ -1065,7 +1065,7 @@ def handle_WMS_endpoint(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     datetimes = get_collection_datetimes_from_config(endpoint_config)
     spatial_extent = collection.extent.spatial.to_dict().get("bbox", [-180, -90, 180, 90])[0]
     if endpoint_config.get("Type") != "OverwriteTimes" or not endpoint_config.get("OverwriteBBox"):
@@ -1312,7 +1312,7 @@ def add_visualization_info(
                 # special replace for world_settlement_footprint
                 if collection_config.get("EodashIdentifier") == "WSF":
                     value = value.replace(
-                        "{time}", datetimes is not None and str(datetimes[0].year) or "{time}"
+                        "{time}", (datetimes is not None and str(datetimes[0].year)) or "{time}"
                     )
                 dimensions[key] = value
         if datetimes is not None:
@@ -1399,7 +1399,7 @@ def add_visualization_info(
                 else "{time}"
             )
             target_url = (
-                "{}/tiles/{}/{}/{{z}}/{{y}}/{{x}}" "?crs={}&time={}&vmin={}&vmax={}&cbar={}"
+                "{}/tiles/{}/{}/{{z}}/{{y}}/{{x}}?crs={}&time={}&vmin={}&vmax={}&cbar={}"
             ).format(
                 endpoint_config["EndPoint"],
                 endpoint_config["DatacubeId"],
@@ -1445,6 +1445,10 @@ def add_visualization_info(
             media_type="image/png",
             title=collection_config["Title"],
             extra_fields=extra_fields,
+        )
+        add_projection_info(
+            endpoint_config,
+            link,
         )
         add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
         # add eodash style visualization info if Style has been provided
@@ -1517,7 +1521,7 @@ def handle_raw_source(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     if len(endpoint_config.get("TimeEntries", [])) > 0:
         items = []
         style_link = None
@@ -1608,7 +1612,7 @@ def handle_vector_tile_source(
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
-    coll_path_rel_to_root_catalog = f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     if len(endpoint_config.get("TimeEntries", [])) > 0:
         items = []
         style_link = None
