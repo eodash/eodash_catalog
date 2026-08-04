@@ -147,6 +147,17 @@ def get_tick_format(vmin: float, vmax: float) -> str:
             return f".{i}f"
     return ".5f"
 
+def get_range_step(vmin: float, vmax: float) -> float:
+    """Infer a slider step from the displayed value range."""
+    diff = abs(vmax - vmin)
+    if diff >= 10:
+        return 1
+    if diff >= 1:
+        return 0.1
+    for i in range(2, 6):
+        if diff >= 10**-i:
+            return 10**-i
+    return 10**-5
 
 def get_enum_titles(values: list[str]) -> list[str]:
     titles = []
@@ -211,6 +222,9 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             # convert string to numbers if needed
             if isinstance(rescale, list):
                 rescale = [float(x) if isinstance(x, str) else x for x in rescale]
+            
+            step = get_range_step(rescale[0], rescale[1])
+            
             schema["jsonform"]["properties"]["vminmax"] = {
                 "type": "object",
                 "title": "Value Range",
@@ -220,12 +234,14 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                         "default": rescale[0],
                         "format": "range",
                         "minimum": 0,
+                        "step": step,
                     },
                     "vmax": {
                         "type": "number",
                         "default": rescale[1],
                         "format": "range",
                         "maximum": rescale[1] * 1.5 or 1,
+                        "step": step,
                     },
                 },
                 "format": "minmax",
