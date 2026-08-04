@@ -1474,7 +1474,7 @@ def add_visualization_info(
                 endpoint_config,
                 link,
             )
-            add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
+            add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config, collection_config,)
     else:
         LOGGER.info(f"Visualization endpoint not supported {endpoint_config['Name']}")
 
