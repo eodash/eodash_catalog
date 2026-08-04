@@ -148,6 +148,19 @@ def get_tick_format(vmin: float, vmax: float) -> str:
     return ".5f"
 
 
+def get_range_step(vmin: float, vmax: float) -> float:
+    """Infer a slider step from the displayed value range."""
+    diff = abs(vmax - vmin)
+    if diff >= 10:
+        return 1
+    if diff >= 1:
+        return 0.1
+    for i in range(2, 6):
+        if diff >= 10**-i:
+            return 10**-i
+    return 10**-5
+
+
 def get_enum_titles(values: list[str]) -> list[str]:
     titles = []
     for v in values:
@@ -211,6 +224,9 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             # convert string to numbers if needed
             if isinstance(rescale, list):
                 rescale = [float(x) if isinstance(x, str) else x for x in rescale]
+
+            step = get_range_step(rescale[0], rescale[1])
+
             schema["jsonform"]["properties"]["vminmax"] = {
                 "type": "object",
                 "title": "Value Range",
@@ -220,12 +236,14 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                         "default": rescale[0],
                         "format": "range",
                         "minimum": 0,
+                        "step": step,
                     },
                     "vmax": {
                         "type": "number",
                         "default": rescale[1],
                         "format": "range",
                         "maximum": rescale[1] * 1.5 or 1,
+                        "step": step,
                     },
                 },
                 "format": "minmax",
@@ -258,6 +276,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             rescale = endpoint_config["Rescale"]
             # convert string to numbers if needed
             rescale = [float(x) if isinstance(x, str) else x for x in rescale]
+            step = get_range_step(rescale[0], rescale[1])
             schema["jsonform"]["properties"]["vminmax"] = {
                 "type": "object",
                 "title": "Value Range",
@@ -267,12 +286,14 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                         "default": rescale[0],
                         "format": "range",
                         "minimum": 0,
+                        "step": step,
                     },
                     "vmax": {
                         "type": "number",
                         "default": rescale[1],
                         "format": "range",
                         "maximum": float(rescale[1]) * 1.5 or 1,
+                        "step": step,
                     },
                 },
                 "format": "minmax",
@@ -308,6 +329,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
             vmax_def = float((params["range"]).split("/")[1])
         else:
             vmin_def, vmax_def = endpoint_config.get("ScientificRange", (0.0, 1.0))
+        step = get_range_step(vmin_def, vmax_def)
 
         # Build schema
         schema["jsonform"]["required"] = ["vminmax", "cmap"]
@@ -336,12 +358,14 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                         "default": vmin_def,
                         "format": "range",
                         "minimum": vmin_def,
+                        "step": step,
                     },
                     "vmax": {
                         "type": "number",
                         "default": vmax_def,
                         "format": "range",
                         "maximum": max(round(vmax_def * 1.5, 3) or 1, vmax_def),
+                        "step": step,
                     },
                 },
                 "format": "minmax",
