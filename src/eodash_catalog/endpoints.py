@@ -1462,7 +1462,7 @@ def add_visualization_info(
         if target_url:
             extra_fields_link = extra_fields.copy()
             if tms := endpoint_config.get("TileMatrixSet"):
-                extra_fields_link["tilematrixset"] = tms
+                extra_fields_link["eodash:tilematrixset"] = tms
             link = Link(
                 rel="xyz",
                 target=target_url,
