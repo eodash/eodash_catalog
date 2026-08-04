@@ -357,8 +357,9 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
         algorithm_params = f"&algorithm_params={algo_p}"
     file_url = f"&url={file_url}" if file_url else ""
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
+    tilematrixset = endpoint_config.get("TileMatrixSet", "WebMercatorQuad")
     target_url = (
-        f"{target_url_base}/raster/cog/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?"
+        f"{target_url_base}/raster/cog/tiles/{tilematrixset}/{{z}}/{{x}}/{{y}}?"
         f"{bidx}{colormap}{colormap_name}{rescale}{no_data}"
         f"{file_url}{resampling_method}"
         f"{expression}{algorithm}{algorithm_params}"
@@ -437,7 +438,9 @@ def retry(exceptions, tries=3, delay=2, backoff=1, logger=None):
                     if _tries == 0:
                         raise
                     else:
-                        msg = f"{e}, Try: {tries-_tries+1}/{tries}, retry in {_delay} seconds..."
+                        msg = (
+                            f"{e}, Try: {tries - _tries + 1}/{tries}, retry in {_delay} seconds..."
+                        )
                         if logger:
                             logger.warning(msg)
                         else:
@@ -481,7 +484,7 @@ def get_full_url(url: str, catalog_config) -> str:
     if url.startswith("http"):
         return url
     else:
-        return f'{catalog_config["assets_endpoint"]}/{url}'
+        return f"{catalog_config['assets_endpoint']}/{url}"
 
 
 def update_extents_from_collection_children(collection: Collection):
