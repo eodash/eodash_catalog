@@ -462,9 +462,8 @@ def add_link_with_rasterform(
     rf = handle_rasterform_config(endpoint_config, catalog_config)
     if rf:
         link.extra_fields["eodash:rasterform"] = rf
-
-    colorlegend = endpoint_config.get("Colorlegend")
-    if colorlegend is None and collection_config:
+    colorlegend = None
+    if collection_config:
         colorlegend = collection_config.get("Colorlegend")
 
     if colorlegend is not None:
