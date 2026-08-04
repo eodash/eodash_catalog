@@ -76,7 +76,7 @@ def get_or_create_collection(
                     description = collection_config["Subtitle"]
             else:
                 # relative path to assets was given
-                response = requests.get(f'{catalog_config["assets_endpoint"]}/{description}')
+                response = requests.get(f"{catalog_config['assets_endpoint']}/{description}")
                 if response.status_code == 200:
                     description = response.text
                 elif collection_config.get("Subtitle"):
@@ -687,7 +687,7 @@ def add_collection_information(
         collection.add_asset(
             "legend",
             Asset(
-                href=f'{catalog_config["assets_endpoint"]}/{collection_config["Legend"]}',
+                href=f"{catalog_config['assets_endpoint']}/{collection_config['Legend']}",
                 media_type="image/png",
                 roles=["metadata"],
             ),
@@ -753,7 +753,7 @@ def add_collection_information(
         if collection_config["Image"].startswith("http"):
             image_url = collection_config["Image"]
         else:
-            image_url = f'{catalog_config["assets_endpoint"]}/{collection_config["Image"]}'
+            image_url = f"{catalog_config['assets_endpoint']}/{collection_config['Image']}"
         collection.add_asset(
             "thumbnail",
             Asset(

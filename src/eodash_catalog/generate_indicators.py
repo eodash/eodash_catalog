@@ -101,7 +101,7 @@ def process_catalog_file(file_path: str, options: Options):
     LOGGER.info("Started creation of collection files")
     start = time.time()
     if options.ni:
-        catalog_self_href = f'{options.outputpath}/{catalog_config["id"]}'
+        catalog_self_href = f"{options.outputpath}/{catalog_config['id']}"
         catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
         recursive_save(catalog, options.ni)
     else:
@@ -360,7 +360,7 @@ def process_collection_file(
             catalog, collection_config["Name"], collection_config, catalog_config, {}
         )
         coll_path_rel_to_root_catalog = (
-            f'{coll_path_rel_to_root_catalog}/{collection_config["Name"]}'
+            f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
         )
         locations = []
         countries = []
