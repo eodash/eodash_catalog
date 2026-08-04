@@ -1220,11 +1220,13 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
     if algo_p := endpoint_config.get("AlgorithmParams"):
         algorithm_params = f"&algorithm_params={algo_p}"
 
+    tilematrixset = endpoint_config.get("TileMatrixSet", "WebMercatorQuad")
+
     item = item if item else "{item}"
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "").replace("/stac", "")
     target_url = (
         f"{target_url_base}/raster/collections/{collection}/items/{item}"
-        f"/tiles/WebMercatorQuad/{{z}}/{{x}}/{{y}}?{assets}{colormap_name}{color_formula}"
+        f"/tiles/{tilematrixset}/{{z}}/{{x}}/{{y}}?{assets}{colormap_name}{color_formula}"
         f"{no_data}{rescale}{expression}{colormap}{resampling}{asset_as_band}{algorithm}{algorithm_params}"
     )
     return target_url
@@ -1458,12 +1460,15 @@ def add_visualization_info(
         elif endpoint_config["Type"] == "tiles":
             target_url = generate_veda_tiles_link(endpoint_config, file_url)
         if target_url:
+            extra_fields_link = extra_fields.copy()
+            if tms := endpoint_config.get("TileMatrixSet"):
+                extra_fields_link["eodash:tilematrixset"] = tms
             link = Link(
                 rel="xyz",
                 target=target_url,
                 media_type="image/png",
                 title=collection_config["Title"],
-                extra_fields=extra_fields,
+                extra_fields=extra_fields_link,
             )
             add_projection_info(
                 endpoint_config,

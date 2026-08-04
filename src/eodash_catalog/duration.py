@@ -159,9 +159,7 @@ class Duration:
             # 'other' has attributes year, month, day
             # and relies on 'timedelta + other' being implemented
             if not (float(self.years).is_integer() and float(self.months).is_integer()):
-                raise ValueError(
-                    "fractional years or months not supported" " for date calculations"
-                )
+                raise ValueError("fractional years or months not supported for date calculations")
             newmonth = other.month + self.months
             carry, newmonth = fquotmod(newmonth, 1, 13)
             newyear = other.year + self.years + carry
@@ -239,9 +237,7 @@ class Duration:
             # check if other behaves like a date/datetime object
             # does it have year, month, day and replace?
             if not (float(self.years).is_integer() and float(self.months).is_integer()):
-                raise ValueError(
-                    "fractional years or months not supported" " for date calculations"
-                )
+                raise ValueError("fractional years or months not supported for date calculations")
             newmonth = other.month - self.months
             carry, newmonth = fquotmod(newmonth, 1, 13)
             newyear = other.year - self.years + carry
