@@ -40,6 +40,19 @@ ISO8601_PERIOD_REGEX = re.compile(
 )
 # regular expression to parse ISO duartion strings.
 
+PROJ_TO_TMS = {
+    "EPSG:32631": "UTM31WGS84Quad",
+    "EPSG:4326": "WGS1984Quad",
+    "EPSG:5041": "UPSArcticWGS84Quad",
+    "EPSG:3857": "WebMercatorQuad",
+    "EPSG:3395": "WorldMercatorWGS84Quad",
+    "EPSG:5042": "UPSAntarcticWGS84Quad",
+    "EPSG:5482": "LINZAntarticaMapTilegrid",
+    "EPSG:2193": "NZTM2000Quad",
+    "EPSG:3035": "EuropeanETRS89_LAEAQuad",
+    "EPSG:3978": "CanadianNAD83_LCC",
+}
+
 LOGGER = get_logger(__name__)
 
 
@@ -65,6 +78,27 @@ def create_geometry_from_bbox(bbox: list[float | int]) -> dict:
         [bbox[0], bbox[1]],
     ]
     return {"type": "Polygon", "coordinates": [coordinates]}
+
+
+def get_tms_id(projection: str | int | dict | None) -> str:
+    """Determine the TileMatrixSet ID based on a projection definition."""
+    if not projection:
+        return "WebMercatorQuad"
+
+    code = None
+    if isinstance(projection, int):
+        code = f"EPSG:{projection}"
+    elif isinstance(projection, str):
+        if projection.isdigit():
+            code = f"EPSG:{projection}"
+        else:
+            code = projection.upper()
+            if not code.startswith("EPSG:"):
+                code = f"EPSG:{code}"
+    elif isinstance(projection, dict):
+        code = projection.get("name", "").upper()
+    tile_matrix_set = PROJ_TO_TMS.get(code, "WebMercatorQuad")
+    return tile_matrix_set
 
 
 def retrieveExtentFromWCS(
@@ -357,7 +391,7 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
         algorithm_params = f"&algorithm_params={algo_p}"
     file_url = f"&url={file_url}" if file_url else ""
     target_url_base = endpoint_config["EndPoint"].replace("/stac/", "")
-    tilematrixset = endpoint_config.get("TileMatrixSet", "WebMercatorQuad")
+    tilematrixset = get_tms_id(endpoint_config.get("DataProjection"))
     target_url = (
         f"{target_url_base}/raster/cog/tiles/{tilematrixset}/{{z}}/{{x}}/{{y}}?"
         f"{bidx}{colormap}{colormap_name}{rescale}{no_data}"
