@@ -96,7 +96,11 @@ def get_tms_id(projection: str | int | dict | None) -> str:
             if not code.startswith("EPSG:"):
                 code = f"EPSG:{code}"
     elif isinstance(projection, dict):
+        # Handle DataProjection object with name property
         code = projection.get("name", "").upper()
+        if code and not code.startswith("EPSG:"):
+            code = f"EPSG:{code}"
+
     tile_matrix_set = PROJ_TO_TMS.get(code, "WebMercatorQuad")
     return tile_matrix_set
 
