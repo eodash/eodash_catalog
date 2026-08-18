@@ -7,15 +7,13 @@ name = "eodash_catalog"
 dynamic = ["version"]
 description = "This package is intended to help create a compatible STAC catalog for the eodash dashboard client. It supports configuration of multiple endpoint types for information extraction."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "MIT"
 keywords = []
 authors = [{ name = "Daniel Santillan", email = "daniel.santillan@eox.at" }]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
@@ -60,7 +58,7 @@ cov-report = ["- coverage combine", "coverage report"]
 cov = ["test-cov", "cov-report"]
 
 [[tool.hatch.envs.all.matrix]]
-python = ["3.10", "3.11", "3.12"]
+python = ["3.12"]
 
 [tool.hatch.envs.types]
 dependencies = ["mypy>=1.0.0"]
