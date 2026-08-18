@@ -25,7 +25,7 @@ from eodash_catalog.stac_handling import (
     add_base_overlay_info,
     add_collection_information,
     add_example_info,
-    add_link_with_rasterform,
+    add_link_and_rasterform,
     add_process_info_child_collection,
     add_projection_info,
     add_raw_assets,
@@ -1349,7 +1349,7 @@ def add_visualization_info(
             endpoint_config,
             link,
         )
-        add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
+        add_link_and_rasterform(stac_object, link, endpoint_config, catalog_config)
     elif endpoint_config["Name"] == "rasdaman":
         extra_fields.update(
             {
@@ -1420,7 +1420,7 @@ def add_visualization_info(
                 title=collection_config["Title"],
                 extra_fields=extra_fields,
             )
-            add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
+            add_link_and_rasterform(stac_object, link, endpoint_config, catalog_config)
     elif endpoint_config.get("Type") == "WMTSCapabilities":
         target_url = "{}".format(endpoint_config.get("EndPoint"))
         extra_fields.update(
@@ -1453,7 +1453,7 @@ def add_visualization_info(
             endpoint_config,
             link,
         )
-        add_link_with_rasterform(stac_object, link, endpoint_config, catalog_config)
+        add_link_and_rasterform(stac_object, link, endpoint_config, catalog_config)
         # add eodash style visualization info if Style has been provided
     elif endpoint_config["Name"] == "VEDA":
         if endpoint_config["Type"] == "cog":
@@ -1472,9 +1472,7 @@ def add_visualization_info(
                 endpoint_config,
                 link,
             )
-            add_link_with_rasterform(
-                stac_object, link, endpoint_config, catalog_config, collection_config
-            )
+            add_link_and_rasterform(stac_object, link, endpoint_config, catalog_config)
     else:
         LOGGER.info(f"Visualization endpoint not supported {endpoint_config['Name']}")
 

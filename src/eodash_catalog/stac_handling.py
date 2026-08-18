@@ -210,9 +210,6 @@ def generate_rasterform(endpoint_config: dict) -> dict:
         "title": title,
         "scaleType": "continuous",
     }
-    colorlegend = endpoint_config.get("Colorlegend")
-    if colorlegend and colorlegend.get("tickFormat"):
-        schema["legend"]["tickFormat"] = colorlegend["tickFormat"]
 
     name = endpoint_config.get("Name")
     if not name:
@@ -452,23 +449,18 @@ def handle_rasterform_config(config: dict, catalog_config: dict) -> dict | str |
     return None
 
 
-def add_link_with_rasterform(
+def add_link_and_rasterform(
     stac_object: Collection | Item,
     link: Link,
     endpoint_config: dict,
     catalog_config: dict,
-    collection_config: dict | None = None,
 ):
-    rf = handle_rasterform_config(endpoint_config, catalog_config)
-    if rf:
-        link.extra_fields["eodash:rasterform"] = rf
-    colorlegend = None
-    if collection_config:
-        colorlegend = collection_config.get("Colorlegend")
-
-    if colorlegend is not None:
-        link.extra_fields["eox:colorlegend"] = colorlegend
-
+    if isinstance(stac_object, Collection):
+        # adding rasterform to each Item would be unnecessary bloat
+        # we are fine with adding this eodash-specific config on Collection
+        rf = handle_rasterform_config(endpoint_config, catalog_config)
+        if rf:
+            stac_object.extra_fields["eodash:rasterform"] = rf
     stac_object.add_link(link)
 
 
@@ -722,6 +714,8 @@ def add_collection_information(
                 roles=["metadata"],
             ),
         )
+    if colorlegend := collection_config.get("Colorlegend"):
+        collection.extra_fields["eox:colorlegend"] = colorlegend
     if stories := collection_config.get("Stories"):
         for story in stories:
             stories_endpoint_config = catalog_config.get("stories_endpoint", {})
