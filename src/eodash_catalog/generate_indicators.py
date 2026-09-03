@@ -35,6 +35,7 @@ from eodash_catalog.stac_handling import (
     add_extra_fields,
     add_process_info,
     add_projection_info,
+    fetch_fallback_collection,
     get_or_create_collection,
 )
 from eodash_catalog.utils import (
@@ -91,6 +92,10 @@ def process_catalog_file(file_path: str, options: Options):
                 )
             except FileNotFoundError:
                 LOGGER.info(f"Warning: neither collection nor indicator found for {collection}")
+            except Exception as e:
+                LOGGER.error(f"Error processing indicator {collection}: {e}")
+        except Exception as e:
+            LOGGER.error(f"Error processing collection/indicator {collection}: {e}")
     if catalog_config.get("MapProjection"):
         catalog.extra_fields["eodash:mapProjection"] = catalog_config["MapProjection"]
 
@@ -173,18 +178,30 @@ def process_indicator_file(
     if indicator_config.get("Collections"):
         coll_path_rel_to_root_catalog = indicator_config["Name"]
         for collection in indicator_config["Collections"]:
-            process_collection_file(
-                catalog_config,
-                f"{options.collectionspath}/{collection}",
-                parent_indicator,
-                options,
-                "Disable" in indicator_config and collection in indicator_config["Disable"],
-                "Hidden" in indicator_config and collection in indicator_config["Hidden"],
-                coll_path_rel_to_root_catalog,
-            )
+            try:
+                process_collection_file(
+                    catalog_config,
+                    f"{options.collectionspath}/{collection}",
+                    parent_indicator,
+                    options,
+                    "Disable" in indicator_config and collection in indicator_config["Disable"],
+                    "Hidden" in indicator_config and collection in indicator_config["Hidden"],
+                    coll_path_rel_to_root_catalog,
+                )
+            except Exception as e:
+                ind_name = indicator_config.get("Name")
+                LOGGER.error(
+                    f"Error processing collection {collection} in indicator {ind_name}: {e}"
+                )
     else:
         # we assume that collection files can also be loaded directly
-        process_collection_file(catalog_config, file_path, parent_indicator, options)
+        try:
+            process_collection_file(catalog_config, file_path, parent_indicator, options)
+        except Exception as e:
+            ind_name = indicator_config.get("Name")
+            LOGGER.error(
+                f"Error processing collection file {file_path} in indicator {ind_name}: {e}"
+            )
     add_collection_information(catalog_config, parent_indicator, indicator_config, True)
     if iter_len_at_least(parent_indicator.get_items(recursive=True), 1):
         parent_indicator.update_extent_from_items()
@@ -200,6 +217,144 @@ def process_indicator_file(
 
 
 @retry((Exception), tries=3, delay=5, backoff=2, logger=LOGGER)
+def _process_single_resource(
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog | Collection,
+    options: Options,
+) -> Collection:
+    collection = None
+    if endpoint_config["Name"] == "Sentinel Hub":
+        collection = handle_SH_endpoint(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+        )
+    elif endpoint_config["Name"] == "Sentinel Hub WMS":
+        collection = handle_SH_WMS_endpoint(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+        )
+    elif endpoint_config["Name"] == "GeoDB":
+        collection = handle_GeoDB_endpoint(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+        )
+    elif endpoint_config["Name"] == "GeoDB Features":
+        collection = handle_GeoDB_Features_endpoint(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+        )
+    elif endpoint_config["Name"] == "VEDA":
+        collection = handle_VEDA_endpoint(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+        )
+    elif endpoint_config["Name"] == "marinedatastore":
+        collection = handle_WMS_endpoint(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+            wmts=True,
+        )
+    elif endpoint_config["Name"] == "xcube":
+        collection = handle_xcube_endpoint(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+        )
+    elif endpoint_config["Name"] == "rasdaman":
+        collection = handle_rasdaman_endpoint(
+            catalog_config, endpoint_config, collection_config, catalog, options
+        )
+    elif endpoint_config["Name"] == "WMS":
+        collection = handle_WMS_endpoint(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+        )
+    elif endpoint_config["Name"] == "VectorTile source":
+        collection = handle_vector_tile_source(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+        )
+    elif endpoint_config["Name"] == "MapboxStyle source":
+        collection = handle_vector_tile_source(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+            mapbox_style=True,
+        )
+    elif endpoint_config["Name"] == "Collection-only":
+        collection = handle_collection_only(
+            catalog_config, endpoint_config, collection_config, catalog
+        )
+    elif endpoint_config["Name"] == "Custom-Endpoint":
+        collection = handle_custom_endpoint(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            catalog,
+        )
+    elif endpoint_config["Name"] in [
+        "COG source",
+        "GeoJSON source",
+        "FlatGeobuf source",
+    ]:
+        collection = handle_raw_source(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog,
+            catalog,
+            options,
+        )
+    else:
+        raise ValueError("Type of Resource is not supported")
+
+    if collection:
+        return collection
+    else:
+        raise Exception(f"No collection was generated for resource {endpoint_config}")
+
+
 def process_collection_file(
     catalog_config: dict,
     file_path: str,
@@ -217,142 +372,41 @@ def process_collection_file(
     if collection_config.get("Resources"):
         for endpoint_config in collection_config["Resources"]:
             try:
-                collection = None
-                if endpoint_config["Name"] == "Sentinel Hub":
-                    collection = handle_SH_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                    )
-                elif endpoint_config["Name"] == "Sentinel Hub WMS":
-                    collection = handle_SH_WMS_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                    )
-                elif endpoint_config["Name"] == "GeoDB":
-                    collection = handle_GeoDB_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                    )
-                elif endpoint_config["Name"] == "GeoDB Features":
-                    collection = handle_GeoDB_Features_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                    )
-                elif endpoint_config["Name"] == "VEDA":
-                    collection = handle_VEDA_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                    )
-                elif endpoint_config["Name"] == "marinedatastore":
-                    collection = handle_WMS_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                        wmts=True,
-                    )
-                elif endpoint_config["Name"] == "xcube":
-                    collection = handle_xcube_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                    )
-                elif endpoint_config["Name"] == "rasdaman":
-                    collection = handle_rasdaman_endpoint(
-                        catalog_config, endpoint_config, collection_config, catalog, options
-                    )
-                elif endpoint_config["Name"] == "WMS":
-                    collection = handle_WMS_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                    )
-                elif endpoint_config["Name"] == "VectorTile source":
-                    collection = handle_vector_tile_source(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                    )
-                elif endpoint_config["Name"] == "MapboxStyle source":
-                    collection = handle_vector_tile_source(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                        mapbox_style=True,
-                    )
-                elif endpoint_config["Name"] == "Collection-only":
-                    collection = handle_collection_only(
-                        catalog_config, endpoint_config, collection_config, catalog
-                    )
-                elif endpoint_config["Name"] == "Custom-Endpoint":
-                    collection = handle_custom_endpoint(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        catalog,
-                    )
-                elif endpoint_config["Name"] in [
-                    "COG source",
-                    "GeoJSON source",
-                    "FlatGeobuf source",
-                ]:
-                    collection = handle_raw_source(
-                        catalog_config,
-                        endpoint_config,
-                        collection_config,
-                        coll_path_rel_to_root_catalog,
-                        catalog,
-                        options,
-                    )
-                else:
-                    raise ValueError("Type of Resource is not supported")
+                collection = _process_single_resource(
+                    catalog_config,
+                    endpoint_config,
+                    collection_config,
+                    coll_path_rel_to_root_catalog,
+                    catalog,
+                    options,
+                )
+                if not options.gp:
+                    add_single_item_if_collection_empty(endpoint_config, collection)
+                add_projection_info(endpoint_config, collection)
+                add_to_catalog(
+                    collection, catalog, endpoint_config, collection_config, disable, hidden
+                )
+            except Exception as e:
+                LOGGER.warning(
+                    f"Resource {endpoint_config.get('Name')} failed after retries: {e}. "
+                    f"Attempting fallback to previous catalog deployment."
+                )
+                collection = fetch_fallback_collection(
+                    catalog_config=catalog_config,
+                    collection_config=collection_config,
+                    coll_path_rel_to_root_catalog=coll_path_rel_to_root_catalog,
+                    options=options,
+                )
                 if collection:
-                    # check if geoparquet flag is used, as these collections have no items
-                    if not options.gp:
-                        add_single_item_if_collection_empty(endpoint_config, collection)
-                    add_projection_info(endpoint_config, collection)
+                    LOGGER.info(f"Recovered collection {collection.id} from previous deployment")
                     add_to_catalog(
                         collection, catalog, endpoint_config, collection_config, disable, hidden
                     )
                 else:
-                    raise Exception(f"No collection was generated for resource {endpoint_config}")
-            except Exception as e:
-                LOGGER.warn(f"""Exception: {e.args[0]} with config: {endpoint_config}""")
-                raise e
+                    coll_name = collection_config.get("Name")
+                    LOGGER.warning(
+                        f"Previous deployment fallback failed for {coll_name}. Skipping collection."
+                    )
 
     elif collection_config.get("Subcollections"):
         # if no endpoint is specified we check for definition of subcollections
@@ -421,18 +475,20 @@ def process_collection_file(
                     None,
                     coll_path_rel_to_root_catalog,
                 )
-                links = tmp_catalog.get_child(sub_coll_def["Identifier"]).get_links()  # type: ignore
-                for link in links:
-                    # extract summary information
-                    if link.extra_fields.get("city"):
-                        locations.append(link.extra_fields["city"])
-                    if link.extra_fields.get("country"):
-                        if isinstance(link.extra_fields["country"], list):
-                            countries.extend(link.extra_fields["country"])
-                        else:
-                            countries.append(link.extra_fields["country"])
+                child_sub = tmp_catalog.get_child(sub_coll_def["Identifier"])
+                if child_sub:
+                    links = child_sub.get_links()
+                    for link in links:
+                        # extract summary information
+                        if link.extra_fields.get("city"):
+                            locations.append(link.extra_fields["city"])
+                        if link.extra_fields.get("country"):
+                            if isinstance(link.extra_fields["country"], list):
+                                countries.extend(link.extra_fields["country"])
+                            else:
+                                countries.append(link.extra_fields["country"])
 
-                parent_collection.add_links(links)
+                    parent_collection.add_links(links)
 
         add_collection_information(catalog_config, parent_collection, collection_config, True)
         add_process_info(parent_collection, catalog_config, collection_config)

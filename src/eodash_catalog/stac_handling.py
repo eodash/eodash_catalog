@@ -1,7 +1,8 @@
+import os
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
 import requests
 import spdx_lookup as lookup
@@ -13,6 +14,7 @@ from pystac import (
     Item,
     Link,
     Provider,
+    RelType,
     SpatialExtent,
     TemporalExtent,
 )
@@ -24,6 +26,7 @@ from eodash_catalog.colormaps import (
     XCUBE_COLORMAPS,
 )
 from eodash_catalog.utils import (
+    Options,
     convert_layers_config_to_assets_configs,
     generateDatetimesFromInterval,
     get_full_url,
@@ -1103,3 +1106,168 @@ def add_authentication(stac_object: Item | Collection | Catalog, url: str, extra
         }
         extra_fields_link["auth:refs"] = ["mapboxauth"]
     pass
+
+
+def fetch_fallback_collection(
+    catalog_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    options: Options,
+) -> Collection | None:
+    endpoint_base = catalog_config.get("endpoint")
+    if not endpoint_base:
+        LOGGER.warning("No 'endpoint' in catalog_config; cannot fetch fallback collection.")
+        return None
+
+    endpoint_base = endpoint_base.rstrip("/") + "/"
+
+    candidates = []
+    coll_name = collection_config.get("Name", "").strip("/")
+    rel_root = coll_path_rel_to_root_catalog.strip("/") if coll_path_rel_to_root_catalog else ""
+
+    if rel_root and coll_name:
+        nested_path = f"{rel_root}/{coll_name}"
+        if nested_path not in candidates:
+            candidates.append(nested_path)
+    if rel_root and rel_root not in candidates:
+        candidates.append(rel_root)
+    if coll_name and coll_name not in candidates:
+        candidates.append(coll_name)
+
+    for candidate_path in candidates:
+        candidate_url = urljoin(endpoint_base, f"{candidate_path}/collection.json")
+        LOGGER.info(f"Attempting fallback fetch from: {candidate_url}")
+        collection = load_fallback_collection_recursively(
+            collection_url=candidate_url,
+            catalog_config=catalog_config,
+            options=options,
+            rel_path=candidate_path,
+        )
+        if collection is not None:
+            return collection
+
+    LOGGER.warning(
+        f"Fallback fetch failed for {collection_config.get('Name')} at candidates: {candidates}"
+    )
+    return None
+
+
+def load_fallback_collection_recursively(
+    collection_url: str,
+    catalog_config: dict,
+    options: Options,
+    rel_path: str,
+) -> Collection | None:
+    try:
+        resp = requests.get(collection_url, timeout=30)
+        if resp.status_code != 200:
+            LOGGER.warning(
+                f"Failed to fetch fallback from {collection_url}, status: {resp.status_code}"
+            )
+            return None
+        coll_dict = resp.json()
+        collection = Collection.from_dict(coll_dict)
+    except Exception as e:
+        LOGGER.warning(f"Error fetching/parsing fallback collection from {collection_url}: {e}")
+        return None
+
+    # Separate structural links from non-structural links before doing any PySTAC operations
+    item_links = [lnk for lnk in collection.links if lnk.rel in [RelType.ITEM, "item"]]
+    child_links = [lnk for lnk in collection.links if lnk.rel in [RelType.CHILD, "child"]]
+    collection.links = [
+        lnk
+        for lnk in collection.links
+        if lnk.rel
+        not in [
+            RelType.ROOT,
+            "root",
+            RelType.PARENT,
+            "parent",
+            RelType.SELF,
+            "self",
+            RelType.CHILD,
+            "child",
+            RelType.ITEM,
+            "item",
+        ]
+    ]
+
+    # Handle geoparquet / assets downloading
+    if options.gp or "geoparquet" in collection.assets:
+        parquet_asset = collection.assets.get("geoparquet")
+        if parquet_asset:
+            parquet_url = urljoin(collection_url, parquet_asset.href)
+            local_dest_dir = f"{options.outputpath}/{catalog_config['id']}/{rel_path}"
+            os.makedirs(local_dest_dir, exist_ok=True)
+            local_parquet_file = f"{local_dest_dir}/items.parquet"
+            try:
+                LOGGER.info(
+                    f"Downloading fallback GeoParquet from {parquet_url} to {local_parquet_file}"
+                )
+                p_resp = requests.get(parquet_url, timeout=60)
+                if p_resp.status_code == 200:
+                    with open(local_parquet_file, "wb") as f:
+                        f.write(p_resp.content)
+                    collection.assets["geoparquet"] = Asset(
+                        href="./items.parquet",
+                        media_type="application/vnd.apache.parquet",
+                        title=parquet_asset.title or "GeoParquet Items",
+                        roles=parquet_asset.roles or ["collection-mirror"],
+                    )
+                else:
+                    LOGGER.warning(
+                        f"Failed download GeoParquet {parquet_url}: {p_resp.status_code}"
+                    )
+            except Exception as e:
+                LOGGER.warning(f"Exception downloading GeoParquet asset from {parquet_url}: {e}")
+    else:
+        # Load items if any
+        for item_link in item_links:
+            item_url = urljoin(collection_url, item_link.target)
+            try:
+                item_resp = requests.get(item_url, timeout=30)
+                if item_resp.status_code == 200:
+                    item_dict = item_resp.json()
+                    item = Item.from_dict(item_dict)
+                    item.links = [
+                        lnk
+                        for lnk in item.links
+                        if lnk.rel
+                        not in [
+                            RelType.ROOT,
+                            "root",
+                            RelType.PARENT,
+                            "parent",
+                            RelType.COLLECTION,
+                            "collection",
+                            RelType.SELF,
+                            "self",
+                        ]
+                    ]
+                    new_item_link = collection.add_item(item)
+                    if item_link.extra_fields and new_item_link:
+                        new_item_link.extra_fields.update(item_link.extra_fields)
+                else:
+                    LOGGER.warning(
+                        f"Failed to fetch item from {item_url}: status {item_resp.status_code}"
+                    )
+            except Exception as e:
+                LOGGER.warning(f"Error loading item from {item_url}: {e}")
+
+    # Recursively load child collections if any
+    for child_link in child_links:
+        child_url = urljoin(collection_url, child_link.target)
+        child_id = child_link.extra_fields.get("id") or os.path.basename(os.path.dirname(child_url))
+        child_rel_path = f"{rel_path}/{child_id}" if rel_path else child_id
+        child_coll = load_fallback_collection_recursively(
+            collection_url=child_url,
+            catalog_config=catalog_config,
+            options=options,
+            rel_path=child_rel_path,
+        )
+        if child_coll:
+            new_link = collection.add_child(child_coll)
+            if child_link.extra_fields and new_link:
+                new_link.extra_fields.update(child_link.extra_fields)
+
+    return collection
