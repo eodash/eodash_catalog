@@ -315,7 +315,15 @@ def process_STACAPI_Endpoint(
     added_times = {}
     items = []
 
+    # Check if we should remove web-map-links (default true)
+    remove_web_map_links = endpoint_config.get("RemoveWebMapLinks", True)
+
     for item in results.items():
+        if remove_web_map_links:
+            # list of rels typically used by web-map-links extension
+            wml_rels = ["wms", "wmts", "xyz"]
+            item.links = [link for link in item.links if link.rel not in wml_rels]
+
         item_datetime = item.get_datetime()
 
         if item_datetime is not None:
