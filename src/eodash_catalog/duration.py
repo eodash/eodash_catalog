@@ -103,12 +103,12 @@ class Duration:
         """
         params = []
         if self.years:
-            params.append("%d years" % self.years)
+            params.append(f"{self.years} years")
         if self.months:
-            fmt = "%d months"
+            fmt = f"{self.months} months"
             if self.months <= 1:
-                fmt = "%d month"
-            params.append(fmt % self.months)
+                fmt = f"{self.months} month"
+            params.append(fmt)
         params.append(str(self.tdelta))
         return ", ".join(params)
 
@@ -116,14 +116,10 @@ class Duration:
         """
         Return a string suitable for repr(x) calls.
         """
-        return "%s.%s(%d, %d, %d, years=%d, months=%d)" % (
-            self.__class__.__module__,
-            self.__class__.__name__,
-            self.tdelta.days,
-            self.tdelta.seconds,
-            self.tdelta.microseconds,
-            self.years,
-            self.months,
+        return (
+            f"{self.__class__.__module__}.{self.__class__.__name__}("
+            f"{self.tdelta.days}, {self.tdelta.seconds}, {self.tdelta.microseconds}, "
+            f"years={self.years}, months={self.months})"
         )
 
     def __hash__(self):
