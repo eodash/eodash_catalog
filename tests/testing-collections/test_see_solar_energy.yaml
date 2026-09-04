@@ -1,6 +1,5 @@
-Name: solar_energy
 Title: Solar energy cog example
-EodashIdentifier: SEE
+Name: SEE
 Description: testing 
 Themes:
   - placeholder

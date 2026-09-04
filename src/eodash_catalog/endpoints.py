@@ -875,7 +875,7 @@ def handle_GeoDB_endpoint(
                 assets = {"dummy_asset": Asset(href="")}
                 if endpoint_config.get("FeatureCollection"):
                     url = f"{endpoint_config['EndPoint']}{endpoint_config['Database']}_{endpoint_config['FeatureCollection']}?aoi_id=eq.{v['aoi_id']}"  # noqa: E501
-                    if collection_config.get("EodashIdentifier") == "E13d":
+                    if collection_config.get("Name") == "E13d":
                         # custom override of E13d to be +- 60 minutes around observation datetime
                         time_start_features = (time_object - timedelta(minutes=60)).isoformat()
                         time_end_features = (time_object + timedelta(minutes=60)).isoformat()
@@ -1007,7 +1007,6 @@ def handle_GeoDB_endpoint(
             locations_collection, catalog_config, collection_config, key
         )
         locations_collection.description = collection.description
-        locations_collection.extra_fields["subcode"] = key
         link = collection.add_child(locations_collection)
         # collection.update_extent_from_items()
         # bubble up information we want to the link
@@ -1309,7 +1308,7 @@ def add_visualization_info(
                 "role": ["data"],
             }
         )
-        if collection_config.get("EodashIdentifier") == "FNF":
+        if collection_config.get("Name") == "FNF":
             extra_fields.update(
                 {
                     "wms:layers": endpoint_config.get("LayerId", "").replace(
@@ -1321,7 +1320,7 @@ def add_visualization_info(
         if dimensions_config := endpoint_config.get("Dimensions", {}):
             for key, value in dimensions_config.items():
                 # special replace for world_settlement_footprint
-                if collection_config.get("EodashIdentifier") == "WSF":
+                if collection_config.get("Name") == "WSF":
                     value = value.replace(
                         "{time}", (datetimes is not None and str(datetimes[0].year)) or "{time}"
                     )

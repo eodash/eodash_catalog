@@ -1,7 +1,6 @@
 {
-  "Name": "IDEAS1_hopi_b1",
   "Title": "Raw COG Source",
-  "EodashIdentifier": "IND1_1_b1",
+  "Name": "IND1_1_b1",
   "Subtitle": "Indicator 1: HOUHPI",
   "Description": "IDEAS1_hopi/IDEAS1_hopi.md",
   "Themes": [

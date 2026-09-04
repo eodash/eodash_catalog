@@ -1,6 +1,5 @@
-Name: test_indicator_grouping_collections
 Title: test_indicator_grouping_collections
-EodashIdentifier: test_indicator_1
+Name: test_indicator_1
 Description: 'test_indicator_1_description'
 MapProjection: 3035
 Collections:

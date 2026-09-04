@@ -1,7 +1,6 @@
 {
-  "Name": "Lakes_Sentinel1",
   "Title": "SH WMS with Locations",
-  "EodashIdentifier": "Lakes_Sentinel1",
+  "Name": "Lakes_Sentinel1",
   "Description": "Lakes_Sentinel1/Lakes_Sentinel1.md",
   "Themes": [
     "water"

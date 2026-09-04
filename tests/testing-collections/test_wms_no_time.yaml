@@ -1,6 +1,5 @@
-Name: imperviousness_density_2018
 Title: Imperviousness Density 2018 WMS
-EodashIdentifier: IMD
+Name: IMD
 Description: CLMS Imperviousness Density 2018 10m resolution.
 Themes:
   - example theme

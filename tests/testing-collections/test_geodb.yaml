@@ -1,7 +1,6 @@
 ---
-Name: agricultural_production_area
 Title: GeoDB chart only
-EodashIdentifier: E10a2
+Name: E10a2
 Subtitle: Agricultural production in Europe
 Description: E10a2_agricultural_production_area/E10a2_agricultural_production_area.md
 Themes:

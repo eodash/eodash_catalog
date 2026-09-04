@@ -1,7 +1,6 @@
 {
-  "Name": "phosphate",
   "Title": "Phosphate",
-  "EodashIdentifier": "PO4",
+  "Name": "PO4",
   "Description": "N/A\n",
   "Themes": [
     "Aquaculture"

@@ -1,6 +1,5 @@
-Name: test_tif_demo_1
 Title: test_tif_demo_1
-EodashIdentifier: test_tif_demo_1
+Name: test_tif_demo_1
 Description: ''
 Themes:
   - cryosphere

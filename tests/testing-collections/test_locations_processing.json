@@ -1,7 +1,6 @@
 {
-  "Name": "test_locations_processing",
   "Title": "Lakes collection (Sentinel 2)",
-  "EodashIdentifier": "Lakes_S2L2A",
+  "Name": "Lakes_S2L2A",
   "Description": "Lakes_S2L2A/Lakes_S2L2A.md",
   "Themes": ["water"],
   "Tags": ["Sentinel", "Open data", "Water extent"],

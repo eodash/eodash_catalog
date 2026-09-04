@@ -1,7 +1,6 @@
 {
-  "Name": "4D_Greenland_Melt_Duration",
   "Title": "SentinelHub with projection",
-  "EodashIdentifier": "4D_Greenland_Melt_Duration",
+  "Name": "4D_Greenland_Melt_Duration",
   "Subtitle": "Greenland Melt Duration from 4D Greenland",
   "Description": "4D_Greenland_Melt_Duration/4D_Greenland_Melt_Duration.md",
   "Themes": [

@@ -1021,8 +1021,6 @@ def add_extra_fields(
         stac_object.extra_fields["sensor"] = collection_config["Sensor"]
     if collection_config.get("Agency"):
         stac_object.extra_fields["agency"] = collection_config["Agency"]
-    if collection_config.get("EodashIdentifier"):
-        stac_object.extra_fields["subcode"] = collection_config["EodashIdentifier"]
     if collection_config.get("CollectionGroup"):
         stac_object.extra_fields["collection_group"] = collection_config["CollectionGroup"]
     if collection_config.get("DataSource"):

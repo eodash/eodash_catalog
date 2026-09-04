@@ -1,6 +1,5 @@
-Name: crop_forecast_at
 Title: Raw GeoJSON source
-EodashIdentifier: CROPOMAT1
+Name: CROPOMAT1
 Subtitle: Yield forecast under "what-if" scenarios
 Description: ""
 Themes:
