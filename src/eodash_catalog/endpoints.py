@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 import pyarrow.parquet as pq
 import requests
 from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries, TemporalExtent
+from pystac.extensions.file import FileExtension
 from pystac_client import Client
 from shapely import wkt
 from shapely.geometry import mapping
@@ -1586,15 +1587,15 @@ def handle_raw_source(
             extents = extract_extent_from_geoparquet(table)
             collection.extent.temporal = extents[0]
             collection.extent.spatial = extents[1]
-            collection.add_asset(
-                "geoparquet",
-                Asset(
-                    href=parquet_source,
-                    media_type="application/vnd.apache.parquet",
-                    title="GeoParquet Items",
-                    roles=["collection-mirror"],
-                ),
+            parquet_asset = Asset(
+                href=parquet_source,
+                media_type="application/vnd.apache.parquet",
+                title="GeoParquet Items",
+                roles=["collection-mirror"],
             )
+            collection.add_asset("geoparquet", parquet_asset)
+            # adding this size explicitly here because github pages gzips the file
+            FileExtension.ext(parquet_asset, add_if_missing=True).size = len(parquet_file.content)
 
     else:
         LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
