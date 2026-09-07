@@ -19,6 +19,7 @@ from owslib.wcs import WebCoverageService
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
 from pystac import Asset, Catalog, Collection, Item, RelType, SpatialExtent, TemporalExtent
+from pystac.extensions.file import FileExtension
 from pytz import timezone as pytztimezone
 from shapely import geometry as sgeom
 from shapely import wkb
@@ -634,20 +635,21 @@ def save_items(
         table = record_batch_reader.read_all()
         output_path = f"{buildcatpath}/{colpath}"
         os.makedirs(output_path, exist_ok=True)
-        stacgp.arrow.to_parquet(table, f"{output_path}/items.parquet")
+        parquet_path = f"{output_path}/items.parquet"
+        stacgp.arrow.to_parquet(table, parquet_path)
         extents = extract_extent_from_geoparquet(table)
         collection.extent.temporal = extents[0]
         collection.extent.spatial = extents[1]
         # Make sure to also reference the geoparquet as asset
-        collection.add_asset(
-            "geoparquet",
-            Asset(
-                href="./items.parquet",
-                media_type="application/vnd.apache.parquet",
-                title="GeoParquet Items",
-                roles=["collection-mirror"],
-            ),
+        parquet_asset = Asset(
+            href="./items.parquet",
+            media_type="application/vnd.apache.parquet",
+            title="GeoParquet Items",
+            roles=["collection-mirror"],
         )
+        collection.add_asset("geoparquet", parquet_asset)
+        # adding this size explicitly here because github pages gzips the file
+        FileExtension.ext(parquet_asset, add_if_missing=True).size = os.path.getsize(parquet_path)
     else:
         # go over items and add them to the collection
         LOGGER.info(

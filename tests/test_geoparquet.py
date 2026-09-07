@@ -51,6 +51,12 @@ def test_geoparquet_geojson_items(catalog_output_folder):
         assert parquet_asset["type"] == "application/vnd.apache.parquet"
         items_path = os.path.join(child_collection_path, parquet_asset["href"].split("/")[-1])
         assert os.path.exists(items_path)
+        # size is advertised so the client does not have to probe the mirror over HTTP
+        assert (
+            "https://stac-extensions.github.io/file/v2.1.0/schema.json"
+            in collection_json["stac_extensions"]
+        )
+        assert parquet_asset["file:size"] == os.path.getsize(items_path)
 
     with open(items_path, "rb") as fp:
         table = pa.parquet.read_table(fp)
