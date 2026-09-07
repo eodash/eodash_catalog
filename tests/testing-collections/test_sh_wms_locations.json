@@ -1,6 +1,6 @@
 {
-  "Title": "SH WMS with Locations",
   "Name": "Lakes_Sentinel1",
+  "Title": "SH WMS with Locations",
   "Description": "Lakes_Sentinel1/Lakes_Sentinel1.md",
   "Themes": [
     "water"

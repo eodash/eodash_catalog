@@ -1,6 +1,6 @@
 {
-  "Title": "VEDA COG",
   "Name": "HLS_NDVI",
+  "Title": "VEDA COG",
   "Subtitle": "NDVI calculated from Harmonized Landsat and Sentinel-2",
   "Description": "HLS_NDVI/HLS_NDVI.md",
   "Themes": [

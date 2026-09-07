@@ -1,6 +1,6 @@
 {
-  "Title": "VEDA Tiles",
   "Name": "NLK_lake_biwa",
+  "Title": "VEDA Tiles",
   "Description": "Biwa lake Landsat-8",
   "Themes": [
     "water"
