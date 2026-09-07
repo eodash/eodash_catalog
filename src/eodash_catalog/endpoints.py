@@ -1301,7 +1301,7 @@ def add_visualization_info(
             endpoint_config,
             link,
         )
-        stac_object.add_link(link)
+        add_link_and_rasterform(stac_object, link, endpoint_config, catalog_config)
     elif endpoint_config["Name"] == "WMS":
         extra_fields.update(
             {
