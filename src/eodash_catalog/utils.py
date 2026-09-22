@@ -636,7 +636,7 @@ def save_items(
         output_path = f"{buildcatpath}/{colpath}"
         os.makedirs(output_path, exist_ok=True)
         parquet_path = f"{output_path}/items.parquet"
-        stacgp.arrow.to_parquet(table, parquet_path)
+        stacgp.arrow.to_parquet(table, parquet_path, write_page_index=True)
         extents = extract_extent_from_geoparquet(table)
         collection.extent.temporal = extents[0]
         collection.extent.spatial = extents[1]

@@ -58,6 +58,11 @@ def test_geoparquet_geojson_items(catalog_output_folder):
         )
         assert parquet_asset["file:size"] == os.path.getsize(items_path)
 
+    # page index lets the client skip pages instead of reading whole column chunks
+    column = pa.parquet.ParquetFile(items_path).metadata.row_group(0).column(0)
+    assert column.has_column_index
+    assert column.has_offset_index
+
     with open(items_path, "rb") as fp:
         table = pa.parquet.read_table(fp)
         items = list(stac_gp.arrow.stac_table_to_items(table))
