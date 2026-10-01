@@ -105,6 +105,8 @@ def create_service_link(
         "id": endpoint_config["Identifier"],
         "method": endpoint_config.get("Method", "GET"),
     }
+    if endpoint_config.get("Title"):
+        extra_fields["title"] = endpoint_config["Title"]
     if endpoint_config.get("EndPoint"):
         extra_fields["endpoint"] = endpoint_config["EndPoint"]
     if endpoint_config.get("Body"):
