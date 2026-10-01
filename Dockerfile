@@ -1,7 +1,7 @@
-FROM ghcr.io/osgeo/gdal:ubuntu-small-3.11.0
+FROM ghcr.io/osgeo/gdal:ubuntu-small-3.13.3
 LABEL name="eodash catalog generator" \
     vendor="EOX IT Services GmbH <https://eox.at>" \
-    license="MIT Copyright (C) 2025 EOX IT Services GmbH <https://eox.at>" \
+    license="MIT Copyright (C) 2026 EOX IT Services GmbH <https://eox.at>" \
     type="eodash catalog"
 
 USER root
