@@ -130,7 +130,6 @@ def process_catalog_file(file_path: str, options: Options):
 
 def extract_indicator_info(parent_collection: Collection):
     to_extract = [
-        "subcode",
         "themes",
         "keywords",
         "satellite",
@@ -537,8 +536,6 @@ def add_to_catalog(
     if collection_config.get("ShortDescription"):
         link.extra_fields["shortdescription"] = collection_config["ShortDescription"]
     link.extra_fields["title"] = collection.title
-    if collection_config.get("EodashIdentifier"):
-        link.extra_fields["code"] = collection_config["EodashIdentifier"]
     link.extra_fields["id"] = collection_config["Name"]
     if collection_config.get("Themes"):
         link.extra_fields["themes"] = collection_config["Themes"]

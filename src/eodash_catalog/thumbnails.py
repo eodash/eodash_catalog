@@ -13,7 +13,7 @@ from eodash_catalog.utils import format_datetime_to_isostring_zulu, generate_ved
 
 def fetch_and_save_thumbnail(collection_config: dict, url: str) -> None:
     collection_path = "../thumbnails/{}_{}/".format(
-        collection_config["EodashIdentifier"], collection_config["Name"]
+        collection_config["Name"], collection_config["Name"]
     )
     Path(collection_path).mkdir(parents=True, exist_ok=True)
     image_path = f"{collection_path}/thumbnail.png"
