@@ -8,7 +8,12 @@
 **Table of Contents**
 
 - [Installation](#installation)
+- [Testing](#testing)
+- [Versioning and branches](#versioning-and-branches)
+- [Tagging](#tagging)
 - [License](#license)
+- [Wiki](#wiki)
+- [MCP Server](#mcp-server)
 
 ## Installation
 
@@ -75,4 +80,29 @@ cd eodash_catalog.wiki
 for f in *.md; do pandoc -V geometry:margin=1in "$f" -o "$f".pdf; done
 now=`date +'%Y%m%d'` && pdftk Home.md.pdf Data-integration-steps.md.pdf "Data-definition-‐-first-steps.md.pdf" Auxiliary-layers.md.pdf Colorlegend.md.pdf DataSource.md.pdf Locations.md.pdf Process.md.pdf Projection.md.pdf Provider.md.pdf Reference.md.pdf Resource.md.pdf Service.md.pdf Story.md.pdf output eodash-catalog-wiki-snapshot-$now.pdf
 ```
+
 Add missing files if new wiki pages have been added in the meantime.
+
+## MCP Server
+
+The EODash MCP is deployed at `https://eodash.mcp.eox.at`.
+
+The server provides tooling for AI coding assistants and automation workflows:
+
+- **`validate_catalog_config`**: Validate collection and indicator definitions against eodash schemas and domain rules.
+- **`generate_map_from_stac`**: Generate and verify `<eox-map>` configurations (layers, center, zoom, time controls, legends) from generated STAC catalogs or collection endpoints.
+- **`find_examples`**: Search reference catalog, collection, indicator, processing, jsonform, vega chart and styling configurations and examples.
+
+### MCP Client Configuration
+
+Connect your MCP client via HTTP:
+
+```json
+{
+  "mcpServers": {
+    "eodash": {
+      "url": "https://eodash.mcp.eox.at"
+    }
+  }
+}
+```
