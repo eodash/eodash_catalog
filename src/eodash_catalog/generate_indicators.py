@@ -20,7 +20,6 @@ from eodash_catalog.endpoints import (
     handle_custom_endpoint,
     handle_GeoDB_endpoint,
     handle_GeoDB_Features_endpoint,
-    handle_rasdaman_endpoint,
     handle_raw_source,
     handle_SH_endpoint,
     handle_SH_WMS_endpoint,
@@ -289,10 +288,6 @@ def _process_single_resource(
             coll_path_rel_to_root_catalog,
             catalog,
             options,
-        )
-    elif endpoint_config["Name"] == "rasdaman":
-        collection = handle_rasdaman_endpoint(
-            catalog_config, endpoint_config, collection_config, catalog, options
         )
     elif endpoint_config["Name"] == "WMS":
         collection = handle_WMS_endpoint(

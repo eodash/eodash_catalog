@@ -593,20 +593,6 @@ def handle_xcube_endpoint(
     return collection
 
 
-def handle_rasdaman_endpoint(
-    catalog_config: dict,
-    endpoint_config: dict,
-    collection_config: dict,
-    coll_path_rel_to_root_catalog: str,
-    catalog: Catalog,
-) -> Collection:
-    collection = process_WCS_rasdaman_Endpoint(
-        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog
-    )
-    # add_example_info(collection, collection_config, endpoint_config, catalog_config)
-    return collection
-
-
 def handle_GeoDB_Features_endpoint(
     catalog_config: dict,
     endpoint_config: dict,
