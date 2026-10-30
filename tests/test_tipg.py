@@ -36,8 +36,8 @@ def test_handle_tipg_endpoint(tipg_options):
         "Name": "tipg",
         "EndPoint": "https://eoapi.example.com/vector/",
         "CollectionId": "public.e10a1_geometries_for_date",
-        "TimesEndpoint": "https://eoapi.example.com/vector/times",
-        "LocationsEndpoint": "https://eoapi.example.com/vector/locations",
+        "TimesEndpoint": "https://eoapi.example.com/vector/collections/public.e10a1_timeseries/items?properties=time&limit=10000&f=json",
+        "LocationsEndpoint": "https://eoapi.example.com/vector/collections/public.e10a1_geometries/items?f=json",
         "TimeParameter": "time",
         "Aggregation": "day",
         "Style": "https://assets.example.com/styles/e10a1.json",
@@ -62,9 +62,9 @@ def test_handle_tipg_endpoint(tipg_options):
     def mock_get(url, *args, **kwargs):
         resp = MagicMock()
         resp.status_code = 200
-        if "times" in url:
+        if "timeseries" in url:
             resp.json.return_value = mock_times
-        elif "locations" in url:
+        elif "geometries" in url:
             resp.json.return_value = mock_locations
         else:
             resp.json.return_value = []
@@ -128,7 +128,7 @@ def test_handle_vector_tile_source_tipg_delegation(tipg_options):
         "Name": "VectorTile source",
         "EndPoint": "https://eoapi.example.com/vector/",
         "CollectionId": "public.modis_snpp_2023_for_date",
-        "TimesEndpoint": "https://eoapi.example.com/vector/times",
+        "TimesEndpoint": "https://eoapi.example.com/vector/collections/public.modis_snpp_2023/items?properties=date_time&limit=10000&f=json&geom-column=",
         "TimeParameter": "date_time",
         "Aggregation": "day",
         "Bbox": [-180, -85, 180, 85],

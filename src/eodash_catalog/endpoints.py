@@ -621,15 +621,6 @@ def handle_GeoDB_Features_endpoint(
     for value in response:
         time_object = datetime.fromisoformat(value[endpoint_config["TimeParameter"]])
         match aggregation:
-            case "hour":
-                unique_datetimes.add(
-                    datetime(
-                        time_object.year,
-                        time_object.month,
-                        time_object.day,
-                        time_object.hour,
-                    )
-                )
             case "day":
                 unique_datetimes.add(
                     datetime(time_object.year, time_object.month, time_object.day).date()
@@ -649,8 +640,6 @@ def handle_GeoDB_Features_endpoint(
         item_datetime = dt if isinstance(dt, datetime) else datetime(dt.year, dt.month, dt.day)
         matching_string = ""
         match aggregation:
-            case "hour":
-                matching_string = item_datetime.strftime("%Y-%m-%dT%H:00:00Z")
             case "day":
                 matching_string = item_datetime.strftime("%Y-%m-%d")
             case "month":
@@ -1648,16 +1637,6 @@ def handle_vector_tile_source(
             coll_path_rel_to_root_catalog,
             options.gp,
         )
-    elif endpoint_config.get("TimesEndpoint") or endpoint_config.get("TimesCollection"):
-        return handle_tipg_endpoint(
-            catalog_config,
-            endpoint_config,
-            collection_config,
-            coll_path_rel_to_root_catalog,
-            catalog,
-            options,
-            mapbox_style=mapbox_style,
-        )
     else:
         LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
 
@@ -1672,26 +1651,22 @@ def handle_tipg_endpoint(
     coll_path_rel_to_root_catalog: str,
     catalog: Catalog,
     options: Options,
-    mapbox_style: bool = False,
 ) -> Collection:
     collection = get_or_create_collection(
         catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
     )
     coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
 
-    # 1. Resolve tile URL template
-    url_template = endpoint_config.get("Url")
-    if not url_template:
-        ep_base = endpoint_config["EndPoint"].rstrip("/")
-        coll_id = endpoint_config.get("CollectionId", collection_config["Name"])
-        tms = endpoint_config.get("TileMatrixSet", "WebMercatorQuad")
-        param = endpoint_config.get("QueryParam", "target_date")
-        url_template = (
-            f"{ep_base}/collections/{coll_id}/tiles/{tms}/{{z}}/{{x}}/{{y}}?"
-            f"{param}={{{{date_time}}}}"
-        )
+    # Resolve tile URL template
+    ep_base = endpoint_config["EndPoint"].rstrip("/")
+    coll_id = endpoint_config.get("CollectionId", collection_config["Name"])
+    tms = get_tms_id(endpoint_config.get("DataProjection"))
+    param = endpoint_config.get("QueryParam", "target_date")  # comes from the view definition
+    url_template = (
+        f"{ep_base}/collections/{coll_id}/tiles/{tms}/{{z}}/{{x}}/{{y}}?{param}={{{{date_time}}}}"
+    )
 
-    # 2. Resolve TimesEndpoint
+    # Resolve TimesEndpoint
     times_url = endpoint_config.get("TimesEndpoint")
     if not times_url:
         ep_base = endpoint_config.get("EndPoint", "").rstrip("/")
@@ -1730,16 +1705,6 @@ def handle_tipg_endpoint(
                 except Exception:
                     continue
                 match aggregation:
-                    case "hour":
-                        unique_datetimes.add(
-                            datetime(
-                                time_object.year,
-                                time_object.month,
-                                time_object.day,
-                                time_object.hour,
-                                tzinfo=timezone.utc,
-                            )
-                        )
                     case "day":
                         unique_datetimes.add(
                             datetime(
@@ -1822,18 +1787,18 @@ def handle_tipg_endpoint(
                 link.extra_fields["country"] = country
                 link.extra_fields["name"] = city
             collection.extra_fields["locations"] = True
-            collection.summaries = Summaries({
-                "cities": sorted(cities),
-                "countries": sorted(countries),
-            })
+            collection.summaries = Summaries(
+                {
+                    "cities": sorted(cities),
+                    "countries": sorted(countries),
+                }
+            )
 
     # 4. Generate TimeEntries and STAC Items
     time_format = endpoint_config.get("TimeFormat")
     aggregation = endpoint_config.get("Aggregation", "day")
     if not time_format:
         match aggregation:
-            case "hour":
-                time_format = "%Y-%m-%dT%H:00:00Z"
             case "day":
                 time_format = "%Y-%m-%d"
             case "month":
@@ -1845,9 +1810,9 @@ def handle_tipg_endpoint(
 
     items = []
     bbox = endpoint_config.get("Bbox", endpoint_config.get("OverwriteBBox", [-180, -85, 180, 85]))
-    media_type = "application/json" if mapbox_style else "application/vnd.mapbox-vector-tile"
+    media_type = "application/json"
     style_type = "text/vector-styles"
-    rel = "mapbox-style-document" if mapbox_style else "vector-tile"
+    rel = "mapbox-style-document"
 
     for dt in sorted(unique_datetimes):
         date_str = dt.strftime(time_format)
