@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pystac import Catalog
 
-from eodash_catalog.endpoints import handle_tipg_endpoint, handle_vector_tile_source
+from eodash_catalog.endpoints import handle_tipg_endpoint
 from eodash_catalog.utils import Options
 
 
@@ -36,8 +36,6 @@ def test_handle_tipg_endpoint(tipg_options):
         "Name": "tipg",
         "EndPoint": "https://eoapi.example.com/vector/",
         "CollectionId": "public.e10a1_geometries_for_date",
-        "TimesEndpoint": "https://eoapi.example.com/vector/collections/public.e10a1_timeseries/items?properties=time&limit=10000&f=json",
-        "LocationsEndpoint": "https://eoapi.example.com/vector/collections/public.e10a1_geometries/items?f=json",
         "TimeParameter": "time",
         "Aggregation": "day",
         "Style": "https://assets.example.com/styles/e10a1.json",
@@ -47,6 +45,16 @@ def test_handle_tipg_endpoint(tipg_options):
         "Name": "e10a1_test",
         "Title": "E10a1 Productive Area",
         "Description": "Test E10a1 description",
+        "Locations": True,
+        "Process": {
+            "EndPoints": [
+                {
+                    "Identifier": "timeseries",
+                    "Type": "application/json",
+                    "Url": "https://eoapi.example.com/vector/collections/public.e10a1_timeseries_by_id/items?target_id={{feature}}&f=json",
+                }
+            ]
+        },
     }
 
     mock_times = [
@@ -119,16 +127,16 @@ def test_handle_tipg_endpoint(tipg_options):
     assert style_links[0].target == "https://assets.example.com/styles/e10a1.json"
 
 
-def test_handle_vector_tile_source_tipg_delegation(tipg_options):
+def test_handle_tipg_modis(tipg_options):
     catalog_config = {
         "id": "test_catalog",
         "assets_endpoint": "https://assets.example.com",
     }
     endpoint_config = {
-        "Name": "VectorTile source",
+        "Name": "tipg",
         "EndPoint": "https://eoapi.example.com/vector/",
         "CollectionId": "public.modis_snpp_2023_for_date",
-        "TimesEndpoint": "https://eoapi.example.com/vector/collections/public.modis_snpp_2023/items?properties=date_time&limit=10000&f=json&geom-column=",
+        "TimesCollection": "public.modis_snpp_2023",
         "TimeParameter": "date_time",
         "Aggregation": "day",
         "Bbox": [-180, -85, 180, 85],
@@ -153,7 +161,7 @@ def test_handle_vector_tile_source_tipg_delegation(tipg_options):
     catalog = Catalog(id="test_root", description="root")
 
     with patch("requests.get", side_effect=mock_get):
-        collection = handle_vector_tile_source(
+        collection = handle_tipg_endpoint(
             catalog_config,
             endpoint_config,
             collection_config,

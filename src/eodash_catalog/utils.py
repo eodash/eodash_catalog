@@ -21,7 +21,6 @@ from owslib.wmts import WebMapTileService
 from pystac import Asset, Catalog, Collection, Item, RelType, SpatialExtent, TemporalExtent
 from pystac.extensions.file import FileExtension
 from pytz import timezone as pytztimezone
-from shapely import geometry as sgeom
 from shapely import wkb
 from six import string_types
 from structlog import get_logger
@@ -582,7 +581,14 @@ def extract_extent_from_geoparquet(table) -> tuple[TemporalExtent, SpatialExtent
         max_datetime = max_datetime.replace(tzinfo=timezone.utc)
     temporal = TemporalExtent([min_datetime, max_datetime])
     geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
-    bbox = sgeom.MultiPolygon(geoms).bounds
+    if geoms:
+        minx = min(g.bounds[0] for g in geoms)
+        miny = min(g.bounds[1] for g in geoms)
+        maxx = max(g.bounds[2] for g in geoms)
+        maxy = max(g.bounds[3] for g in geoms)
+        bbox = [minx, miny, maxx, maxy]
+    else:
+        bbox = [-180.0, -90.0, 180.0, 90.0]
     spatial = SpatialExtent([bbox])
     return [temporal, spatial]
 
