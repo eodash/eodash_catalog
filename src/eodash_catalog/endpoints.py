@@ -3,7 +3,6 @@ import importlib
 import io
 import json
 import os
-import re
 import sys
 import uuid
 from collections.abc import Callable
@@ -1660,43 +1659,49 @@ def _derive_tipg_urls(endpoint_config: dict, collection_config: dict) -> tuple[s
         )
     coll_id = endpoint_config["CollectionId"]
 
-    # Extract schema and table prefix from CollectionId: <schema>.<prefix>_<suffix>
+    # Extract schema and root prefix from CollectionId: <schema>.<prefix> or <prefix>
     schema = ""
-    table_part = coll_id
+    prefix = coll_id
     if "." in coll_id:
-        schema, table_part = coll_id.split(".", 1)
+        schema, prefix = coll_id.split(".", 1)
 
-    pattern = r"([a-zA-Z0-9_-]+?)_(?:geometries|timeseries|for_date).*"
-    m = re.match(pattern, table_part)
-    prefix = m.group(1) if m else table_part
     schema_prefix = f"{schema}." if schema else ""
-
-    # 1. Times URL for 1-table direct timestamp queries
-    times_url = ""
-    if endpoint_config.get("TimesCollection"):
-        t_param = endpoint_config.get("TimeParameter", "time")
-        times_url = (
-            f"{ep_base}/collections/{endpoint_config['TimesCollection']}/items?"
-            f"properties={t_param}&limit=10000&f=json"
-        )
-
-    # 2. Timeseries Template (for per-location querying in 2-table approach)
-    ts_url_template = (
-        f"{ep_base}/collections/{schema_prefix}{prefix}_timeseries_by_id/items?"
-        f"target_id={{{{feature}}}}&f=json&limit=10000"
-    )
-
-    # 3. Locations Endpoint (only for collections with locations)
     has_locations = collection_config.get("Locations") is True
-    loc_url = ""
-    if has_locations:
-        loc_url = f"{ep_base}/collections/{schema_prefix}{prefix}_geometries/items"
+
+    # 1. Tiles Collection & URL Template
+    tiles_coll = endpoint_config.get("TilesCollection")
+    if not tiles_coll:
+        suffix = "_geometries_for_date" if has_locations else "_for_date"
+        tiles_coll = f"{schema_prefix}{prefix}{suffix}"
 
     tms = get_tms_id(endpoint_config.get("DataProjection"))
     param = endpoint_config.get("QueryParam", "target_date")
     url_template = (
-        f"{ep_base}/collections/{coll_id}/tiles/{tms}/{{z}}/{{x}}/{{y}}?{param}={{{{date_time}}}}"
+        f"{ep_base}/collections/{tiles_coll}/tiles/{tms}/{{z}}/{{x}}/{{y}}?{param}={{{{date_time}}}}"
     )
+
+    # 2. Times URL for 1-table direct timestamp queries (autoinferred from root collection)
+    times_url = ""
+    if not has_locations:
+        times_coll = endpoint_config.get("TimesCollection", f"{schema_prefix}{prefix}")
+        t_param = endpoint_config.get("TimeParameter", "time")
+        times_url = (
+            f"{ep_base}/collections/{times_coll}/items?properties={t_param}&limit=10000&f=json"
+        )
+
+    # 3. Timeseries Template (for per-location querying in 2-table approach)
+    ts_default = f"{schema_prefix}{prefix}_timeseries_by_id"
+    ts_coll = endpoint_config.get("TimeseriesCollection", ts_default)
+    ts_url_template = (
+        f"{ep_base}/collections/{ts_coll}/items?target_id={{{{feature}}}}&f=json&limit=10000"
+    )
+
+    # 4. Locations Endpoint (only for collections with locations)
+    loc_url = ""
+    if has_locations:
+        loc_coll = endpoint_config.get("LocationsCollection", f"{schema_prefix}{prefix}_geometries")
+        loc_url = f"{ep_base}/collections/{loc_coll}/items"
+
     return times_url, ts_url_template, loc_url, url_template
 
 
@@ -1919,12 +1924,6 @@ def handle_tipg_endpoint(
             target_tile_url = url_template.replace("{{date_time}}", date_str)
             identifier = str(uuid.uuid4())
             extra_fields_link = {"key": identifier}
-            if id_prop := endpoint_config.get("idProperty"):
-                extra_fields_link["idProperty"] = id_prop
-            if layers := endpoint_config.get("layers"):
-                extra_fields_link["layers"] = layers
-            if apply_opts := endpoint_config.get("applyOptions"):
-                extra_fields_link["applyOptions"] = apply_opts
 
             vt_link = Link(
                 rel=rel,

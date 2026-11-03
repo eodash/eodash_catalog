@@ -35,7 +35,7 @@ def test_handle_tipg_endpoint(tipg_options):
     endpoint_config = {
         "Name": "tipg",
         "EndPoint": "https://eoapi.example.com/vector/",
-        "CollectionId": "public.e10a1_geometries_for_date",
+        "CollectionId": "public.e10a1",
         "TimeParameter": "time",
         "Aggregation": "day",
         "Style": "https://assets.example.com/styles/e10a1.json",
@@ -135,8 +135,7 @@ def test_handle_tipg_modis(tipg_options):
     endpoint_config = {
         "Name": "tipg",
         "EndPoint": "https://eoapi.example.com/vector/",
-        "CollectionId": "public.modis_snpp_2023_for_date",
-        "TimesCollection": "public.modis_snpp_2023",
+        "CollectionId": "public.modis_snpp_2023",
         "TimeParameter": "date_time",
         "Aggregation": "day",
         "Bbox": [-180, -85, 180, 85],
@@ -176,3 +175,53 @@ def test_handle_tipg_modis(tipg_options):
     vt_links = [link for link in items[0].links if link.rel == "vector-tile"]
     assert len(vt_links) == 1
     assert "public.modis_snpp_2023_for_date" in vt_links[0].target
+
+
+def test_handle_tipg_overrides(tipg_options):
+    catalog_config = {
+        "id": "test_catalog",
+        "assets_endpoint": "https://assets.example.com",
+    }
+    # Test explicit overrides for TilesCollection and TimesCollection
+    endpoint_config = {
+        "Name": "tipg",
+        "EndPoint": "https://eoapi.example.com/vector/",
+        "CollectionId": "public.custom_root",
+        "TilesCollection": "public.custom_tiles_view",
+        "TimesCollection": "public.custom_times_table",
+        "TimeParameter": "timestamp",
+        "Aggregation": "day",
+    }
+    collection_config = {
+        "Name": "custom_test",
+        "Title": "Custom Test",
+        "Description": "Test description",
+    }
+
+    mock_times = [{"timestamp": "2023-05-01T00:00:00Z"}]
+    called_urls = []
+
+    def mock_get(url, *args, **kwargs):
+        called_urls.append(url)
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = mock_times
+        return resp
+
+    catalog = Catalog(id="test_root", description="root")
+
+    with patch("requests.get", side_effect=mock_get):
+        collection = handle_tipg_endpoint(
+            catalog_config,
+            endpoint_config,
+            collection_config,
+            coll_path_rel_to_root_catalog="test_catalog",
+            catalog=catalog,
+            options=tipg_options,
+        )
+
+    assert any("public.custom_times_table" in u for u in called_urls)
+    items = list(collection.get_items())
+    assert len(items) == 1
+    vt_link = items[0].links[0]
+    assert "public.custom_tiles_view" in vt_link.target
