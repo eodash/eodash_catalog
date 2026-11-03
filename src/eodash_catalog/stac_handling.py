@@ -1,6 +1,6 @@
 import os
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from urllib.parse import parse_qs, urljoin, urlparse
 
@@ -1152,6 +1152,77 @@ def fetch_fallback_collection(
         f"Fallback fetch failed for {collection_config.get('Name')} at candidates: {candidates}"
     )
     return None
+
+
+def build_wms_xyz_item(
+    match_input: dict,
+    time_object: datetime,
+    raw_time_str: str,
+    aoi_id: str,
+    bbox: list[float],
+    geometry: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+) -> Item:
+    item = Item(
+        id=raw_time_str,
+        bbox=bbox,
+        properties={},
+        geometry=geometry,
+        datetime=time_object,
+        assets={"dummy_asset": Asset(href="")},
+    )
+    match match_input["Type"]:
+        case "WMS":
+            url = match_input["Url"]
+            extra_fields = {
+                "wms:layers": [match_input["Layers"]],
+                "role": ["data"],
+            }
+            if "sentinel-hub.com" in url:
+                instance_id = os.getenv("SH_INSTANCE_ID")
+                if "InstanceId" in endpoint_config:
+                    instance_id = endpoint_config["InstanceId"]
+                from eodash_catalog.utils import format_datetime_to_isostring_zulu
+
+                start_date = format_datetime_to_isostring_zulu(time_object)
+                used_delta = timedelta(days=1)
+                if "TimeDelta" in match_input:
+                    used_delta = timedelta(minutes=match_input["TimeDelta"])
+                end_date = format_datetime_to_isostring_zulu(
+                    time_object + used_delta - timedelta(milliseconds=1)
+                )
+                extra_fields.update({"wms:dimensions": {"TIME": f"{start_date}/{end_date}"}})
+                url = f"{url}{instance_id}"
+            else:
+                extra_fields.update({"wms:dimensions": {"TIME": raw_time_str}})
+            link = Link(
+                rel="wms",
+                target=url,
+                media_type=(endpoint_config.get("MimeType", "image/png")),
+                title=match_input["Identifier"],
+                extra_fields=extra_fields,
+            )
+            item.add_link(link)
+        case "XYZ":
+            url = match_input["Url"]
+            extra_fields = {}
+            date_formatted = time_object.strftime(match_input.get("DateFormat", "%Y_%m_%d"))
+            target_url = url.replace("{time}", date_formatted)
+            if site_mapping := match_input.get("SiteMapping"):
+                site = site_mapping.get(aoi_id)
+                if site:
+                    target_url = target_url.replace("{site}", site)
+            link = Link(
+                rel="xyz",
+                target=target_url,
+                media_type="image/png",
+                title=collection_config["Title"],
+                extra_fields=extra_fields,
+            )
+            item.add_link(link)
+    add_projection_info(endpoint_config, item)
+    return item
 
 
 def load_fallback_collection_recursively(
