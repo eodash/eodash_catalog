@@ -1685,9 +1685,15 @@ def _derive_tipg_urls(endpoint_config: dict, collection_config: dict) -> tuple[s
     if not has_locations:
         times_coll = endpoint_config.get("TimesCollection", f"{schema_prefix}{prefix}")
         t_param = endpoint_config.get("TimeParameter", "time")
-        times_url = (
-            f"{ep_base}/collections/{times_coll}/items?properties={t_param}&limit=10000&f=json"
-        )
+        if "?" in times_coll:
+            coll_part, query_part = times_coll.split("?", 1)
+            times_url = (
+                f"{ep_base}/collections/{coll_part}/items?{query_part}&properties={t_param}&limit=10000&f=json"
+            )
+        else:
+            times_url = (
+                f"{ep_base}/collections/{times_coll}/items?properties={t_param}&limit=10000&f=json"
+            )
 
     # 3. Timeseries Template (for per-location querying in 2-table approach)
     ts_default = f"{schema_prefix}{prefix}_timeseries_by_id"
