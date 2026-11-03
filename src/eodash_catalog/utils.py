@@ -19,8 +19,8 @@ from owslib.wcs import WebCoverageService
 from owslib.wms import WebMapService
 from owslib.wmts import WebMapTileService
 from pystac import Asset, Catalog, Collection, Item, RelType, SpatialExtent, TemporalExtent
+from pystac.extensions.file import FileExtension
 from pytz import timezone as pytztimezone
-from shapely import geometry as sgeom
 from shapely import wkb
 from six import string_types
 from structlog import get_logger
@@ -581,7 +581,14 @@ def extract_extent_from_geoparquet(table) -> tuple[TemporalExtent, SpatialExtent
         max_datetime = max_datetime.replace(tzinfo=timezone.utc)
     temporal = TemporalExtent([min_datetime, max_datetime])
     geoms = [wkb.loads(g.as_py()) for g in table["geometry"] if g is not None]
-    bbox = sgeom.MultiPolygon(geoms).bounds
+    if geoms:
+        minx = min(g.bounds[0] for g in geoms)
+        miny = min(g.bounds[1] for g in geoms)
+        maxx = max(g.bounds[2] for g in geoms)
+        maxy = max(g.bounds[3] for g in geoms)
+        bbox = [minx, miny, maxx, maxy]
+    else:
+        bbox = [-180.0, -90.0, 180.0, 90.0]
     spatial = SpatialExtent([bbox])
     return [temporal, spatial]
 
@@ -634,20 +641,21 @@ def save_items(
         table = record_batch_reader.read_all()
         output_path = f"{buildcatpath}/{colpath}"
         os.makedirs(output_path, exist_ok=True)
-        stacgp.arrow.to_parquet(table, f"{output_path}/items.parquet")
+        parquet_path = f"{output_path}/items.parquet"
+        stacgp.arrow.to_parquet(table, parquet_path, write_page_index=True)
         extents = extract_extent_from_geoparquet(table)
         collection.extent.temporal = extents[0]
         collection.extent.spatial = extents[1]
         # Make sure to also reference the geoparquet as asset
-        collection.add_asset(
-            "geoparquet",
-            Asset(
-                href="./items.parquet",
-                media_type="application/vnd.apache.parquet",
-                title="GeoParquet Items",
-                roles=["collection-mirror"],
-            ),
+        parquet_asset = Asset(
+            href="./items.parquet",
+            media_type="application/vnd.apache.parquet",
+            title="GeoParquet Items",
+            roles=["collection-mirror"],
         )
+        collection.add_asset("geoparquet", parquet_asset)
+        # adding this size explicitly here because github pages gzips the file
+        FileExtension.ext(parquet_asset, add_if_missing=True).size = os.path.getsize(parquet_path)
     else:
         # go over items and add them to the collection
         LOGGER.info(

@@ -6,7 +6,8 @@ import os
 import sys
 import uuid
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from contextlib import suppress
+from datetime import datetime, timedelta, timezone
 from itertools import groupby
 from operator import itemgetter
 from urllib.parse import urlparse
@@ -14,9 +15,10 @@ from urllib.parse import urlparse
 import pyarrow.parquet as pq
 import requests
 from pystac import Asset, Catalog, Collection, Item, Link, SpatialExtent, Summaries, TemporalExtent
+from pystac.extensions.file import FileExtension
 from pystac_client import Client
 from shapely import wkt
-from shapely.geometry import mapping
+from shapely.geometry import mapping, shape
 from structlog import get_logger
 
 from eodash_catalog.sh_endpoint import get_SH_token
@@ -29,6 +31,7 @@ from eodash_catalog.stac_handling import (
     add_process_info_child_collection,
     add_projection_info,
     add_raw_assets,
+    build_wms_xyz_item,
     get_collection_datetimes_from_config,
     get_or_create_collection,
 )
@@ -233,13 +236,6 @@ def handle_STAC_based_endpoint(
             link.extra_fields["latlng"] = latlng
             link.extra_fields["name"] = location["Name"]
             add_example_info(collection, collection_config, endpoint_config, catalog_config)
-            # eodash v4 compatibility
-            add_visualization_info(
-                collection,
-                collection_config,
-                endpoint_config,
-                catalog_config,
-            )
             add_process_info_child_collection(collection, catalog_config, collection_config, None)
             if location.get("OverwriteBBox"):
                 collection.extent.spatial = SpatialExtent(
@@ -264,13 +260,6 @@ def handle_STAC_based_endpoint(
             headers=headers,
             bbox=bbox,
         )
-    # eodash v4 compatibility
-    add_visualization_info(
-        root_collection,
-        collection_config,
-        endpoint_config,
-        catalog_config,
-    )
     add_collection_information(catalog_config, root_collection, collection_config, True)
     add_example_info(root_collection, collection_config, endpoint_config, catalog_config)
     return root_collection
@@ -467,13 +456,6 @@ def handle_collection_only(
             link = collection.add_item(item)
             link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
     add_collection_information(catalog_config, collection, collection_config)
-    # eodash v4 compatibility
-    add_visualization_info(
-        collection,
-        collection_config,
-        endpoint_config,
-        catalog_config,
-    )
     return collection
 
 
@@ -588,14 +570,7 @@ def handle_SH_WMS_endpoint(
         # set time extent from geodb
         time_extent = [min(datetimes), max(datetimes)]
         root_collection.extent.temporal = TemporalExtent([time_extent])
-    # eodash v4 compatibility
     add_collection_information(catalog_config, root_collection, collection_config, True)
-    add_visualization_info(
-        root_collection,
-        collection_config,
-        endpoint_config,
-        catalog_config,
-    )
     return root_collection
 
 
@@ -617,20 +592,6 @@ def handle_xcube_endpoint(
     )
 
     add_example_info(collection, collection_config, endpoint_config, catalog_config)
-    return collection
-
-
-def handle_rasdaman_endpoint(
-    catalog_config: dict,
-    endpoint_config: dict,
-    collection_config: dict,
-    coll_path_rel_to_root_catalog: str,
-    catalog: Catalog,
-) -> Collection:
-    collection = process_WCS_rasdaman_Endpoint(
-        catalog_config, endpoint_config, collection_config, coll_path_rel_to_root_catalog, catalog
-    )
-    # add_example_info(collection, collection_config, endpoint_config, catalog_config)
     return collection
 
 
@@ -662,15 +623,6 @@ def handle_GeoDB_Features_endpoint(
     for value in response:
         time_object = datetime.fromisoformat(value[endpoint_config["TimeParameter"]])
         match aggregation:
-            case "hour":
-                unique_datetimes.add(
-                    datetime(
-                        time_object.year,
-                        time_object.month,
-                        time_object.day,
-                        time_object.hour,
-                    )
-                )
             case "day":
                 unique_datetimes.add(
                     datetime(time_object.year, time_object.month, time_object.day).date()
@@ -690,8 +642,6 @@ def handle_GeoDB_Features_endpoint(
         item_datetime = dt if isinstance(dt, datetime) else datetime(dt.year, dt.month, dt.day)
         matching_string = ""
         match aggregation:
-            case "hour":
-                matching_string = item_datetime.strftime("%Y-%m-%dT%H:00:00Z")
             case "day":
                 matching_string = item_datetime.strftime("%Y-%m-%d")
             case "month":
@@ -1163,13 +1113,6 @@ def handle_WMS_endpoint(
                 endpoint_config["OverwriteBBox"],
             ]
         )
-    # eodash v4 compatibility
-    add_visualization_info(
-        collection,
-        collection_config,
-        endpoint_config,
-        catalog_config,
-    )
     add_collection_information(catalog_config, collection, collection_config)
     return collection
 
@@ -1300,7 +1243,7 @@ def add_visualization_info(
             endpoint_config,
             link,
         )
-        stac_object.add_link(link)
+        add_link_and_rasterform(stac_object, link, endpoint_config, catalog_config)
     elif endpoint_config["Name"] == "WMS":
         extra_fields.update(
             {
@@ -1573,9 +1516,6 @@ def handle_raw_source(
             coll_path_rel_to_root_catalog,
             options.gp,
         )
-        # eodash v4 compatibility, adding last referenced style to collection
-        if style_link:
-            collection.add_link(style_link)
     elif endpoint_config.get("ParquetSource"):
         # if parquet source is provided, download it and create items from it
         parquet_source = endpoint_config["ParquetSource"]
@@ -1593,15 +1533,15 @@ def handle_raw_source(
             extents = extract_extent_from_geoparquet(table)
             collection.extent.temporal = extents[0]
             collection.extent.spatial = extents[1]
-            collection.add_asset(
-                "geoparquet",
-                Asset(
-                    href=parquet_source,
-                    media_type="application/vnd.apache.parquet",
-                    title="GeoParquet Items",
-                    roles=["collection-mirror"],
-                ),
+            parquet_asset = Asset(
+                href=parquet_source,
+                media_type="application/vnd.apache.parquet",
+                title="GeoParquet Items",
+                roles=["collection-mirror"],
             )
+            collection.add_asset("geoparquet", parquet_asset)
+            # adding this size explicitly here because github pages gzips the file
+            FileExtension.ext(parquet_asset, add_if_missing=True).size = len(parquet_file.content)
 
     else:
         LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
@@ -1698,9 +1638,354 @@ def handle_vector_tile_source(
             coll_path_rel_to_root_catalog,
             options.gp,
         )
-
     else:
         LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
 
     add_collection_information(catalog_config, collection, collection_config)
+    return collection
+
+
+def _derive_tipg_urls(endpoint_config: dict, collection_config: dict) -> tuple[str, str, str, str]:
+    if "EndPoint" not in endpoint_config:
+        raise ValueError(
+            f"Missing required 'EndPoint' in tipg resource for {collection_config.get('Name')}"
+        )
+    ep_base = endpoint_config["EndPoint"].rstrip("/")
+
+    if "CollectionId" not in endpoint_config:
+        raise ValueError(
+            f"Missing required 'CollectionId' in tipg resource for {collection_config.get('Name')}"
+        )
+    coll_id = endpoint_config["CollectionId"]
+
+    # Extract schema and root prefix from CollectionId: <schema>.<prefix> or <prefix>
+    schema = ""
+    prefix = coll_id
+    if "." in coll_id:
+        schema, prefix = coll_id.split(".", 1)
+
+    schema_prefix = f"{schema}." if schema else ""
+    has_locations = collection_config.get("Locations") is True
+
+    # 1. Tiles Collection & URL Template
+    tiles_coll = endpoint_config.get("TilesCollection")
+    if not tiles_coll:
+        suffix = "_geometries_for_date" if has_locations else "_for_date"
+        tiles_coll = f"{schema_prefix}{prefix}{suffix}"
+
+    tms = get_tms_id(endpoint_config.get("DataProjection"))
+    param = endpoint_config.get("QueryParam", "target_date")
+    url_template = (
+        f"{ep_base}/collections/{tiles_coll}/tiles/{tms}/{{z}}/{{x}}/{{y}}?{param}={{{{date_time}}}}"
+    )
+
+    # 2. Times URL for 1-table direct timestamp queries (autoinferred from root collection)
+    times_url = ""
+    if not has_locations:
+        times_coll = endpoint_config.get("TimesCollection", f"{schema_prefix}{prefix}")
+        t_param = endpoint_config.get("TimeParameter", "time")
+        if "?" in times_coll:
+            coll_part, query_part = times_coll.split("?", 1)
+            times_url = (
+                f"{ep_base}/collections/{coll_part}/items?{query_part}&properties={t_param}&limit=10000&f=json"
+            )
+        else:
+            times_url = (
+                f"{ep_base}/collections/{times_coll}/items?properties={t_param}&limit=10000&f=json"
+            )
+
+    # 3. Timeseries Template (for per-location querying in 2-table approach)
+    ts_default = f"{schema_prefix}{prefix}_timeseries_by_id"
+    ts_coll = endpoint_config.get("TimeseriesCollection", ts_default)
+    ts_url_template = (
+        f"{ep_base}/collections/{ts_coll}/items?target_id={{{{feature}}}}&f=json&limit=10000"
+    )
+
+    # 4. Locations Endpoint (only for collections with locations)
+    loc_url = ""
+    if has_locations:
+        loc_coll = endpoint_config.get("LocationsCollection", f"{schema_prefix}{prefix}_geometries")
+        loc_url = f"{ep_base}/collections/{loc_coll}/items"
+
+    return times_url, ts_url_template, loc_url, url_template
+
+
+def handle_tipg_endpoint(
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
+    options: Options,
+) -> Collection:
+    collection = get_or_create_collection(
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
+    )
+    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
+
+    times_url, ts_url_template, loc_url, url_template = _derive_tipg_urls(
+        endpoint_config, collection_config
+    )
+
+    # 1. Fetch Locations / Geometries
+    location_features = []
+    if loc_url:
+        LOGGER.info(f"Querying tipg locations from: {loc_url}")
+        resp = requests.get(loc_url)
+        if resp.status_code == 200:
+            data = resp.json()
+            if isinstance(data, dict) and "features" in data:
+                location_features = data["features"]
+            elif isinstance(data, list):
+                location_features = [{"properties": r} for r in data]
+        else:
+            LOGGER.error(f"Failed to fetch locations from tipg {loc_url}: {resp.status_code}")
+
+    # 2. Iterate Locations & Fetch Distinct Times per Location
+    input_data = endpoint_config.get("InputData", [])
+    has_input_data = len(input_data) > 0
+    all_unique_datetimes = set()
+    cities = set()
+    countries = set()
+    time_param = endpoint_config.get("TimeParameter", "time")
+    aggregation = endpoint_config.get("Aggregation", "day")
+    match aggregation:
+        case "day":
+            time_format = "%Y-%m-%d"
+        case "month":
+            time_format = "%Y-%m"
+        case "year":
+            time_format = "%Y"
+        case _:
+            time_format = "%Y-%m-%d"
+
+    for feat in location_features:
+        props = feat.get("properties", {})
+        aoi_id = str(props.get("aoi_id") or props.get("id"))
+        city = props.get("city") or props.get("name") or props.get("site_name") or aoi_id
+        country = props.get("country", "")
+        latlng = props.get("aoi")
+        if not latlng and "lat" in props and "lon" in props:
+            latlng = f"{props['lat']},{props['lon']}"
+        if city:
+            cities.add(city)
+        if country:
+            countries.add(country)
+
+        # Compute location geometry and bbox
+        geom_obj = feat.get("geometry")
+        if geom_obj and geom_obj.get("type") in ["Polygon", "MultiPolygon"]:
+            shapely_geom = shape(geom_obj)
+            loc_bbox = list(shapely_geom.bounds)
+            loc_geometry = geom_obj
+        elif geom_obj and geom_obj.get("type") == "Point":
+            lon, lat = geom_obj["coordinates"][0], geom_obj["coordinates"][1]
+            buff = 0.2
+            loc_bbox = [lon - buff, lat - buff, lon + buff, lat + buff]
+            loc_geometry = create_geometry_from_bbox(loc_bbox)
+        elif latlng:
+            lat, lon = (float(x.strip()) for x in latlng.split(","))
+            buff = 0.2
+            loc_bbox = [lon - buff, lat - buff, lon + buff, lat + buff]
+            loc_geometry = create_geometry_from_bbox(loc_bbox)
+        else:
+            loc_bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
+            loc_geometry = create_geometry_from_bbox(loc_bbox)
+
+        # Create child collection for this location
+        child_coll = Collection(
+            id=aoi_id,
+            title=city,
+            description=collection.description or collection_config.get("Description", ""),
+            extent=collection.extent.clone(),
+        )
+        child_coll.extent.spatial = SpatialExtent([loc_bbox])
+        link = collection.add_child(child_coll)
+        link.extra_fields["id"] = aoi_id
+        link.extra_fields["latlng"] = latlng
+        link.extra_fields["country"] = country
+        link.extra_fields["name"] = city
+
+        add_process_info_child_collection(child_coll, catalog_config, collection_config, aoi_id)
+        add_collection_information(catalog_config, child_coll, collection_config)
+        add_base_overlay_info(child_coll, catalog_config, collection_config)
+
+        # Query timeseries records for this specific location
+        loc_ts_url = ts_url_template.replace("{{feature}}", aoi_id) if ts_url_template else ""
+        loc_records = []
+        if loc_ts_url:
+            resp_ts = requests.get(loc_ts_url)
+            if resp_ts.status_code == 200:
+                ts_res = resp_ts.json()
+                if isinstance(ts_res, list):
+                    loc_records = ts_res
+                elif isinstance(ts_res, dict) and "features" in ts_res:
+                    loc_records = [f.get("properties", {}) for f in ts_res["features"]]
+            else:
+                LOGGER.warn(
+                    f"Failed timeseries query for {aoi_id} from {loc_ts_url}: {resp_ts.status_code}"
+                )
+
+        location_items = []
+        loc_datetimes = []
+        for r in loc_records:
+            raw_time = r.get(time_param)
+            if not raw_time:
+                continue
+            try:
+                time_obj = parse_datestring_to_tz_aware_datetime(str(raw_time))
+            except Exception:
+                continue
+            loc_datetimes.append(time_obj)
+            all_unique_datetimes.add(time_obj)
+
+            if has_input_data:
+                row_input_data = r.get("input_data")
+                match_input = next(
+                    (item for item in input_data if item.get("Identifier") == row_input_data), None
+                )
+                if match_input:
+                    item = build_wms_xyz_item(
+                        match_input=match_input,
+                        time_object=time_obj,
+                        raw_time_str=str(raw_time),
+                        aoi_id=aoi_id,
+                        bbox=loc_bbox,
+                        geometry=loc_geometry,
+                        endpoint_config=endpoint_config,
+                        collection_config=collection_config,
+                    )
+                    location_items.append(item)
+
+        if location_items:
+            save_items(
+                child_coll,
+                location_items,
+                options.outputpath,
+                catalog_config["id"],
+                f"{coll_path_rel_to_root_catalog}/{child_coll.id}",
+                options.gp,
+            )
+            if not options.gp:
+                child_coll.update_extent_from_items()
+        elif loc_datetimes:
+            child_coll.extent.temporal = TemporalExtent([[min(loc_datetimes), max(loc_datetimes)]])
+
+    if location_features:
+        collection.extra_fields["locations"] = True
+        collection.summaries = Summaries(
+            {
+                "cities": sorted(cities),
+                "countries": sorted(countries),
+            }
+        )
+
+    # If no locations existed, query times endpoint directly
+    if not location_features:
+        direct_url = times_url
+        if not direct_url and ts_url_template:
+            direct_url = (
+                ts_url_template.replace("{{feature}}", "").replace("target_id=", "").rstrip("?&")
+            )
+        if direct_url:
+            LOGGER.info(f"Querying tipg timestamps from: {direct_url}")
+            resp = requests.get(direct_url)
+            if resp.status_code == 200:
+                ts_res = resp.json()
+                records = ts_res.get("features", []) if isinstance(ts_res, dict) else ts_res
+                for r in records:
+                    p = r.get("properties", r) if isinstance(r, dict) else {}
+                    raw_time = p.get(time_param)
+                    if raw_time:
+                        with suppress(Exception):
+                            all_unique_datetimes.add(
+                                parse_datestring_to_tz_aware_datetime(str(raw_time))
+                            )
+
+    # 3. For collections without InputData, generate root-level VectorTile items
+    if not has_input_data:
+        unique_aggregated = set()
+        for dt in all_unique_datetimes:
+            match aggregation:
+                case "day":
+                    unique_aggregated.add(datetime(dt.year, dt.month, dt.day, tzinfo=timezone.utc))
+                case "month":
+                    unique_aggregated.add(datetime(dt.year, dt.month, 1, tzinfo=timezone.utc))
+                case "year":
+                    unique_aggregated.add(datetime(dt.year, 1, 1, tzinfo=timezone.utc))
+                case _:
+                    unique_aggregated.add(datetime(dt.year, dt.month, dt.day, tzinfo=timezone.utc))
+
+        items = []
+        bbox = endpoint_config.get(
+            "Bbox", endpoint_config.get("OverwriteBBox", [-180, -85, 180, 85])
+        )
+        media_type = "application/vnd.mapbox-vector-tile"
+        style_type = "text/vector-styles"
+        rel = "vector-tile"
+
+        for dt in sorted(unique_aggregated):
+            date_str = dt.strftime(time_format)
+            target_tile_url = url_template.replace("{{date_time}}", date_str)
+            identifier = str(uuid.uuid4())
+            extra_fields_link = {"key": identifier}
+
+            vt_link = Link(
+                rel=rel,
+                target=target_tile_url,
+                media_type=media_type,
+                title=collection_config["Title"],
+                extra_fields=extra_fields_link,
+            )
+            add_projection_info(endpoint_config, vt_link)
+
+            item = Item(
+                id=format_datetime_to_isostring_zulu(dt),
+                bbox=bbox,
+                properties={},
+                geometry=create_geometry_from_bbox(bbox),
+                datetime=dt,
+                assets={"dummy_asset": Asset(href="")},
+            )
+            item.add_link(vt_link)
+            add_projection_info(endpoint_config, item)
+
+            if ep_st := endpoint_config.get("Style"):
+                target_style = (
+                    ep_st
+                    if ep_st.startswith("http")
+                    else f"{catalog_config['assets_endpoint']}/{ep_st}"
+                )
+                style_link = Link(
+                    rel="style",
+                    target=target_style,
+                    media_type=style_type,
+                    extra_fields={"links:keys": [identifier]},
+                )
+                item.add_link(style_link)
+
+            items.append(item)
+
+        if items:
+            save_items(
+                collection,
+                items,
+                options.outputpath,
+                catalog_config["id"],
+                coll_path_rel_to_root_catalog,
+                options.gp,
+            )
+            if not options.gp:
+                collection.update_extent_from_items()
+        else:
+            LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
+
+    if location_features and has_input_data:
+        update_extents_from_collection_children(collection)
+
+    if endpoint_config.get("OverwriteBBox"):
+        collection.extent.spatial = SpatialExtent([endpoint_config["OverwriteBBox"]])
+
+    add_collection_information(catalog_config, collection, collection_config)
+    add_example_info(collection, collection_config, endpoint_config, catalog_config)
     return collection
