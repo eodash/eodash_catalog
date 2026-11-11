@@ -1,6 +1,6 @@
 exclude = ["venv"]
 
-line-length = 100
+line-length = 150
 target-version = "py312"
 
 [lint]
