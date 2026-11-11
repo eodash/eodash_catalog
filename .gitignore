@@ -166,3 +166,6 @@ layers/
 .venv
 .pytest
 .DS_Store
+
+.serena
+.session*
