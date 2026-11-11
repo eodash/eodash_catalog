@@ -168,10 +168,7 @@ def retrieveExtentFromWMSWMTS(
     ows_ns = "{http://www.opengis.net/ows/1.1}"
     ns = "{http://www.opengis.net/wmts/1.0}"
     try:
-        if not wmts:
-            service = WebMapService(capabilities_url, version=version)
-        else:
-            service = WebMapTileService(capabilities_url)
+        service = WebMapService(capabilities_url, version=version) if not wmts else WebMapTileService(capabilities_url)
         if layer in list(service.contents):
             # Extract available styles
             styles = list(service[layer].styles.keys())
@@ -305,10 +302,7 @@ def generateDatetimesFromInterval(
     if timedelta_config is None:
         timedelta_config = {}
     start_dt = parse_datestring_to_tz_aware_datetime(start)
-    if end == "today":
-        end_dt = datetime.now(tz=timezone.utc)
-    else:
-        end_dt = parse_datestring_to_tz_aware_datetime(end)
+    end_dt = datetime.now(tz=timezone.utc) if end == "today" else parse_datestring_to_tz_aware_datetime(end)
     delta = timedelta(**timedelta_config)
     dates = []
     while start_dt <= end_dt:
