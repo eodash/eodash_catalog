@@ -236,6 +236,13 @@ def handle_STAC_based_endpoint(
             link.extra_fields["latlng"] = latlng
             link.extra_fields["name"] = location["Name"]
             add_example_info(collection, collection_config, endpoint_config, catalog_config)
+            # eodash v4 compatibility
+            add_visualization_info(
+                collection,
+                collection_config,
+                endpoint_config,
+                catalog_config,
+            )
             add_process_info_child_collection(collection, catalog_config, collection_config, None)
             if location.get("OverwriteBBox"):
                 collection.extent.spatial = SpatialExtent(
@@ -260,6 +267,13 @@ def handle_STAC_based_endpoint(
             headers=headers,
             bbox=bbox,
         )
+    # eodash v4 compatibility
+    add_visualization_info(
+        root_collection,
+        collection_config,
+        endpoint_config,
+        catalog_config,
+    )
     add_collection_information(catalog_config, root_collection, collection_config, True)
     add_example_info(root_collection, collection_config, endpoint_config, catalog_config)
     return root_collection
@@ -456,6 +470,13 @@ def handle_collection_only(
             link = collection.add_item(item)
             link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
     add_collection_information(catalog_config, collection, collection_config)
+    # eodash v4 compatibility
+    add_visualization_info(
+        collection,
+        collection_config,
+        endpoint_config,
+        catalog_config,
+    )
     return collection
 
 
@@ -570,7 +591,14 @@ def handle_SH_WMS_endpoint(
         # set time extent from geodb
         time_extent = [min(datetimes), max(datetimes)]
         root_collection.extent.temporal = TemporalExtent([time_extent])
+    # eodash v4 compatibility
     add_collection_information(catalog_config, root_collection, collection_config, True)
+    add_visualization_info(
+        root_collection,
+        collection_config,
+        endpoint_config,
+        catalog_config,
+    )
     return root_collection
 
 
@@ -1114,6 +1142,13 @@ def handle_WMS_endpoint(
                 endpoint_config["OverwriteBBox"],
             ]
         )
+    # eodash v4 compatibility
+    add_visualization_info(
+        collection,
+        collection_config,
+        endpoint_config,
+        catalog_config,
+    )
     add_collection_information(catalog_config, collection, collection_config)
     return collection
 
@@ -1517,6 +1552,9 @@ def handle_raw_source(
             coll_path_rel_to_root_catalog,
             options.gp,
         )
+        # eodash v4 compatibility, adding last referenced style to collection
+        if style_link:
+            collection.add_link(style_link)
     elif endpoint_config.get("ParquetSource"):
         # if parquet source is provided, download it and create items from it
         parquet_source = endpoint_config["ParquetSource"]
