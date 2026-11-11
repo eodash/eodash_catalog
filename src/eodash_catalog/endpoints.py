@@ -236,7 +236,6 @@ def handle_STAC_based_endpoint(
             link.extra_fields["latlng"] = latlng
             link.extra_fields["name"] = location["Name"]
             add_example_info(collection, collection_config, endpoint_config, catalog_config)
-            # eodash v4 compatibility
             add_visualization_info(
                 collection,
                 collection_config,
@@ -267,7 +266,6 @@ def handle_STAC_based_endpoint(
             headers=headers,
             bbox=bbox,
         )
-    # eodash v4 compatibility
     add_visualization_info(
         root_collection,
         collection_config,
@@ -470,7 +468,6 @@ def handle_collection_only(
             link = collection.add_item(item)
             link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
     add_collection_information(catalog_config, collection, collection_config)
-    # eodash v4 compatibility
     add_visualization_info(
         collection,
         collection_config,
@@ -591,7 +588,6 @@ def handle_SH_WMS_endpoint(
         # set time extent from geodb
         time_extent = [min(datetimes), max(datetimes)]
         root_collection.extent.temporal = TemporalExtent([time_extent])
-    # eodash v4 compatibility
     add_collection_information(catalog_config, root_collection, collection_config, True)
     add_visualization_info(
         root_collection,
@@ -1142,7 +1138,6 @@ def handle_WMS_endpoint(
                 endpoint_config["OverwriteBBox"],
             ]
         )
-    # eodash v4 compatibility
     add_visualization_info(
         collection,
         collection_config,
@@ -1552,7 +1547,7 @@ def handle_raw_source(
             coll_path_rel_to_root_catalog,
             options.gp,
         )
-        # eodash v4 compatibility, adding last referenced style to collection
+        # adding last referenced style to collection
         if style_link:
             collection.add_link(style_link)
     elif endpoint_config.get("ParquetSource"):
@@ -1714,9 +1709,7 @@ def _derive_tipg_urls(endpoint_config: dict, collection_config: dict) -> tuple[s
 
     tms = get_tms_id(endpoint_config.get("DataProjection"))
     param = endpoint_config.get("QueryParam", "target_date")
-    url_template = (
-        f"{ep_base}/collections/{tiles_coll}/tiles/{tms}/{{z}}/{{x}}/{{y}}?{param}={{{{date_time}}}}"
-    )
+    url_template = f"{ep_base}/collections/{tiles_coll}/tiles/{tms}/{{z}}/{{x}}/{{y}}?{param}={{{{date_time}}}}"
 
     # 2. Times URL for 1-table direct timestamp queries (autoinferred from root collection)
     times_url = ""
@@ -1725,9 +1718,7 @@ def _derive_tipg_urls(endpoint_config: dict, collection_config: dict) -> tuple[s
         t_param = endpoint_config.get("TimeParameter", "time")
         if "?" in times_coll:
             coll_part, query_part = times_coll.split("?", 1)
-            times_url = (
-                f"{ep_base}/collections/{coll_part}/items?{query_part}&properties={t_param}&limit=10000&f=json"
-            )
+            times_url = f"{ep_base}/collections/{coll_part}/items?{query_part}&properties={t_param}&limit=10000&f=json"
         else:
             times_url = (
                 f"{ep_base}/collections/{times_coll}/items?properties={t_param}&limit=10000&f=json"
