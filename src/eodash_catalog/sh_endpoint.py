@@ -16,9 +16,7 @@ def get_SH_token(endpoint_config: dict) -> str:
         client_id = os.getenv(f"SH_CLIENT_ID_{env_id}", "")
         client_secret = os.getenv(f"SH_CLIENT_SECRET_{env_id}", "")
     # 10 minutes before end of validity
-    if client_id in _token_cache and (_token_cache[client_id]["expires_at"] - (60 * 10)) > (
-        time.time()
-    ):
+    if client_id in _token_cache and (_token_cache[client_id]["expires_at"] - (60 * 10)) > (time.time()):
         return _token_cache[client_id]["access_token"]
     # Create a session
     client = BackendApplicationClient(client_id=client_id)
@@ -30,9 +28,7 @@ def get_SH_token(endpoint_config: dict) -> str:
         SH_TOKEN_URL = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
     else:
         # old sentinel hub auth handler
-        SH_TOKEN_URL = (
-            f"https://{endpoint_url_parts.netloc}/auth/realms/main/protocol/openid-connect/token"
-        )
+        SH_TOKEN_URL = f"https://{endpoint_url_parts.netloc}/auth/realms/main/protocol/openid-connect/token"
     token = oauth.fetch_token(
         token_url=SH_TOKEN_URL,
         client_secret=client_secret,

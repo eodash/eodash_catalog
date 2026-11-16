@@ -116,9 +116,7 @@ def test_handle_tipg_endpoint(tipg_options):
     first_item = items[0]
     vt_links = [link for link in first_item.links if link.rel == "vector-tile"]
     assert len(vt_links) == 1
-    expected_substr = (
-        "public.e10a1_geometries_for_date/tiles/WebMercatorQuad/{z}/{x}/{y}?target_date="
-    )
+    expected_substr = "public.e10a1_geometries_for_date/tiles/WebMercatorQuad/{z}/{x}/{y}?target_date="
     assert expected_substr in vt_links[0].target
     assert vt_links[0].media_type == "application/vnd.mapbox-vector-tile"
 

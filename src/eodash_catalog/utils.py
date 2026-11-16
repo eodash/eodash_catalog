@@ -195,11 +195,7 @@ def retrieveExtentFromWMSWMTS(
                 if metadata_elem is not None:
                     search_root = metadata_elem.find(f".//{ns}VariableInformation")
                     if search_root is not None:
-                        variable_information = {
-                            child.tag.replace(ns, ""): child.text.strip()
-                            for child in search_root
-                            if child.text is not None
-                        }
+                        variable_information = {child.tag.replace(ns, ""): child.text.strip() for child in search_root if child.text is not None}
             tps = []
             if not wmts and service[layer].timepositions is not None:
                 tps = service[layer].timepositions
@@ -296,9 +292,7 @@ def parse_duration(datestring):
     return ret
 
 
-def generateDatetimesFromInterval(
-    start: str, end: str, timedelta_config: dict | None = None, interval_between_dates: bool = False
-) -> list[datetime]:
+def generateDatetimesFromInterval(start: str, end: str, timedelta_config: dict | None = None, interval_between_dates: bool = False) -> list[datetime]:
     if timedelta_config is None:
         timedelta_config = {}
     start_dt = parse_datestring_to_tz_aware_datetime(start)
@@ -345,9 +339,7 @@ def generate_veda_cog_link(endpoint_config: dict, file_url: str | None) -> str:
     bidx = ""
     if endpoint_config.get("Bidx"):
         # Check if an array was provided
-        if hasattr(endpoint_config["Bidx"], "__len__") and not isinstance(
-            endpoint_config["Bidx"], str
-        ):
+        if hasattr(endpoint_config["Bidx"], "__len__") and not isinstance(endpoint_config["Bidx"], str):
             for band in endpoint_config["Bidx"]:
                 bidx = bidx + f"&bidx={band}"
         else:
@@ -470,9 +462,7 @@ def retry(exceptions, tries=3, delay=2, backoff=1, logger=None):
                     if _tries == 0:
                         raise
                     else:
-                        msg = (
-                            f"{e}, Try: {tries - _tries + 1}/{tries}, retry in {_delay} seconds..."
-                        )
+                        msg = f"{e}, Try: {tries - _tries + 1}/{tries}, retry in {_delay} seconds..."
                         if logger:
                             logger.warning(msg)
                         else:
@@ -521,11 +511,7 @@ def get_full_url(url: str, catalog_config) -> str:
 
 def update_extents_from_collection_children(collection: Collection):
     # retrieve extents from children
-    c_bboxes = [
-        c_child.extent.spatial.bboxes[0]
-        for c_child in collection.get_children()
-        if isinstance(c_child, Collection)
-    ]
+    c_bboxes = [c_child.extent.spatial.bboxes[0] for c_child in collection.get_children() if isinstance(c_child, Collection)]
     if len(c_bboxes) > 0:
         merged_bbox = merge_bboxes(c_bboxes)
     else:
@@ -542,9 +528,7 @@ def update_extents_from_collection_children(collection: Collection):
     # set time extent of collection
     individual_datetimes = []
     for c_child in collection.get_children():
-        if isinstance(c_child, Collection) and isinstance(
-            c_child.extent.temporal.intervals[0], list
-        ):
+        if isinstance(c_child, Collection) and isinstance(c_child.extent.temporal.intervals[0], list):
             individual_datetimes.extend(c_child.extent.temporal.intervals[0])  # type: ignore
     individual_datetimes = list(filter(lambda x: x is not None, individual_datetimes))
     if individual_datetimes:
@@ -673,11 +657,7 @@ def save_items(
                 )
 
             # bubble up data assets based on role
-            collected_assets = [
-                asset.href
-                for asset in item.assets.values()
-                if asset.roles and ("data" in asset.roles or "default" in asset.roles)
-            ]
+            collected_assets = [asset.href for asset in item.assets.values() if asset.roles and ("data" in asset.roles or "default" in asset.roles)]
             if collected_assets:
                 link.extra_fields["assets"] = collected_assets
             # also bubble up cog_href if available
@@ -698,9 +678,7 @@ def read_config_file(path: str) -> dict:
         if os.path.exists(candidate):
             return _load_file(candidate)
 
-    raise FileNotFoundError(
-        f"No file found for '{path}' with or without supported suffixes (.json/.yaml/.yml)"
-    )
+    raise FileNotFoundError(f"No file found for '{path}' with or without supported suffixes (.json/.yaml/.yml)")
 
 
 def _load_file(filepath):

@@ -1494,18 +1494,13 @@ def handle_custom_endpoint(
     return collection
 
 
-def handle_raw_source(
+def _populate_raw_source_collection(
+    collection: Collection,
     catalog_config: dict,
     endpoint_config: dict,
-    collection_config: dict,
     coll_path_rel_to_root_catalog: str,
-    catalog: Catalog,
     options: Options,
-) -> Collection:
-    collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
-    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
+) -> None:
     if len(endpoint_config.get("TimeEntries", [])) > 0:
         items = []
         style_link = None
@@ -1558,12 +1553,12 @@ def handle_raw_source(
             parquet_file = requests.get(parquet_source)
             if parquet_file.status_code != 200:
                 LOGGER.error(f"Failed to download parquet file from {parquet_source}")
-                return collection
+                return
             try:
                 table = pq.read_table(io.BytesIO(parquet_file.content))
             except Exception as e:
                 LOGGER.error(f"Failed to read parquet file: {e}")
-                return collection
+                return
             extents = extract_extent_from_geoparquet(table)
             collection.extent.temporal = extents[0]
             collection.extent.spatial = extents[1]
@@ -1576,12 +1571,101 @@ def handle_raw_source(
             collection.add_asset("geoparquet", parquet_asset)
             # adding this size explicitly here because github pages gzips the file
             FileExtension.ext(parquet_asset, add_if_missing=True).size = len(parquet_file.content)
-
     else:
-        LOGGER.warn(f"NO datetimes configured for collection: {collection_config['Name']}!")
+        LOGGER.warn(f"NO datetimes configured for collection: {collection.id}!")
 
-    add_collection_information(catalog_config, collection, collection_config)
-    return collection
+
+def handle_raw_source(
+    catalog_config: dict,
+    endpoint_config: dict,
+    collection_config: dict,
+    coll_path_rel_to_root_catalog: str,
+    catalog: Catalog,
+    options: Options,
+) -> Collection:
+    root_collection = get_or_create_collection(
+        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
+    )
+    coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
+    if collection_config.get("Locations"):
+        cities = []
+        countries = []
+        override_keys = (
+            "TimeEntries",
+            "ParquetSource",
+            "Bbox",
+            "DataProjection",
+            "Style",
+            "Attribution",
+            "MergeAssets",
+        )
+        for location in collection_config["Locations"]:
+            loc_endpoint_config = copy.deepcopy(endpoint_config)
+            for key in override_keys:
+                if key in location:
+                    loc_endpoint_config[key] = location[key]
+
+            identifier = location.get("Identifier", str(uuid.uuid4()))
+            location_config = {
+                "Title": location["Name"],
+            }
+            collection = get_or_create_collection(
+                catalog, identifier, location_config, catalog_config, loc_endpoint_config
+            )
+            if location.get("Description"):
+                collection.description = location["Description"]
+            else:
+                collection.description = root_collection.description
+            collection.extra_fields["endpointtype"] = endpoint_config["Name"]
+
+            _populate_raw_source_collection(
+                collection,
+                catalog_config,
+                loc_endpoint_config,
+                f"{coll_path_rel_to_root_catalog}/{collection.id}",
+                options,
+            )
+            add_projection_info(loc_endpoint_config, collection)
+
+            link = root_collection.add_child(collection)
+            latlng = f"{location['Point'][1]},{location['Point'][0]}".strip()
+            link.extra_fields["id"] = identifier
+            link.extra_fields["latlng"] = latlng
+            link.extra_fields["name"] = location["Name"]
+            link.extra_fields["city"] = location["Name"]
+            cities.append(location["Name"])
+            if country := location.get("Country"):
+                link.extra_fields["country"] = country
+                if isinstance(country, list):
+                    countries.extend(country)
+                else:
+                    countries.append(country)
+
+            add_process_info_child_collection(
+                collection, catalog_config, collection_config, identifier
+            )
+            add_collection_information(catalog_config, collection, collection_config)
+            add_base_overlay_info(collection, catalog_config, collection_config)
+
+        update_extents_from_collection_children(root_collection)
+        root_collection.summaries = Summaries(
+            {
+                "cities": list(dict.fromkeys(cities)),
+                "countries": list(dict.fromkeys(countries)),
+            }
+        )
+        add_collection_information(catalog_config, root_collection, collection_config, True)
+        return root_collection
+
+    _populate_raw_source_collection(
+        root_collection,
+        catalog_config,
+        endpoint_config,
+        coll_path_rel_to_root_catalog,
+        options,
+    )
+    add_collection_information(catalog_config, root_collection, collection_config)
+    return root_collection
 
 
 def handle_vector_tile_source(

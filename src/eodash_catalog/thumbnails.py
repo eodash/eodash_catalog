@@ -12,9 +12,7 @@ from eodash_catalog.utils import format_datetime_to_isostring_zulu, generate_ved
 
 
 def fetch_and_save_thumbnail(collection_config: dict, url: str) -> None:
-    collection_path = "../thumbnails/{}_{}/".format(
-        collection_config["EodashIdentifier"], collection_config["Name"]
-    )
+    collection_path = "../thumbnails/{}_{}/".format(collection_config["EodashIdentifier"], collection_config["Name"])
     Path(collection_path).mkdir(parents=True, exist_ok=True)
     image_path = f"{collection_path}/thumbnail.png"
     if not os.path.exists(image_path):
@@ -35,9 +33,7 @@ def generate_thumbnail(
         if endpoint_config.get("InstanceId"):
             instanceId = endpoint_config["InstanceId"]
         # Build example url
-        wms_config = (
-            "REQUEST=GetMap&SERVICE=WMS&VERSION=1.3.0&FORMAT=image/png&STYLES=&TRANSPARENT=true"
-        )
+        wms_config = "REQUEST=GetMap&SERVICE=WMS&VERSION=1.3.0&FORMAT=image/png&STYLES=&TRANSPARENT=true"
         bbox = [-180, -85, 180, 85]
         if bbox_s := stac_object.bbox:
             bbox = f"{bbox_s[1]},{bbox_s[0]},{bbox_s[3]},{bbox_s[2]}"  # type: ignore

@@ -37,6 +37,8 @@ from eodash_catalog.utils import (
 
 LOGGER = get_logger(__name__)
 
+DEFAULT_GEODB_FORM = "https://raw.githubusercontent.com/eurodatacube/eodash-assets/refs/heads/main/defaults/geodb_form.json"
+
 
 def get_or_create_collection(
     catalog: Catalog,
@@ -98,9 +100,7 @@ def get_or_create_collection(
     return collection
 
 
-def create_service_link(
-    endpoint_config: dict, catalog_config: dict, location_id: str | None = None
-) -> Link:
+def create_service_link(endpoint_config: dict, catalog_config: dict, location_id: str | None = None) -> Link:
     extra_fields = {
         "id": endpoint_config["Identifier"],
         "method": endpoint_config.get("Method", "GET"),
@@ -115,9 +115,7 @@ def create_service_link(
         # either a string
         if isinstance(endpoint_config["Flatstyle"], str):
             # update URL if needed
-            extra_fields["eox:flatstyle"] = get_full_url(
-                endpoint_config["Flatstyle"], catalog_config
-            )
+            extra_fields["eox:flatstyle"] = get_full_url(endpoint_config["Flatstyle"], catalog_config)
         elif isinstance(endpoint_config["Flatstyle"], list):
             # or a list of objects - update URL if needed
             extra_fields["eox:flatstyle"] = []
@@ -347,9 +345,7 @@ def generate_rasterform(endpoint_config: dict) -> dict:
                 "type": "string",
                 "title": "Colormap",
                 "enum": list(MARINE_COLORMAPS),
-                "default": params.get(
-                    "cmap", endpoint_config.get("DefaultScientificCmap", "thermal")
-                ),
+                "default": params.get("cmap", endpoint_config.get("DefaultScientificCmap", "thermal")),
             },
             "vminmax": {
                 "type": "object",
@@ -469,9 +465,7 @@ def add_link_and_rasterform(
     stac_object.add_link(link)
 
 
-def create_web_map_link(
-    collection: Collection, catalog_config: dict, layer_config: dict, role: str
-) -> Link:
+def create_web_map_link(collection: Collection, catalog_config: dict, layer_config: dict, role: str) -> Link:
     extra_fields = {
         "roles": [role],
         "id": layer_config["id"],
@@ -511,9 +505,7 @@ def create_web_map_link(
             if ep_st := layer_config.get("Style"):
                 style_link = Link(
                     rel="style",
-                    target=ep_st
-                    if ep_st.startswith("http")
-                    else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                    target=ep_st if ep_st.startswith("http") else f"{catalog_config['assets_endpoint']}/{ep_st}",
                     media_type="text/vector-styles",
                     extra_fields={"links:keys": [identifier]},
                 )
@@ -578,9 +570,7 @@ def add_raw_assets(time_entry: dict, endpoint_config: dict, catalog_config: dict
     if ep_st := endpoint_config.get("Style"):
         style_link = Link(
             rel="style",
-            target=ep_st
-            if ep_st.startswith("http")
-            else f"{catalog_config['assets_endpoint']}/{ep_st}",
+            target=ep_st if ep_st.startswith("http") else f"{catalog_config['assets_endpoint']}/{ep_st}",
             media_type=style_type,
             extra_fields={
                 "asset:keys": list(assets),
@@ -759,22 +749,16 @@ def add_collection_information(
                 description="Rendered page of the story",
                 extra_fields=extra_fields,
             )
-            if stories_additional_stac_property := stories_endpoint_config.get(
-                "additional_stac_property", "eodash:narratives"
-            ):
+            if stories_additional_stac_property := stories_endpoint_config.get("additional_stac_property", "eodash:narratives"):
                 # copy assets to root level to be in a special category in eodash stacinfo
                 if stories_additional_stac_property not in collection.extra_fields:
                     collection.extra_fields[stories_additional_stac_property] = {}
                 root_level_asset = asset.to_dict()
                 del root_level_asset["description"]
-                collection.extra_fields[stories_additional_stac_property][story_id] = (
-                    root_level_asset
-                )
+                collection.extra_fields[stories_additional_stac_property][story_id] = root_level_asset
 
             collection.add_asset(story_id, asset)
-            alternate_extension = (
-                "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json"
-            )
+            alternate_extension = "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json"
             if alternate_extension not in collection.stac_extensions:
                 collection.stac_extensions.append(alternate_extension)
     if collection_config.get("Image"):
@@ -818,11 +802,8 @@ def add_collection_information(
 def add_process_info(collection: Collection, catalog_config: dict, collection_config: dict) -> None:
     if any(collection_config.get(key) for key in ["Locations", "Subcollections"]):
         # add the generic geodb-like selection process on the root collection instead of Processes
-        if catalog_config.get("geodb_default_form"):
-            # adding default geodb-like map handling for Locations
-            collection.extra_fields["eodash:jsonform"] = get_full_url(
-                catalog_config["geodb_default_form"], catalog_config
-            )
+        geodb_form = catalog_config.get("geodb_default_form", DEFAULT_GEODB_FORM)
+        collection.extra_fields["eodash:jsonform"] = get_full_url(geodb_form, catalog_config)
         # link a process definition for getting a collection with {{feature}} placeholder
         sl = Link(
             rel="service",
@@ -836,9 +817,7 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
             },
         )
         collection.add_link(sl)
-        has_geodb = any(
-            item.get("Name") == "GeoDB" for item in collection_config.get("Resources", [])
-        )
+        has_geodb = any(item.get("Name") == "GeoDB" for item in collection_config.get("Resources", []))
         # adding additional service links
         if has_geodb and collection_config.get("Process", {}).get("EndPoints"):
             for endpoint in collection_config["Process"]["EndPoints"]:
@@ -847,9 +826,7 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
         # for geodb collections now based on locations, we want to make sure
         # also manually defined processes are added to the collection
         if has_geodb and collection_config.get("Process", {}).get("VegaDefinition"):
-            collection.extra_fields["eodash:vegadefinition"] = get_full_url(
-                collection_config["Process"]["VegaDefinition"], catalog_config
-            )
+            collection.extra_fields["eodash:vegadefinition"] = get_full_url(collection_config["Process"]["VegaDefinition"], catalog_config)
     # elif is intentional for cases when Process is defined on collection with Locations
     # then we want to only add it to the "children", not the root
     elif collection_config.get("Process"):
@@ -857,25 +834,17 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
             for endpoint in collection_config["Process"]["EndPoints"]:
                 collection.add_link(create_service_link(endpoint, catalog_config))
         if collection_config["Process"].get("JsonForm"):
-            collection.extra_fields["eodash:jsonform"] = get_full_url(
-                collection_config["Process"]["JsonForm"], catalog_config
-            )
+            collection.extra_fields["eodash:jsonform"] = get_full_url(collection_config["Process"]["JsonForm"], catalog_config)
         if collection_config["Process"].get("VegaDefinition"):
-            collection.extra_fields["eodash:vegadefinition"] = get_full_url(
-                collection_config["Process"]["VegaDefinition"], catalog_config
-            )
+            collection.extra_fields["eodash:vegadefinition"] = get_full_url(collection_config["Process"]["VegaDefinition"], catalog_config)
     elif collection_config.get("Resources"):
         # see if geodb resource configured use defaults if available
         for resource in collection_config["Resources"]:
             if resource["Name"] == "GeoDB":
                 if catalog_config.get("geodb_default_form"):
-                    collection.extra_fields["eodash:jsonform"] = get_full_url(
-                        catalog_config["geodb_default_form"], catalog_config
-                    )
+                    collection.extra_fields["eodash:jsonform"] = get_full_url(catalog_config["geodb_default_form"], catalog_config)
                 if catalog_config.get("geodb_default_vega"):
-                    collection.extra_fields["eodash:vegadefinition"] = get_full_url(
-                        catalog_config["geodb_default_vega"], catalog_config
-                    )
+                    collection.extra_fields["eodash:vegadefinition"] = get_full_url(catalog_config["geodb_default_vega"], catalog_config)
                 query_string = "?aoi_id=eq.{{feature}}&select=site_name,city,color_code,time,aoi,measurement_value,indicator_value,reference_time,eo_sensor,reference_value,input_data"  # noqa: E501
                 collection.add_link(
                     Link(
@@ -906,9 +875,7 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
                 }
                 extra_fields["body"] = get_full_url(process_endpoint_config["Body"], catalog_config)
                 if catalog_config["default_xcube_process"].get("JsonForm"):
-                    collection.extra_fields["eodash:jsonform"] = get_full_url(
-                        catalog_config["default_xcube_process"]["JsonForm"], catalog_config
-                    )
+                    collection.extra_fields["eodash:jsonform"] = get_full_url(catalog_config["default_xcube_process"]["JsonForm"], catalog_config)
                 if catalog_config["default_xcube_process"].get("VegaDefinition"):
                     collection.extra_fields["eodash:vegadefinition"] = get_full_url(
                         catalog_config["default_xcube_process"]["VegaDefinition"], catalog_config
@@ -923,9 +890,7 @@ def add_process_info(collection: Collection, catalog_config: dict, collection_co
                 collection.add_link(sl)
 
 
-def add_process_info_child_collection(
-    collection: Collection, catalog_config: dict, collection_config: dict, location_id: str | None
-) -> None:
+def add_process_info_child_collection(collection: Collection, catalog_config: dict, collection_config: dict, location_id: str | None) -> None:
     # in case of locations, we add the process itself on a child collection
     if collection_config.get("Process"):
         if collection_config["Process"].get("EndPoints"):
@@ -935,23 +900,15 @@ def add_process_info_child_collection(
         if collection_config["Process"].get("JsonForm"):
             if location_id and catalog_config.get("geodb_empty_form"):
                 # specific handling of geodb locations to replace with an empty jsonform
-                collection.extra_fields["eodash:jsonform"] = get_full_url(
-                    catalog_config["geodb_empty_form"], catalog_config
-                )
+                collection.extra_fields["eodash:jsonform"] = get_full_url(catalog_config["geodb_empty_form"], catalog_config)
             else:
                 # standard json form pass through
-                collection.extra_fields["eodash:jsonform"] = get_full_url(
-                    collection_config["Process"]["JsonForm"], catalog_config
-                )
+                collection.extra_fields["eodash:jsonform"] = get_full_url(collection_config["Process"]["JsonForm"], catalog_config)
         if collection_config["Process"].get("VegaDefinition"):
-            collection.extra_fields["eodash:vegadefinition"] = get_full_url(
-                collection_config["Process"]["VegaDefinition"], catalog_config
-            )
+            collection.extra_fields["eodash:vegadefinition"] = get_full_url(collection_config["Process"]["VegaDefinition"], catalog_config)
 
 
-def add_base_overlay_info(
-    collection: Collection, catalog_config: dict, collection_config: dict
-) -> None:
+def add_base_overlay_info(collection: Collection, catalog_config: dict, collection_config: dict) -> None:
     # add custom baselayers specially for this indicator
     # alternatively use default base layers defined
     if "BaseLayers" in collection_config or catalog_config.get("default_base_layers"):
@@ -968,9 +925,7 @@ def add_base_overlay_info(
                 "FlatGeobuf source",
             ]:
                 time_entry_structure, layer_config = convert_layers_config_to_assets_configs(layer)
-                assets, style_link = add_raw_assets(
-                    time_entry_structure, layer_config, catalog_config, role="baselayer"
-                )
+                assets, style_link = add_raw_assets(time_entry_structure, layer_config, catalog_config, role="baselayer")
                 for asset_key, asset in assets.items():
                     collection.add_asset(asset_key, asset)
                 collection.add_link(style_link)
@@ -994,9 +949,7 @@ def add_base_overlay_info(
                 "FlatGeobuf source",
             ]:
                 time_entry_structure, layer_config = convert_layers_config_to_assets_configs(layer)
-                assets, style_link = add_raw_assets(
-                    time_entry_structure, layer_config, catalog_config, role="overlay"
-                )
+                assets, style_link = add_raw_assets(time_entry_structure, layer_config, catalog_config, role="overlay")
                 for asset_key, asset in assets.items():
                     collection.add_asset(asset_key, asset)
                 collection.extra_fields["eodash:merge_assets"] = False
@@ -1006,14 +959,10 @@ def add_base_overlay_info(
                 collection.add_link(link)
 
 
-def add_extra_fields(
-    stac_object: Collection | Link, collection_config: dict, is_root_collection: bool = False
-) -> None:
+def add_extra_fields(stac_object: Collection | Link, collection_config: dict, is_root_collection: bool = False) -> None:
     if collection_config.get("Themes"):
         stac_object.extra_fields["themes"] = collection_config["Themes"]
-    if (
-        collection_config.get("Locations") or collection_config.get("Subcollections")
-    ) and is_root_collection:
+    if (collection_config.get("Locations") or collection_config.get("Subcollections")) and is_root_collection:
         stac_object.extra_fields["locations"] = True
     if collection_config.get("Tags"):
         stac_object.extra_fields["tags"] = collection_config["Tags"]
@@ -1030,13 +979,9 @@ def add_extra_fields(
     if collection_config.get("DataSource"):
         if collection_config["DataSource"].get("Spaceborne"):
             if collection_config["DataSource"]["Spaceborne"].get("Sensor"):
-                stac_object.extra_fields["sensor"] = collection_config["DataSource"]["Spaceborne"][
-                    "Sensor"
-                ]
+                stac_object.extra_fields["sensor"] = collection_config["DataSource"]["Spaceborne"]["Sensor"]
             if collection_config["DataSource"]["Spaceborne"].get("Satellite"):
-                stac_object.extra_fields["satellite"] = collection_config["DataSource"][
-                    "Spaceborne"
-                ]["Satellite"]
+                stac_object.extra_fields["satellite"] = collection_config["DataSource"]["Spaceborne"]["Satellite"]
         if collection_config["DataSource"].get("InSitu"):
             stac_object.extra_fields["insituSources"] = collection_config["DataSource"]["InSitu"]
         if collection_config["DataSource"].get("Other"):
@@ -1051,9 +996,7 @@ def get_collection_datetimes_from_config(endpoint_config: dict) -> list[datetime
         interval_between_dates = endpoint_config.get("WMSIntervalsBetweenDates")
         if endpoint_config.get("Times"):
             times = list(endpoint_config.get("Times", []))
-            times_datetimes = sorted(
-                [parse_datestring_to_tz_aware_datetime(time) for time in times]
-            )
+            times_datetimes = sorted([parse_datestring_to_tz_aware_datetime(time) for time in times])
             if interval_between_dates:
                 # convert to list of datetime_start and datetime_end
                 times_datetimes = make_intervals(times_datetimes)
@@ -1061,15 +1004,11 @@ def get_collection_datetimes_from_config(endpoint_config: dict) -> list[datetime
             start = endpoint_config["DateTimeInterval"].get("Start", "2020-09-01T00:00:00Z")
             end = endpoint_config["DateTimeInterval"].get("End", "2020-10-01T00:00:00Z")
             timedelta_config = endpoint_config["DateTimeInterval"].get("Timedelta", {"days": 1})
-            times_datetimes = generateDatetimesFromInterval(
-                start, end, timedelta_config, interval_between_dates
-            )
+            times_datetimes = generateDatetimesFromInterval(start, end, timedelta_config, interval_between_dates)
     return times_datetimes
 
 
-def add_projection_info(
-    endpoint_config: dict, stac_object: Item | Asset | Collection | Link
-) -> None:
+def add_projection_info(endpoint_config: dict, stac_object: Item | Asset | Collection | Link) -> None:
     if proj := endpoint_config.get("DataProjection"):
         if isinstance(proj, str):
             if proj.lower().startswith("epsg"):
@@ -1148,9 +1087,7 @@ def fetch_fallback_collection(
         if collection is not None:
             return collection
 
-    LOGGER.warning(
-        f"Fallback fetch failed for {collection_config.get('Name')} at candidates: {candidates}"
-    )
+    LOGGER.warning(f"Fallback fetch failed for {collection_config.get('Name')} at candidates: {candidates}")
     return None
 
 
@@ -1189,9 +1126,7 @@ def build_wms_xyz_item(
                 used_delta = timedelta(days=1)
                 if "TimeDelta" in match_input:
                     used_delta = timedelta(minutes=match_input["TimeDelta"])
-                end_date = format_datetime_to_isostring_zulu(
-                    time_object + used_delta - timedelta(milliseconds=1)
-                )
+                end_date = format_datetime_to_isostring_zulu(time_object + used_delta - timedelta(milliseconds=1))
                 extra_fields.update({"wms:dimensions": {"TIME": f"{start_date}/{end_date}"}})
                 url = f"{url}{instance_id}"
             else:
@@ -1234,9 +1169,7 @@ def load_fallback_collection_recursively(
     try:
         resp = requests.get(collection_url, timeout=30)
         if resp.status_code != 200:
-            LOGGER.warning(
-                f"Failed to fetch fallback from {collection_url}, status: {resp.status_code}"
-            )
+            LOGGER.warning(f"Failed to fetch fallback from {collection_url}, status: {resp.status_code}")
             return None
         coll_dict = resp.json()
         collection = Collection.from_dict(coll_dict)
@@ -1274,9 +1207,7 @@ def load_fallback_collection_recursively(
             os.makedirs(local_dest_dir, exist_ok=True)
             local_parquet_file = f"{local_dest_dir}/items.parquet"
             try:
-                LOGGER.info(
-                    f"Downloading fallback GeoParquet from {parquet_url} to {local_parquet_file}"
-                )
+                LOGGER.info(f"Downloading fallback GeoParquet from {parquet_url} to {local_parquet_file}")
                 p_resp = requests.get(parquet_url, timeout=60)
                 if p_resp.status_code == 200:
                     with open(local_parquet_file, "wb") as f:
@@ -1288,9 +1219,7 @@ def load_fallback_collection_recursively(
                         roles=parquet_asset.roles or ["collection-mirror"],
                     )
                 else:
-                    LOGGER.warning(
-                        f"Failed download GeoParquet {parquet_url}: {p_resp.status_code}"
-                    )
+                    LOGGER.warning(f"Failed download GeoParquet {parquet_url}: {p_resp.status_code}")
             except Exception as e:
                 LOGGER.warning(f"Exception downloading GeoParquet asset from {parquet_url}: {e}")
     else:
@@ -1321,9 +1250,7 @@ def load_fallback_collection_recursively(
                     if item_link.extra_fields and new_item_link:
                         new_item_link.extra_fields.update(item_link.extra_fields)
                 else:
-                    LOGGER.warning(
-                        f"Failed to fetch item from {item_url}: status {item_resp.status_code}"
-                    )
+                    LOGGER.warning(f"Failed to fetch item from {item_url}: status {item_resp.status_code}")
             except Exception as e:
                 LOGGER.warning(f"Error loading item from {item_url}: {e}")
 

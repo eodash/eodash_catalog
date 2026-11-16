@@ -60,9 +60,7 @@ def process_catalog_file(file_path: str, options: Options):
     if len(options.collections) > 0:
         # create only catalogs containing the passed collections
         process_collections = [c for c in catalog_config["collections"] if c in options.collections]
-    elif (len(options.collections) == 1 and options.collections == "all") or len(
-        options.collections
-    ) == 0:
+    elif (len(options.collections) == 1 and options.collections == "all") or len(options.collections) == 0:
         # create full catalog
         process_collections = catalog_config["collections"]
     if len(process_collections) == 0:
@@ -111,9 +109,7 @@ def process_catalog_file(file_path: str, options: Options):
         recursive_save(catalog, options.ni)
     else:
         # For full catalog save with items this still seems to be faster
-        catalog_self_href = catalog_config.get(
-            "endpoint", "{}/{}".format(options.outputpath, catalog_config["id"])
-        )
+        catalog_self_href = catalog_config.get("endpoint", "{}/{}".format(options.outputpath, catalog_config["id"]))
         catalog.normalize_hrefs(catalog_self_href, strategy=strategy)
         catalog.save(dest_href="{}/{}".format(options.outputpath, catalog_config["id"]))
     end = time.time()
@@ -166,15 +162,11 @@ def extract_indicator_info(parent_collection: Collection):
     parent_collection.summaries = Summaries(summaries)
 
 
-def process_indicator_file(
-    catalog_config: dict, file_path: str, catalog: Catalog, options: Options
-):
+def process_indicator_file(catalog_config: dict, file_path: str, catalog: Catalog, options: Options):
     LOGGER.info(f"Processing indicator: {file_path}")
     indicator_config = read_config_file(file_path)
 
-    parent_indicator = get_or_create_collection(
-        catalog, indicator_config["Name"], indicator_config, catalog_config, {}
-    )
+    parent_indicator = get_or_create_collection(catalog, indicator_config["Name"], indicator_config, catalog_config, {})
     if indicator_config.get("Collections"):
         coll_path_rel_to_root_catalog = indicator_config["Name"]
         for collection in indicator_config["Collections"]:
@@ -190,18 +182,14 @@ def process_indicator_file(
                 )
             except Exception as e:
                 ind_name = indicator_config.get("Name")
-                LOGGER.error(
-                    f"Error processing collection {collection} in indicator {ind_name}: {e}"
-                )
+                LOGGER.error(f"Error processing collection {collection} in indicator {ind_name}: {e}")
     else:
         # we assume that collection files can also be loaded directly
         try:
             process_collection_file(catalog_config, file_path, parent_indicator, options)
         except Exception as e:
             ind_name = indicator_config.get("Name")
-            LOGGER.error(
-                f"Error processing collection file {file_path} in indicator {ind_name}: {e}"
-            )
+            LOGGER.error(f"Error processing collection file {file_path} in indicator {ind_name}: {e}")
     add_collection_information(catalog_config, parent_indicator, indicator_config, True)
     if iter_len_at_least(parent_indicator.get_items(recursive=True), 1):
         parent_indicator.update_extent_from_items()
@@ -328,9 +316,7 @@ def _process_single_resource(
             mapbox_style=True,
         )
     elif endpoint_config["Name"] == "Collection-only":
-        collection = handle_collection_only(
-            catalog_config, endpoint_config, collection_config, catalog
-        )
+        collection = handle_collection_only(catalog_config, endpoint_config, collection_config, catalog)
     elif endpoint_config["Name"] == "Custom-Endpoint":
         collection = handle_custom_endpoint(
             catalog_config,
@@ -388,13 +374,10 @@ def process_collection_file(
                 if not options.gp:
                     add_single_item_if_collection_empty(endpoint_config, collection)
                 add_projection_info(endpoint_config, collection)
-                add_to_catalog(
-                    collection, catalog, endpoint_config, collection_config, disable, hidden
-                )
+                add_to_catalog(collection, catalog, endpoint_config, collection_config, disable, hidden)
             except Exception as e:
                 LOGGER.warning(
-                    f"Resource {endpoint_config.get('Name')} failed after retries: {e}. "
-                    f"Attempting fallback to previous catalog deployment."
+                    f"Resource {endpoint_config.get('Name')} failed after retries: {e}. Attempting fallback to previous catalog deployment."
                 )
                 collection = fetch_fallback_collection(
                     catalog_config=catalog_config,
@@ -404,23 +387,15 @@ def process_collection_file(
                 )
                 if collection:
                     LOGGER.info(f"Recovered collection {collection.id} from previous deployment")
-                    add_to_catalog(
-                        collection, catalog, endpoint_config, collection_config, disable, hidden
-                    )
+                    add_to_catalog(collection, catalog, endpoint_config, collection_config, disable, hidden)
                 else:
                     coll_name = collection_config.get("Name")
-                    LOGGER.warning(
-                        f"Previous deployment fallback failed for {coll_name}. Skipping collection."
-                    )
+                    LOGGER.warning(f"Previous deployment fallback failed for {coll_name}. Skipping collection.")
 
     elif collection_config.get("Subcollections"):
         # if no endpoint is specified we check for definition of subcollections
-        parent_collection = get_or_create_collection(
-            catalog, collection_config["Name"], collection_config, catalog_config, {}
-        )
-        coll_path_rel_to_root_catalog = (
-            f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
-        )
+        parent_collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, {})
+        coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
         locations = []
         countries = []
         for sub_coll_def in collection_config["Subcollections"]:
@@ -448,11 +423,7 @@ def process_collection_file(
                 )
                 # find link in parent collection to update metadata
                 for link in parent_collection.links:
-                    if (
-                        link.rel == "child"
-                        and link.extra_fields.get("id")
-                        and link.extra_fields["id"] == sub_coll_def["Identifier"]
-                    ):
+                    if link.rel == "child" and link.extra_fields.get("id") and link.extra_fields["id"] == sub_coll_def["Identifier"]:
                         latlng = "{},{}".format(
                             sub_coll_def["Point"][1],
                             sub_coll_def["Point"][0],
@@ -469,9 +440,7 @@ def process_collection_file(
             else:
                 # create temp catalog to save collection
                 tmp_catalog = Catalog(id="tmp_catalog", description="temp catalog placeholder")
-                coll_path_rel_to_root_catalog = (
-                    f"{coll_path_rel_to_root_catalog}/{sub_coll_def['Collection']}"
-                )
+                coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{sub_coll_def['Collection']}"
                 process_collection_file(
                     catalog_config,
                     "{}/{}".format(options.collectionspath, sub_coll_def["Collection"]),
@@ -549,10 +518,7 @@ def add_to_catalog(
         link.extra_fields["themes"] = collection_config["Themes"]
     if collection_config.get("Provider"):
         # get all provider names
-        link.extra_fields["providers"] = [
-            provider.get("Name") or provider.get("Url")
-            for provider in collection_config["Provider"]
-        ]
+        link.extra_fields["providers"] = [provider.get("Name") or provider.get("Url") for provider in collection_config["Provider"]]
     # Check for summaries and bubble up info
     if disable:
         link.extra_fields["roles"] = ["disable"]
@@ -656,9 +622,7 @@ def process_catalogs(
     tasks = []
     for file_name in os.listdir(catalogspath):
         file_path = f"{catalogspath}/{file_name}"
-        if os.path.isfile(file_path) and (
-            catalog is None or os.path.splitext(file_name)[0] == catalog
-        ):
+        if os.path.isfile(file_path) and (catalog is None or os.path.splitext(file_name)[0] == catalog):
             tasks.append(RaisingThread(target=process_catalog_file, args=(file_path, options)))
             tasks[-1].start()
     for task in tasks:

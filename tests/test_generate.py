@@ -109,10 +109,7 @@ def test_collection_no_wms_has_a_single_item(catalog_output_folder):
         assert [-180.0, -90.0, 180.0, 90.0] in collection_json["extent"]["spatial"]["bbox"]
         # test that time interval is 1970-today
         assert collection_json["extent"]["temporal"]["interval"][0][0] == start_date
-        assert (
-            datetime.today().date()
-            == parser.parse(collection_json["extent"]["temporal"]["interval"][0][1]).date()
-        )
+        assert datetime.today().date() == parser.parse(collection_json["extent"]["temporal"]["interval"][0][1]).date()
     child_collection_path = os.path.join(root_collection_path, collection_name)
     child_child_collection_path = os.path.join(child_collection_path, collection_name)
     item_dir = os.path.join(child_child_collection_path, "1970")
@@ -155,16 +152,8 @@ def test_baselayers_and_overlays_added(catalog_output_folder):
     root_collection_path = os.path.join(catalog_output_folder, collection_name)
     with open(os.path.join(root_collection_path, "collection.json")) as fp:
         collection_json = json.load(fp)
-        baselayer_links = [
-            link
-            for link in collection_json["links"]
-            if link.get("roles") and "baselayer" in link["roles"]
-        ]
-        overlay_links = [
-            link
-            for link in collection_json["links"]
-            if link.get("roles") and "overlay" in link["roles"]
-        ]
+        baselayer_links = [link for link in collection_json["links"] if link.get("roles") and "baselayer" in link["roles"]]
+        overlay_links = [link for link in collection_json["links"] if link.get("roles") and "overlay" in link["roles"]]
         assert len(baselayer_links) == 1
         assert len(overlay_links) == 1
         # test that attribution gets passed to a link dict
@@ -181,18 +170,11 @@ def test_geojson_dataset_handled(catalog_output_folder):
     assert len(item_paths) == 1
     with open(os.path.join(child_collection_path, "collection.json")) as fp:
         collection_json = json.load(fp)
-        geojson_links = [
-            link
-            for link in collection_json["links"]
-            if (link.get("rel", "") == "item" and len(link.get("assets", [])) > 0)
-        ]
+        geojson_links = [link for link in collection_json["links"] if (link.get("rel", "") == "item" and len(link.get("assets", [])) > 0)]
         # geojson link with assets exists
         assert len(geojson_links) > 0
         # and has a correct value
-        assert (
-            geojson_links[0]["assets"][0]
-            == "https://raw.githubusercontent.com/eodash/eodash_catalog/main/tests/test-data/regional_forecast.json"
-        )
+        assert geojson_links[0]["assets"][0] == "https://raw.githubusercontent.com/eodash/eodash_catalog/main/tests/test-data/regional_forecast.json"
         # epsg code saved on collection
         assert collection_json["proj:epsg"] == 3035
     with open(os.path.join(item_dir, item_paths[0])) as fp:
@@ -224,11 +206,7 @@ def test_baselayer_with_custom_projection_added(catalog_output_folder):
     root_collection_path = os.path.join(catalog_output_folder, collection_name)
     with open(os.path.join(root_collection_path, "collection.json")) as fp:
         indicator_json = json.load(fp)
-        baselayer_links = [
-            link
-            for link in indicator_json["links"]
-            if link.get("roles") and "baselayer" in link["roles"]
-        ]
+        baselayer_links = [link for link in indicator_json["links"] if link.get("roles") and "baselayer" in link["roles"]]
         # test that manual BaseLayers definition
         # overwrites default_baselayers, so there is just 1
         assert len(baselayer_links) == 1
@@ -253,11 +231,7 @@ def test_collection_locations_processing(catalog_output_folder_json):
         collection_json: dict = json.load(fp)
         # test that locations on collection level is set to true
         assert collection_json["locations"] is True
-    location_folders = [
-        name
-        for name in os.listdir(child_collection_path)
-        if os.path.isdir(os.path.join(child_collection_path, name))
-    ]
+    location_folders = [name for name in os.listdir(child_collection_path) if os.path.isdir(os.path.join(child_collection_path, name))]
     # we specify two locations in this test config
     assert len(location_folders) == 2
     location_dir = os.path.join(child_collection_path, "Balaton")

@@ -145,9 +145,7 @@ class Duration:
         objects.
         """
         if isinstance(other, Duration):
-            newduration = Duration(
-                years=self.years + other.years, months=self.months + other.months
-            )
+            newduration = Duration(years=self.years + other.years, months=self.months + other.months)
             newduration.tdelta = self.tdelta + other.tdelta
             return newduration
         try:
@@ -196,9 +194,7 @@ class Duration:
         objects.
         """
         if isinstance(other, Duration):
-            newduration = Duration(
-                years=self.years - other.years, months=self.months - other.months
-            )
+            newduration = Duration(years=self.years - other.years, months=self.months - other.months)
             newduration.tdelta = self.tdelta - other.tdelta
             return newduration
         try:
@@ -252,10 +248,7 @@ class Duration:
         the two Durations are considered equal.
         """
         if isinstance(other, Duration):
-            return bool(
-                self.years * 12 + self.months == other.years * 12 + other.months
-                and self.tdelta == other.tdelta
-            )
+            return bool(self.years * 12 + self.months == other.years * 12 + other.months and self.tdelta == other.tdelta)
         # check if other con be compared against timedelta object
         # will raise an AssertionError when optimisation is off
         if self.years == 0 and self.months == 0:
@@ -268,10 +261,7 @@ class Duration:
         the two Durations are considered not equal.
         """
         if isinstance(other, Duration):
-            return bool(
-                self.years * 12 + self.months != other.years * 12 + other.months
-                or self.tdelta != other.tdelta
-            )
+            return bool(self.years * 12 + self.months != other.years * 12 + other.months or self.tdelta != other.tdelta)
         # check if other can be compared against timedelta object
         # will raise an AssertionError when optimisation is off
         if self.years == 0 and self.months == 0:
