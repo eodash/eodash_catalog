@@ -1863,15 +1863,7 @@ def handle_tipg_endpoint(
     countries = set()
     time_param = endpoint_config.get("TimeParameter", "time")
     aggregation = endpoint_config.get("Aggregation", "day")
-    match aggregation:
-        case "day":
-            time_format = "%Y-%m-%d"
-        case "month":
-            time_format = "%Y-%m"
-        case "year":
-            time_format = "%Y"
-        case _:
-            time_format = "%Y-%m-%d"
+    time_format = "%Y-%m-%d"
 
     for feat in location_features:
         props = feat.get("properties", {})
