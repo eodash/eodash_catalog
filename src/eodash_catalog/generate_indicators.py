@@ -328,6 +328,7 @@ def _process_single_resource(
         "COG source",
         "GeoJSON source",
         "FlatGeobuf source",
+        "GeoZarr source",
     ]:
         collection = handle_raw_source(
             catalog_config,
