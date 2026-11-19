@@ -535,6 +535,143 @@ def create_web_map_link(collection: Collection, catalog_config: dict, layer_conf
     return wml
 
 
+def extract_geozarr_metadata(
+    zarr_url: str,
+    configured_bands: list[str] | None = None,
+) -> dict:
+    """Inspect a GeoZarr (Zarr v3) store's consolidated metadata to extract bands and STAC datacube fields."""
+    base_url = zarr_url.rstrip("/")
+    if base_url.endswith("/zarr.json"):
+        base_url = base_url[: -len("/zarr.json")]
+
+    root_attrs: dict = {}
+    metadata: dict = {}
+
+    try:
+        res = requests.get(f"{base_url}/zarr.json", timeout=15)
+        if res.status_code == 200:
+            z3_json = res.json()
+            root_attrs = z3_json.get("attributes", {})
+            metadata = z3_json.get("consolidated_metadata", {}).get("metadata", {}) or z3_json.get("metadata", {})
+    except Exception as exc:
+        LOGGER.warning(f"Failed to fetch GeoZarr metadata from {zarr_url}: {exc}")
+
+    spatial_dims = root_attrs.get("spatial:dimensions")
+    y_dim = spatial_dims[0] if isinstance(spatial_dims, list) and len(spatial_dims) == 2 else None
+    x_dim = spatial_dims[1] if isinstance(spatial_dims, list) and len(spatial_dims) == 2 else None
+
+    discovered_vars: dict[str, dict] = {}
+    dim_attrs: dict[str, dict] = {}
+
+    for key, val in metadata.items():
+        if not isinstance(val, dict) or val.get("node_type") != "array":
+            continue
+
+        base_path = key[: -len("/zarr.json")] if key.endswith("/zarr.json") else key
+        parts = [p for p in base_path.split("/") if p]
+        non_numeric_parts = [p for p in parts if not p.isdigit()]
+        if not non_numeric_parts:
+            continue
+        var_name = non_numeric_parts[-1]
+
+        attrs: dict = val.get("attributes", {}) or {}
+        shape = val.get("shape")
+        dimensions = val.get("dimension_names")
+
+        # Scalar/1D arrays are coordinate or grid-mapping arrays in GeoZarr
+        if not isinstance(shape, list) or len(shape) <= 1:
+            if attrs and var_name not in dim_attrs:
+                dim_attrs[var_name] = attrs
+            continue
+        if not isinstance(dimensions, list) or len(dimensions) <= 1:
+            continue
+        # Skip 2D auxiliary coordinate grids (e.g. curvilinear latitude/longitude)
+        if attrs.get("standard_name") in ("latitude", "longitude") and var_name in ("latitude", "longitude"):
+            continue
+
+        description = attrs.get("long_name") or attrs.get("standard_name") or attrs.get("description") or var_name
+        unit = attrs.get("units")
+
+        if var_name not in discovered_vars:
+            discovered_vars[var_name] = {
+                "name": var_name,
+                "description": description,
+                "unit": unit,
+                "dimensions": dimensions,
+            }
+        else:
+            existing = discovered_vars[var_name]
+            if description != var_name and existing["description"] == var_name:
+                existing["description"] = description
+            if unit and not existing["unit"]:
+                existing["unit"] = unit
+
+    selected_names = list(configured_bands) if configured_bands else list(discovered_vars.keys())
+    bands = []
+    cube_variables = {}
+    used_dims: list[str] = []
+
+    for name in selected_names:
+        info = discovered_vars.get(name)
+        band_entry: dict = {"name": name}
+        if info:
+            if info.get("description"):
+                band_entry["description"] = info["description"]
+            if info.get("unit"):
+                band_entry["unit"] = info["unit"]
+            var_entry: dict = {
+                "type": "data",
+                "dimensions": info.get("dimensions") or [],
+            }
+            if info.get("unit"):
+                var_entry["unit"] = info["unit"]
+            if info.get("description"):
+                var_entry["description"] = info["description"]
+            cube_variables[name] = var_entry
+            for d in var_entry["dimensions"]:
+                if d not in used_dims:
+                    used_dims.append(d)
+        bands.append(band_entry)
+
+    cube_dimensions: dict[str, dict] = {}
+    spatial_bbox = root_attrs.get("spatial:bbox")
+    for d in used_dims:
+        d_attrs = dim_attrs.get(d, {})
+        if d == x_dim or (not x_dim and d.lower() in ("x", "lon", "longitude")):
+            dim_obj: dict = {"type": "spatial", "axis": "x"}
+            if isinstance(spatial_bbox, list) and len(spatial_bbox) >= 4:
+                dim_obj["extent"] = [spatial_bbox[0], spatial_bbox[2]]
+            cube_dimensions[d] = dim_obj
+        elif d == y_dim or (not y_dim and d.lower() in ("y", "lat", "latitude")):
+            dim_obj = {"type": "spatial", "axis": "y"}
+            if isinstance(spatial_bbox, list) and len(spatial_bbox) >= 4:
+                dim_obj["extent"] = [spatial_bbox[1], spatial_bbox[3]]
+            cube_dimensions[d] = dim_obj
+        elif d.lower() == "time" or " since " in str(d_attrs.get("units", "")):
+            dim_obj = {"type": "temporal"}
+            if d_attrs.get("units"):
+                dim_obj["unit"] = d_attrs["units"]
+            cube_dimensions[d] = dim_obj
+        else:
+            dim_obj = {"type": "vertical" if d.lower() in ("depth", "height", "level", "elevation", "pressure") else "other"}
+            if d_attrs.get("units"):
+                dim_obj["unit"] = d_attrs["units"]
+            if d_attrs.get("long_name"):
+                dim_obj["description"] = d_attrs["long_name"]
+            cube_dimensions[d] = dim_obj
+
+    result: dict = {}
+    if bands:
+        result["bands"] = bands
+    if cube_dimensions:
+        result["cube:dimensions"] = cube_dimensions
+    if cube_variables:
+        result["cube:variables"] = cube_variables
+    if proj_code := root_attrs.get("proj:code"):
+        result["proj:code"] = proj_code
+    return result
+
+
 def add_raw_assets(time_entry: dict, endpoint_config: dict, catalog_config: dict, role: str):
     assets = {}
     style_link = None
@@ -557,13 +694,25 @@ def add_raw_assets(time_entry: dict, endpoint_config: dict, catalog_config: dict
         media_type = "image/tiff"
     if endpoint_config["Name"] == "FlatGeobuf source":
         media_type = "application/vnd.flatgeobuf"
+    if endpoint_config["Name"] == "GeoZarr source":
+        style_type = "text/zarr-styles"
+        media_type = "application/vnd.zarr"
     for a in time_entry["Assets"]:
+        asset_extra_fields = dict(extra_fields_asset)
+        if endpoint_config["Name"] == "GeoZarr source":
+            configured_bands = a.get("Bands") or endpoint_config.get("Bands")
+            zarr_meta = extract_geozarr_metadata(a["File"], configured_bands)
+            for key in ("bands", "cube:dimensions", "cube:variables"):
+                if key in zarr_meta:
+                    asset_extra_fields[key] = zarr_meta[key]
+            if "proj:code" in zarr_meta and not endpoint_config.get("DataProjection"):
+                asset_extra_fields["proj:code"] = zarr_meta["proj:code"]
         asset = Asset(
             href=a["File"],
             title=a.get("Title", a["Identifier"]),
             roles=roles,
             media_type=media_type,
-            extra_fields=extra_fields_asset,
+            extra_fields=asset_extra_fields,
         )
         add_projection_info(endpoint_config, asset)
         assets[a["Identifier"]] = asset
@@ -923,6 +1072,7 @@ def add_base_overlay_info(collection: Collection, catalog_config: dict, collecti
                 "COG source",
                 "GeoJSON source",
                 "FlatGeobuf source",
+                "GeoZarr source",
             ]:
                 time_entry_structure, layer_config = convert_layers_config_to_assets_configs(layer)
                 assets, style_link = add_raw_assets(time_entry_structure, layer_config, catalog_config, role="baselayer")
@@ -947,6 +1097,7 @@ def add_base_overlay_info(collection: Collection, catalog_config: dict, collecti
                 "COG source",
                 "GeoJSON source",
                 "FlatGeobuf source",
+                "GeoZarr source",
             ]:
                 time_entry_structure, layer_config = convert_layers_config_to_assets_configs(layer)
                 assets, style_link = add_raw_assets(time_entry_structure, layer_config, catalog_config, role="overlay")

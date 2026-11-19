@@ -55,12 +55,8 @@ from eodash_catalog.utils import (
 LOGGER = get_logger(__name__)
 
 
-def process_WCS_rasdaman_Endpoint(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
-) -> Collection:
-    collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+def process_WCS_rasdaman_Endpoint(catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog) -> Collection:
+    collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     bbox, datetimes = retrieveExtentFromWCS(
         endpoint_config["EndPoint"],
         endpoint_config["CoverageId"],
@@ -74,9 +70,7 @@ def process_WCS_rasdaman_Endpoint(
             geometry=None,
             datetime=dt,
         )
-        add_visualization_info(
-            item, collection_config, endpoint_config, catalog_config, datetimes=[dt]
-        )
+        add_visualization_info(item, collection_config, endpoint_config, catalog_config, datetimes=[dt])
         link = collection.add_item(item)
         # bubble up information we want to the link
         link.extra_fields["datetime"] = format_datetime_to_isostring_zulu(dt)
@@ -98,9 +92,7 @@ def process_STAC_Datacube_Endpoint(
     catalog: Catalog,
     options: Options,
 ) -> Collection:
-    collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+    collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     add_visualization_info(
         collection,
         collection_config,
@@ -125,18 +117,13 @@ def process_STAC_Datacube_Endpoint(
     dimensions = item.properties.get("cube:dimensions", {})
     variables = item.properties.get("cube:variables", {})
     if endpoint_config.get("Variable") not in variables:
-        raise Exception(
-            f"Variable {endpoint_config.get('Variable')} not found in datacube {variables}"
-        )
+        raise Exception(f"Variable {endpoint_config.get('Variable')} not found in datacube {variables}")
     time_dimension = "time"
     for k, v in dimensions.items():
         if v.get("type") == "temporal":
             time_dimension = k
             break
-    datetimes = [
-        parse_datestring_to_tz_aware_datetime(time_string)
-        for time_string in dimensions.get(time_dimension).get("values")
-    ]
+    datetimes = [parse_datestring_to_tz_aware_datetime(time_string) for time_string in dimensions.get(time_dimension).get("values")]
     # optionally subset time results based on config
     if query := endpoint_config.get("Query"):
         datetimes = filter_time_entries(datetimes, query)
@@ -161,9 +148,7 @@ def process_STAC_Datacube_Endpoint(
             ep_st = endpoint_config.get("Style")
             style_link = Link(
                 rel="style",
-                target=ep_st
-                if ep_st.startswith("http")
-                else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                target=ep_st if ep_st.startswith("http") else f"{catalog_config['assets_endpoint']}/{ep_st}",
                 media_type="text/tileUrl-styles",
                 extra_fields={
                     "asset:keys": list(new_item.assets.keys()),
@@ -201,9 +186,7 @@ def handle_STAC_based_endpoint(
 ) -> Collection:
     coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     if collection_config.get("Locations"):
-        root_collection = get_or_create_collection(
-            catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-        )
+        root_collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
         for location in collection_config["Locations"]:
             identifier = location.get("Identifier", str(uuid.uuid4()))
             collection = process_STACAPI_Endpoint(
@@ -292,9 +275,7 @@ def process_STACAPI_Endpoint(
     if headers is None:
         headers = {}
     collection_id = endpoint_config["CollectionId"]
-    collection = get_or_create_collection(
-        catalog, collection_id, collection_config, catalog_config, endpoint_config
-    )
+    collection = get_or_create_collection(catalog, collection_id, collection_config, catalog_config, endpoint_config)
     datetime_query = ["1900-01-01T00:00:00Z", "3000-01-01T00:00:00Z"]
     if query := endpoint_config.get("Query"):
         if start := query.get("Start"):
@@ -339,9 +320,7 @@ def process_STACAPI_Endpoint(
             added_times[iso_datetime] = True
         if options.tn:
             if item.assets.get("cog_default"):
-                generate_thumbnail(
-                    item, collection_config, endpoint_config, item.assets["cog_default"].href
-                )
+                generate_thumbnail(item, collection_config, endpoint_config, item.assets["cog_default"].href)
             else:
                 generate_thumbnail(item, collection_config, endpoint_config)
         # Check if we can create visualization link
@@ -353,11 +332,7 @@ def process_STACAPI_Endpoint(
                 catalog_config,
                 item.id,
             )
-        elif (
-            endpoint_config.get("Name") == "VEDA"
-            and endpoint_config.get("Type") == "cog"
-            and item.assets.get("cog_default")
-        ):
+        elif endpoint_config.get("Name") == "VEDA" and endpoint_config.get("Type") == "cog" and item.assets.get("cog_default"):
             add_visualization_info(
                 item,
                 collection_config,
@@ -366,9 +341,7 @@ def process_STACAPI_Endpoint(
                 item.assets["cog_default"].href,
             )
         elif item_datetime:
-            add_visualization_info(
-                item, collection_config, endpoint_config, catalog_config, datetimes=[item_datetime]
-            )
+            add_visualization_info(item, collection_config, endpoint_config, catalog_config, datetimes=[item_datetime])
         elif item.properties.get("start_datetime") and item.properties.get("end_datetime"):
             add_visualization_info(
                 item,
@@ -391,9 +364,7 @@ def process_STACAPI_Endpoint(
         # we check if the item has any assets, if not we create a dummy asset
         if not item.assets:
             item.assets["dummy_asset"] = Asset(href="")
-        if "cog_default" in item.assets and item.assets["cog_default"].extra_fields.get(
-            "raster:bands"
-        ):
+        if "cog_default" in item.assets and item.assets["cog_default"].extra_fields.get("raster:bands"):
             # saving via pyarrow does not work well with statistics ranges
             # Integer value -10183824872833024 is outside of the range exactly
             # representable by a IEEE 754 double precision value
@@ -448,12 +419,8 @@ def handle_VEDA_endpoint(
     return collection
 
 
-def handle_collection_only(
-    catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog
-) -> Collection:
-    collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+def handle_collection_only(catalog_config: dict, endpoint_config: dict, collection_config: dict, catalog: Catalog) -> Collection:
+    collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     datetimes = get_collection_datetimes_from_config(endpoint_config)
     if len(datetimes) > 0:
         for dt in datetimes:
@@ -486,9 +453,7 @@ def handle_SH_WMS_endpoint(
     options: Options,
 ) -> Collection:
     # create collection and subcollections (based on locations)
-    root_collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+    root_collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     if collection_config.get("Locations"):
         for location in collection_config["Locations"]:
@@ -496,9 +461,7 @@ def handle_SH_WMS_endpoint(
             location_config = {
                 "Title": location["Name"],
             }
-            collection = get_or_create_collection(
-                catalog, location["Identifier"], location_config, catalog_config, endpoint_config
-            )
+            collection = get_or_create_collection(catalog, location["Identifier"], location_config, catalog_config, endpoint_config)
             if location.get("Description"):
                 collection.description = location["Description"]
             else:
@@ -519,9 +482,7 @@ def handle_SH_WMS_endpoint(
                     assets={"dummy_asset": Asset(href="")},
                 )
                 add_projection_info(endpoint_config, item)
-                add_visualization_info(
-                    item, collection_config, endpoint_config, catalog_config, datetimes=[dt]
-                )
+                add_visualization_info(item, collection_config, endpoint_config, catalog_config, datetimes=[dt])
                 items.append(item)
             save_items(
                 collection,
@@ -571,9 +532,7 @@ def handle_SH_WMS_endpoint(
                 assets={"dummy_asset": Asset(href="")},
             )
             add_projection_info(endpoint_config, item)
-            add_visualization_info(
-                item, collection_config, endpoint_config, catalog_config, datetimes=[dt]
-            )
+            add_visualization_info(item, collection_config, endpoint_config, catalog_config, datetimes=[dt])
             items.append(item)
         save_items(
             root_collection,
@@ -629,17 +588,10 @@ def handle_GeoDB_Features_endpoint(
 ) -> Collection:
     # ID of collection is data["Name"] instead of CollectionId to be able to
     # create more STAC collections from one geoDB table
-    collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+    collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     select = f"?select={endpoint_config['TimeParameter']}"
-    url = (
-        endpoint_config["EndPoint"]
-        + endpoint_config["Database"]
-        + "_{}".format(endpoint_config["CollectionId"])
-        + select
-    )
+    url = endpoint_config["EndPoint"] + endpoint_config["Database"] + "_{}".format(endpoint_config["CollectionId"]) + select
     response = json.loads(requests.get(url).text)
     # Use aggregation value to group datetime results
     aggregation = endpoint_config.get("Aggregation", "day")
@@ -648,18 +600,14 @@ def handle_GeoDB_Features_endpoint(
         time_object = datetime.fromisoformat(value[endpoint_config["TimeParameter"]])
         match aggregation:
             case "day":
-                unique_datetimes.add(
-                    datetime(time_object.year, time_object.month, time_object.day).date()
-                )
+                unique_datetimes.add(datetime(time_object.year, time_object.month, time_object.day).date())
             case "month":
                 unique_datetimes.add(datetime(time_object.year, time_object.month, 1).date())
             case "year":
                 unique_datetimes.add(datetime(time_object.year, 1, 1).date())
             case _:
                 # default to day
-                unique_datetimes.add(
-                    datetime(time_object.year, time_object.month, time_object.day).date()
-                )
+                unique_datetimes.add(datetime(time_object.year, time_object.month, time_object.day).date())
     # go over unique datetimes and create items
     items = []
     for dt in sorted(unique_datetimes):
@@ -684,9 +632,7 @@ def handle_GeoDB_Features_endpoint(
             id=format_datetime_to_isostring_zulu(item_datetime),
             bbox=endpoint_config.get("OverwriteBBox", [-180, -90, 180, 90]),
             properties={},
-            geometry=create_geometry_from_bbox(
-                endpoint_config.get("OverwriteBBox", [-180, -90, 180, 90])
-            ),
+            geometry=create_geometry_from_bbox(endpoint_config.get("OverwriteBBox", [-180, -90, 180, 90])),
             datetime=item_datetime,
             stac_extensions=[],
             assets=assets,
@@ -696,9 +642,7 @@ def handle_GeoDB_Features_endpoint(
             ep_st = endpoint_config.get("Style")
             style_link = Link(
                 rel="style",
-                target=ep_st
-                if ep_st.startswith("http")
-                else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                target=ep_st if ep_st.startswith("http") else f"{catalog_config['assets_endpoint']}/{ep_st}",
                 media_type="text/vector-styles",
                 extra_fields={
                     "asset:keys": list(assets),
@@ -729,17 +673,10 @@ def handle_GeoDB_endpoint(
 ) -> Collection:
     # ID of collection is data["Name"] instead of CollectionId to be able to
     # create more STAC collections from one geoDB table
-    collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+    collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     select = "?select=aoi,aoi_id,country,city,time,input_data,sub_aoi"
-    url = (
-        endpoint_config["EndPoint"]
-        + endpoint_config["Database"]
-        + "_{}".format(endpoint_config["CollectionId"])
-        + select
-    )
+    url = endpoint_config["EndPoint"] + endpoint_config["Database"] + "_{}".format(endpoint_config["CollectionId"]) + select
     if additional_query_parameters := endpoint_config.get("AdditionalQueryString"):
         url += f"&{additional_query_parameters}"
     response = json.loads(requests.get(url).text)
@@ -762,9 +699,7 @@ def handle_GeoDB_endpoint(
             countries.append(country)
         # sanitize unique key identifier to be sure it is saveable as a filename
         if IdValue is not None:
-            IdValue = "".join(
-                [c for c in IdValue if c.isalpha() or c.isdigit() or c == " "]
-            ).rstrip()
+            IdValue = "".join([c for c in IdValue if c.isalpha() or c.isdigit() or c == " "]).rstrip()
         # Additional check to see if unique key name is empty afterwards
         if IdValue == "" or IdValue is None:
             # use aoi_id as a fallback unique id instead of configured key
@@ -782,9 +717,7 @@ def handle_GeoDB_endpoint(
             "Title": f"{city} - {collection_config['Name']}",
             "Description": collection_config["Description"],
         }
-        locations_collection = get_or_create_collection(
-            collection, key, sc_config, catalog_config, endpoint_config
-        )
+        locations_collection = get_or_create_collection(collection, key, sc_config, catalog_config, endpoint_config)
         # check if input data is none
         if input_data is None:
             input_data = []
@@ -795,22 +728,14 @@ def handle_GeoDB_endpoint(
                 # extract datetimes from another table if configured so and match it based on aoi_id
                 # special for E13d
                 select = f"?select=time&aoi_id=eq.{key}"
-                url = (
-                    endpoint_config["EndPoint"]
-                    + endpoint_config["Database"]
-                    + "_{}".format(endpoint_config["MapTimesCollection"])
-                    + select
-                )
+                url = endpoint_config["EndPoint"] + endpoint_config["Database"] + "_{}".format(endpoint_config["MapTimesCollection"]) + select
                 response = json.loads(requests.get(url).text)
                 content_for_individual_datetimes = []
                 for response_obj in response:
                     time_object = datetime.fromisoformat(response_obj["time"])
                     for searched_row in values:
                         search_datetime = datetime.fromisoformat(searched_row["time"])
-                        if (
-                            search_datetime.month == time_object.month
-                            and search_datetime.year == time_object.year
-                        ):
+                        if search_datetime.month == time_object.month and search_datetime.year == time_object.year:
                             break
                     insert_row = copy.deepcopy(searched_row)
                     # overwrite time with one from another collection and save
@@ -818,15 +743,11 @@ def handle_GeoDB_endpoint(
                     content_for_individual_datetimes.append(insert_row)
             for v in content_for_individual_datetimes:
                 # add items based on inputData fields for each time step available in values
-                first_match: dict = next(
-                    (item for item in input_data if item.get("Identifier") == v["input_data"]), None
-                )
+                first_match: dict = next((item for item in input_data if item.get("Identifier") == v["input_data"]), None)
                 time_object = datetime.fromisoformat(v["time"])
                 if endpoint_config.get("MapReplaceDates"):
                     # get mapping of AOI_ID to list of dates
-                    available_dates_for_aoi_id = endpoint_config.get("MapReplaceDates").get(
-                        v["aoi_id"]
-                    )
+                    available_dates_for_aoi_id = endpoint_config.get("MapReplaceDates").get(v["aoi_id"])
                     if available_dates_for_aoi_id:
                         formatted_datetime = time_object.strftime("%Y-%m-%d")
                         if formatted_datetime not in available_dates_for_aoi_id:
@@ -874,9 +795,7 @@ def handle_GeoDB_endpoint(
                     ep_st = endpoint_config.get("Style")
                     style_link = Link(
                         rel="style",
-                        target=ep_st
-                        if ep_st.startswith("http")
-                        else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                        target=ep_st if ep_st.startswith("http") else f"{catalog_config['assets_endpoint']}/{ep_st}",
                         media_type="text/vector-styles",
                         extra_fields={
                             "asset:keys": list(assets),
@@ -899,12 +818,8 @@ def handle_GeoDB_endpoint(
                                 used_delta = timedelta(days=1)
                                 if "TimeDelta" in first_match:
                                     used_delta = timedelta(minutes=first_match["TimeDelta"])
-                                end_date = format_datetime_to_isostring_zulu(
-                                    time_object + used_delta - timedelta(milliseconds=1)
-                                )
-                                extra_fields.update(
-                                    {"wms:dimensions": {"TIME": f"{start_date}/{end_date}"}}
-                                )
+                                end_date = format_datetime_to_isostring_zulu(time_object + used_delta - timedelta(milliseconds=1))
+                                extra_fields.update({"wms:dimensions": {"TIME": f"{start_date}/{end_date}"}})
                                 # we add the instance id to the url
                                 url = f"{url}{instanceId}"
                             else:
@@ -923,9 +838,7 @@ def handle_GeoDB_endpoint(
                             url = first_match["Url"]
                             extra_fields = {}
                             # replace time to a formatted version
-                            date_formatted = time_object.strftime(
-                                first_match.get("DateFormat", "%Y_%m_%d")
-                            )
+                            date_formatted = time_object.strftime(first_match.get("DateFormat", "%Y_%m_%d"))
                             target_url = url.replace("{time}", date_formatted)
                             if SiteMapping := first_match.get("SiteMapping"):
                                 # match with aoi_id
@@ -934,9 +847,7 @@ def handle_GeoDB_endpoint(
                                 if site:
                                     target_url = target_url.replace("{site}", site)
                                 else:
-                                    LOGGER.info(
-                                        f"Warning: no match for SiteMapping in config for {site}"
-                                    )
+                                    LOGGER.info(f"Warning: no match for SiteMapping in config for {site}")
                             link = Link(
                                 rel="xyz",
                                 target=target_url,
@@ -977,9 +888,7 @@ def handle_GeoDB_endpoint(
             individual_datetimes = [datetime.fromisoformat(v["time"]) for v in values]
             time_extent = [min(individual_datetimes), max(individual_datetimes)]
             locations_collection.extent.temporal = TemporalExtent([time_extent])
-        add_process_info_child_collection(
-            locations_collection, catalog_config, collection_config, key
-        )
+        add_process_info_child_collection(locations_collection, catalog_config, collection_config, key)
         locations_collection.description = collection.description
         locations_collection.extra_fields["subcode"] = key
         link = collection.add_child(locations_collection)
@@ -1021,9 +930,7 @@ def handle_SH_endpoint(
     endpoint_config["EndPoint"] = f"https://{endpoint_url_parts.netloc}/api/v1/catalog/1.0.0/"
     # Overwrite collection id with type, such as ZARR or BYOC
     if endpoint_config.get("Type"):
-        endpoint_config["CollectionId"] = (
-            endpoint_config["Type"] + "-" + endpoint_config["CollectionId"]
-        )
+        endpoint_config["CollectionId"] = endpoint_config["Type"] + "-" + endpoint_config["CollectionId"]
     collection = handle_STAC_based_endpoint(
         catalog_config,
         endpoint_config,
@@ -1045,9 +952,7 @@ def handle_WMS_endpoint(
     options: Options,
     wmts: bool = False,
 ) -> Collection:
-    collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+    collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     datetimes = get_collection_datetimes_from_config(endpoint_config)
     spatial_extent = collection.extent.spatial.to_dict().get("bbox", [-180, -90, 180, 90])[0]
@@ -1114,9 +1019,7 @@ def handle_WMS_endpoint(
             )
             add_projection_info(endpoint_config, item)
             dt_visualization = dt if isinstance(dt, list) else [dt]
-            add_visualization_info(
-                item, collection_config, endpoint_config, catalog_config, datetimes=dt_visualization
-            )
+            add_visualization_info(item, collection_config, endpoint_config, catalog_config, datetimes=dt_visualization)
             items.append(item)
     else:
         LOGGER.warn(f"NO datetimes returned for collection: {collection_config['Name']}!")
@@ -1174,9 +1077,7 @@ def generate_veda_tiles_link(endpoint_config: dict, item: str | None) -> str:
                 rescale += f"&rescale={rescale_config[0]},{rescale_config[1]}"
         else:
             # shared rescale definition for all bands
-            rescale = "&rescale={},{}".format(
-                endpoint_config["Rescale"][0], endpoint_config["Rescale"][1]
-            )
+            rescale = "&rescale={},{}".format(endpoint_config["Rescale"][0], endpoint_config["Rescale"][1])
 
     expression = ""
     if expr := endpoint_config.get("Expression"):
@@ -1224,9 +1125,7 @@ def add_visualization_info(
 ) -> None:
     extra_fields: dict[str, list[str] | dict[str, str]] = {}
     if endpoint_config.get("Attribution"):
-        stac_object.stac_extensions.append(
-            "https://stac-extensions.github.io/attribution/v0.1.0/schema.json"
-        )
+        stac_object.stac_extensions.append("https://stac-extensions.github.io/attribution/v0.1.0/schema.json")
         extra_fields["attribution"] = endpoint_config["Attribution"]
     # add extension reference
     if endpoint_config["Name"] == "Sentinel Hub" or endpoint_config["Name"] == "Sentinel Hub WMS":
@@ -1285,9 +1184,7 @@ def add_visualization_info(
         if collection_config.get("EodashIdentifier") == "FNF":
             extra_fields.update(
                 {
-                    "wms:layers": endpoint_config.get("LayerId", "").replace(
-                        "{time}", (datetimes is not None and str(datetimes[0].year)) or "2020"
-                    ),
+                    "wms:layers": endpoint_config.get("LayerId", "").replace("{time}", (datetimes is not None and str(datetimes[0].year)) or "2020"),
                 }
             )
         dimensions = {}
@@ -1295,9 +1192,7 @@ def add_visualization_info(
             for key, value in dimensions_config.items():
                 # special replace for world_settlement_footprint
                 if collection_config.get("EodashIdentifier") == "WSF":
-                    value = value.replace(
-                        "{time}", (datetimes is not None and str(datetimes[0].year)) or "{time}"
-                    )
+                    value = value.replace("{time}", (datetimes is not None and str(datetimes[0].year)) or "{time}")
                 dimensions[key] = value
         if datetimes is not None:
             if len(datetimes) > 1:
@@ -1382,9 +1277,7 @@ def add_visualization_info(
                 if isinstance(stac_object, Item)
                 else "{time}"
             )
-            target_url = (
-                "{}/tiles/{}/{}/{{z}}/{{y}}/{{x}}?crs={}&time={}&vmin={}&vmax={}&cbar={}"
-            ).format(
+            target_url = ("{}/tiles/{}/{}/{{z}}/{{y}}/{{x}}?crs={}&time={}&vmin={}&vmax={}&cbar={}").format(
                 endpoint_config["EndPoint"],
                 endpoint_config["DatacubeId"],
                 endpoint_config["Variable"],
@@ -1464,9 +1357,7 @@ def handle_custom_endpoint(
     collection_config: dict,
     catalog: Catalog,
 ) -> Collection:
-    collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+    collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     # invoke 3rd party code and return
     function_path = endpoint_config["Python_Function_Location"]
     module_name, _, func_name = function_path.rpartition(".")
@@ -1474,9 +1365,7 @@ def handle_custom_endpoint(
     sys.path.append(os.getcwd())
     try:
         # import configured function
-        imported_function: Callable[[Collection, dict, dict, dict], Collection] = getattr(
-            importlib.import_module(module_name), func_name
-        )
+        imported_function: Callable[[Collection, dict, dict, dict], Collection] = getattr(importlib.import_module(module_name), func_name)
     except ModuleNotFoundError as e:
         LOGGER.warn(
             f"""function {func_name} from module {module_name} can not be imported.
@@ -1519,9 +1408,7 @@ def _populate_raw_source_collection(
                 extra_fields={},
             )
             if endpoint_config.get("Attribution"):
-                item.stac_extensions.append(
-                    "https://stac-extensions.github.io/attribution/v0.1.0/schema.json"
-                )
+                item.stac_extensions.append("https://stac-extensions.github.io/attribution/v0.1.0/schema.json")
                 item.extra_fields["attribution"] = endpoint_config["Attribution"]
             if "MergeAssets" in endpoint_config:
                 item.extra_fields["eodash:merge_assets"] = endpoint_config["MergeAssets"]
@@ -1530,6 +1417,25 @@ def _populate_raw_source_collection(
                 endpoint_config,
                 item,
             )
+            cube_dims = {}
+            cube_vars = {}
+            for asset in assets.values():
+                if asset_dims := asset.extra_fields.get("cube:dimensions"):
+                    cube_dims.update(asset_dims)
+                if asset_vars := asset.extra_fields.get("cube:variables"):
+                    cube_vars.update(asset_vars)
+            if cube_dims or cube_vars:
+                datacube_ext = "https://stac-extensions.github.io/datacube/v2.2.0/schema.json"
+                if datacube_ext not in item.stac_extensions:
+                    item.stac_extensions.append(datacube_ext)
+                if datacube_ext not in collection.stac_extensions:
+                    collection.stac_extensions.append(datacube_ext)
+                if cube_dims:
+                    item.properties["cube:dimensions"] = cube_dims
+                    collection.extra_fields.setdefault("cube:dimensions", {}).update(cube_dims)
+                if cube_vars:
+                    item.properties["cube:variables"] = cube_vars
+                    collection.extra_fields.setdefault("cube:variables", {}).update(cube_vars)
             if style_link:
                 item.add_link(style_link)
             items.append(item)
@@ -1583,9 +1489,7 @@ def handle_raw_source(
     catalog: Catalog,
     options: Options,
 ) -> Collection:
-    root_collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+    root_collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     if collection_config.get("Locations"):
         cities = []
@@ -1609,9 +1513,7 @@ def handle_raw_source(
             location_config = {
                 "Title": location["Name"],
             }
-            collection = get_or_create_collection(
-                catalog, identifier, location_config, catalog_config, loc_endpoint_config
-            )
+            collection = get_or_create_collection(catalog, identifier, location_config, catalog_config, loc_endpoint_config)
             if location.get("Description"):
                 collection.description = location["Description"]
             else:
@@ -1641,9 +1543,7 @@ def handle_raw_source(
                 else:
                     countries.append(country)
 
-            add_process_info_child_collection(
-                collection, catalog_config, collection_config, identifier
-            )
+            add_process_info_child_collection(collection, catalog_config, collection_config, identifier)
             add_collection_information(catalog_config, collection, collection_config)
             add_base_overlay_info(collection, catalog_config, collection_config)
 
@@ -1677,18 +1577,14 @@ def handle_vector_tile_source(
     options: Options,
     mapbox_style: bool = False,
 ) -> Collection:
-    collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+    collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
     if len(endpoint_config.get("TimeEntries", [])) > 0:
         items = []
         style_link = None
         for time_entry in endpoint_config["TimeEntries"]:
             # create Item for each time entry
-            media_type = (
-                "application/json" if mapbox_style else "application/vnd.mapbox-vector-tile"
-            )
+            media_type = "application/json" if mapbox_style else "application/vnd.mapbox-vector-tile"
             style_type = "text/vector-styles"
             bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
             dt = parse_datestring_to_tz_aware_datetime(time_entry["Time"])
@@ -1731,17 +1627,13 @@ def handle_vector_tile_source(
                 item,
             )
             if endpoint_config.get("Attribution"):
-                item.stac_extensions.append(
-                    "https://stac-extensions.github.io/attribution/v0.1.0/schema.json"
-                )
+                item.stac_extensions.append("https://stac-extensions.github.io/attribution/v0.1.0/schema.json")
                 item.extra_fields["attribution"] = endpoint_config["Attribution"]
             # add style
             if ep_st := endpoint_config.get("Style"):
                 style_link = Link(
                     rel="style",
-                    target=ep_st
-                    if ep_st.startswith("http")
-                    else f"{catalog_config['assets_endpoint']}/{ep_st}",
+                    target=ep_st if ep_st.startswith("http") else f"{catalog_config['assets_endpoint']}/{ep_st}",
                     media_type=style_type,
                     extra_fields={"links:keys": [identifier]},
                 )
@@ -1765,15 +1657,11 @@ def handle_vector_tile_source(
 
 def _derive_tipg_urls(endpoint_config: dict, collection_config: dict) -> tuple[str, str, str, str]:
     if "EndPoint" not in endpoint_config:
-        raise ValueError(
-            f"Missing required 'EndPoint' in tipg resource for {collection_config.get('Name')}"
-        )
+        raise ValueError(f"Missing required 'EndPoint' in tipg resource for {collection_config.get('Name')}")
     ep_base = endpoint_config["EndPoint"].rstrip("/")
 
     if "CollectionId" not in endpoint_config:
-        raise ValueError(
-            f"Missing required 'CollectionId' in tipg resource for {collection_config.get('Name')}"
-        )
+        raise ValueError(f"Missing required 'CollectionId' in tipg resource for {collection_config.get('Name')}")
     coll_id = endpoint_config["CollectionId"]
 
     # Extract schema and root prefix from CollectionId: <schema>.<prefix> or <prefix>
@@ -1804,16 +1692,12 @@ def _derive_tipg_urls(endpoint_config: dict, collection_config: dict) -> tuple[s
             coll_part, query_part = times_coll.split("?", 1)
             times_url = f"{ep_base}/collections/{coll_part}/items?{query_part}&properties={t_param}&limit=10000&f=json"
         else:
-            times_url = (
-                f"{ep_base}/collections/{times_coll}/items?properties={t_param}&limit=10000&f=json"
-            )
+            times_url = f"{ep_base}/collections/{times_coll}/items?properties={t_param}&limit=10000&f=json"
 
     # 3. Timeseries Template (for per-location querying in 2-table approach)
     ts_default = f"{schema_prefix}{prefix}_timeseries_by_id"
     ts_coll = endpoint_config.get("TimeseriesCollection", ts_default)
-    ts_url_template = (
-        f"{ep_base}/collections/{ts_coll}/items?target_id={{{{feature}}}}&f=json&limit=10000"
-    )
+    ts_url_template = f"{ep_base}/collections/{ts_coll}/items?target_id={{{{feature}}}}&f=json&limit=10000"
 
     # 4. Locations Endpoint (only for collections with locations)
     loc_url = ""
@@ -1832,14 +1716,10 @@ def handle_tipg_endpoint(
     catalog: Catalog,
     options: Options,
 ) -> Collection:
-    collection = get_or_create_collection(
-        catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config
-    )
+    collection = get_or_create_collection(catalog, collection_config["Name"], collection_config, catalog_config, endpoint_config)
     coll_path_rel_to_root_catalog = f"{coll_path_rel_to_root_catalog}/{collection_config['Name']}"
 
-    times_url, ts_url_template, loc_url, url_template = _derive_tipg_urls(
-        endpoint_config, collection_config
-    )
+    times_url, ts_url_template, loc_url, url_template = _derive_tipg_urls(endpoint_config, collection_config)
 
     # 1. Fetch Locations / Geometries
     location_features = []
@@ -1928,9 +1808,7 @@ def handle_tipg_endpoint(
                 elif isinstance(ts_res, dict) and "features" in ts_res:
                     loc_records = [f.get("properties", {}) for f in ts_res["features"]]
             else:
-                LOGGER.warn(
-                    f"Failed timeseries query for {aoi_id} from {loc_ts_url}: {resp_ts.status_code}"
-                )
+                LOGGER.warn(f"Failed timeseries query for {aoi_id} from {loc_ts_url}: {resp_ts.status_code}")
 
         location_items = []
         loc_datetimes = []
@@ -1947,9 +1825,7 @@ def handle_tipg_endpoint(
 
             if has_input_data:
                 row_input_data = r.get("input_data")
-                match_input = next(
-                    (item for item in input_data if item.get("Identifier") == row_input_data), None
-                )
+                match_input = next((item for item in input_data if item.get("Identifier") == row_input_data), None)
                 if match_input:
                     item = build_wms_xyz_item(
                         match_input=match_input,
@@ -1990,9 +1866,7 @@ def handle_tipg_endpoint(
     if not location_features:
         direct_url = times_url
         if not direct_url and ts_url_template:
-            direct_url = (
-                ts_url_template.replace("{{feature}}", "").replace("target_id=", "").rstrip("?&")
-            )
+            direct_url = ts_url_template.replace("{{feature}}", "").replace("target_id=", "").rstrip("?&")
         if direct_url:
             LOGGER.info(f"Querying tipg timestamps from: {direct_url}")
             resp = requests.get(direct_url)
@@ -2004,9 +1878,7 @@ def handle_tipg_endpoint(
                     raw_time = p.get(time_param)
                     if raw_time:
                         with suppress(Exception):
-                            all_unique_datetimes.add(
-                                parse_datestring_to_tz_aware_datetime(str(raw_time))
-                            )
+                            all_unique_datetimes.add(parse_datestring_to_tz_aware_datetime(str(raw_time)))
 
     # 3. For collections without InputData, generate root-level VectorTile items
     if not has_input_data:
@@ -2023,9 +1895,7 @@ def handle_tipg_endpoint(
                     unique_aggregated.add(datetime(dt.year, dt.month, dt.day, tzinfo=timezone.utc))
 
         items = []
-        bbox = endpoint_config.get(
-            "Bbox", endpoint_config.get("OverwriteBBox", [-180, -85, 180, 85])
-        )
+        bbox = endpoint_config.get("Bbox", endpoint_config.get("OverwriteBBox", [-180, -85, 180, 85]))
         media_type = "application/vnd.mapbox-vector-tile"
         style_type = "text/vector-styles"
         rel = "vector-tile"
@@ -2057,11 +1927,7 @@ def handle_tipg_endpoint(
             add_projection_info(endpoint_config, item)
 
             if ep_st := endpoint_config.get("Style"):
-                target_style = (
-                    ep_st
-                    if ep_st.startswith("http")
-                    else f"{catalog_config['assets_endpoint']}/{ep_st}"
-                )
+                target_style = ep_st if ep_st.startswith("http") else f"{catalog_config['assets_endpoint']}/{ep_st}"
                 style_link = Link(
                     rel="style",
                     target=target_style,
