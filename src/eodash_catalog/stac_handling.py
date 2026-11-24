@@ -2,10 +2,12 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from math import isfinite
 from urllib.parse import parse_qs, urljoin, urlparse
 
 import requests
 import spdx_lookup as lookup
+import zarr
 from pystac import (
     Asset,
     Catalog,
@@ -18,7 +20,9 @@ from pystac import (
     SpatialExtent,
     TemporalExtent,
 )
+from pystac.utils import datetime_to_str
 from structlog import get_logger
+from zarr.storage import FsspecStore
 
 from eodash_catalog.colormaps import (
     MARINE_COLORMAPS,
@@ -535,6 +539,28 @@ def create_web_map_link(collection: Collection, catalog_config: dict, layer_conf
     return wml
 
 
+def _read_geozarr_time_extent(base_url: str, path: str, attrs: dict) -> list[str] | None:
+    """Read a one-dimensional, CF-encoded time coordinate without loading raster variables."""
+    units, separator, reference = str(attrs.get("units", "")).partition(" since ")
+    unit = units.strip().lower().removesuffix("s") + "s"
+    if not separator or unit not in {"days", "hours", "minutes", "seconds", "milliseconds", "microseconds"}:
+        return None
+    if attrs.get("calendar", "standard") not in {"standard", "gregorian", "proleptic_gregorian"}:
+        return None
+
+    try:
+        origin = parse_datestring_to_tz_aware_datetime(reference.strip())
+        store = FsspecStore.from_url(base_url, read_only=True, storage_options={"timeout": 15})
+        coordinate = zarr.open_array(store, path=path, mode="r", zarr_format=3)
+        missing = (attrs.get("_FillValue"), attrs.get("missing_value"))
+        offsets = [value for value in coordinate[:].tolist() if isfinite(value) and value not in missing]
+        if offsets:
+            return [datetime_to_str((origin + timedelta(**{unit: offset})).astimezone(timezone.utc)) for offset in (min(offsets), max(offsets))]
+    except Exception as exc:
+        LOGGER.warning(f"Failed to read GeoZarr time coordinate {path} from {base_url}: {exc}")
+    return None
+
+
 def extract_geozarr_metadata(
     zarr_url: str,
     configured_bands: list[str] | None = None,
@@ -546,11 +572,13 @@ def extract_geozarr_metadata(
 
     root_attrs: dict = {}
     metadata: dict = {}
+    zarr_format = None
 
     try:
         res = requests.get(f"{base_url}/zarr.json", timeout=15)
         if res.status_code == 200:
             z3_json = res.json()
+            zarr_format = z3_json.get("zarr_format")
             root_attrs = z3_json.get("attributes", {})
             metadata = z3_json.get("consolidated_metadata", {}).get("metadata", {}) or z3_json.get("metadata", {})
     except Exception as exc:
@@ -562,6 +590,7 @@ def extract_geozarr_metadata(
 
     discovered_vars: dict[str, dict] = {}
     dim_attrs: dict[str, dict] = {}
+    dim_paths: dict[str, str] = {}
 
     for key, val in metadata.items():
         if not isinstance(val, dict) or val.get("node_type") != "array":
@@ -582,6 +611,8 @@ def extract_geozarr_metadata(
         if not isinstance(shape, list) or len(shape) <= 1:
             if attrs and var_name not in dim_attrs:
                 dim_attrs[var_name] = attrs
+            if shape and dimensions == [var_name]:
+                dim_paths.setdefault(var_name, base_path)
             continue
         if not isinstance(dimensions, list) or len(dimensions) <= 1:
             continue
@@ -651,6 +682,8 @@ def extract_geozarr_metadata(
             dim_obj = {"type": "temporal"}
             if d_attrs.get("units"):
                 dim_obj["unit"] = d_attrs["units"]
+            if zarr_format == 3 and (path := dim_paths.get(d)) and (extent := _read_geozarr_time_extent(base_url, path, d_attrs)):
+                dim_obj["extent"] = extent
             cube_dimensions[d] = dim_obj
         else:
             dim_obj = {"type": "vertical" if d.lower() in ("depth", "height", "level", "elevation", "pressure") else "other"}

@@ -12,6 +12,8 @@ pystac[validation]==1.13.0
 stac_geoparquet==0.7.0
 pyproj<4
 pytz
+zarr>=3.1,<4
+fsspec[http]
 # dev tooling
 pytest==8.1.1
 pytest-watch==4.2.0
