@@ -1393,6 +1393,7 @@ def _populate_raw_source_collection(
     if len(endpoint_config.get("TimeEntries", [])) > 0:
         items = []
         style_link = None
+        geozarr_datetimes: list[datetime] = []
         for time_entry in endpoint_config["TimeEntries"]:
             assets, style_link = add_raw_assets(time_entry, endpoint_config, catalog_config, "data")
             bbox = endpoint_config.get("Bbox", [-180, -85, 180, 85])
@@ -1419,9 +1420,13 @@ def _populate_raw_source_collection(
             )
             cube_dims = {}
             cube_vars = {}
+            asset_datetimes: list[datetime] = []
             for asset in assets.values():
                 if asset_dims := asset.extra_fields.get("cube:dimensions"):
                     cube_dims.update(asset_dims)
+                    for dim in asset_dims.values():
+                        if dim["type"] == "temporal" and (extent := dim.get("extent")):
+                            asset_datetimes.extend(parse_datestring_to_tz_aware_datetime(bound) for bound in extent)
                 if asset_vars := asset.extra_fields.get("cube:variables"):
                     cube_vars.update(asset_vars)
             if cube_dims or cube_vars:
@@ -1439,6 +1444,8 @@ def _populate_raw_source_collection(
             if style_link:
                 item.add_link(style_link)
             items.append(item)
+            if endpoint_config["Name"] == "GeoZarr source":
+                geozarr_datetimes.extend(asset_datetimes or [dt])
 
         save_items(
             collection,
@@ -1448,6 +1455,8 @@ def _populate_raw_source_collection(
             coll_path_rel_to_root_catalog,
             options.gp,
         )
+        if geozarr_datetimes:
+            collection.extent.temporal = TemporalExtent([[min(geozarr_datetimes), max(geozarr_datetimes)]])
         # adding last referenced style to collection
         if style_link:
             collection.add_link(style_link)
